@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%230a0a0a%22/><text x=%2216%22 y=%2222%22 font-family=%22Helvetica%22 font-size=%2213%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>FK</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FKB2B — Portail professionnel Footkorner</title>
+<style>
+  :root {
+    --noir: #0a0a0a; --noir2: #141414; --noir3: #1d1d1d; --bord: #2a2a2a;
+    --blanc: #f5f5f5; --gris: #9a9a9a;
+    --papier: #ffffff; --tuile: #f2f2f0; --encre: #111; --encre2: #777; --hairline: #e6e6e4;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--noir); color: var(--blanc); font-family: "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  button { font-family: inherit; }
+  a { color: inherit; text-decoration: none; }
+
+  /* ---------- header noir, logo centré ---------- */
+  header { position: sticky; top: 0; z-index: 50; display: grid; grid-template-columns: 1fr auto 1fr;
+    align-items: center; padding: 15px 22px; background: rgba(10,10,10,.94); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--bord); }
+  .h-gauche { display: flex; gap: 16px; align-items: center; }
+  .h-gauche a { font-size: 11.5px; letter-spacing: .16em; color: var(--gris); transition: color 150ms ease; }
+  .h-gauche a:hover, .h-gauche a.actif { color: var(--blanc); }
+  .logo { font-size: 19px; font-weight: 700; letter-spacing: .42em; cursor: pointer; text-align: center; padding-left: .42em; }
+  .h-droite { display: flex; align-items: center; gap: 12px; justify-content: flex-end; }
+  select { background: var(--noir3); color: var(--blanc); border: 1px solid var(--bord); border-radius: 8px;
+    padding: 8px 10px; font-size: 12.5px; max-width: 30vw; }
+  .btn-panier { background: var(--blanc); color: var(--noir); border: 0; border-radius: 999px;
+    padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: transform 160ms var(--ease-out); white-space: nowrap; }
+  .btn-panier:active { transform: scale(0.97); }
+  .btn-panier .badge { background: var(--noir); color: var(--blanc); border-radius: 999px; padding: 1px 7px; font-size: 11px; margin-left: 6px; }
+
+  main section.vue { display: none; }
+  main section.vue.active { display: block; }
+
+  /* ---------- ACCUEIL ---------- */
+  .hero { position: relative; min-height: 78svh; display: flex; flex-direction: column; justify-content: center;
+    padding: 60px 22px; overflow: hidden;
+    background: radial-gradient(75% 90% at 72% 10%, #191919 0%, transparent 70%); }
+  /* Fond optionnel : web/hero.mp4 (vidéo) ou web/hero.jpg (image) — appliqué automatiquement si présent. */
+  .hero.avec-image { background: linear-gradient(rgba(5,5,5,.5), rgba(5,5,5,.78)), var(--hero-img) center/cover no-repeat; }
+  .hero.avec-image .fk-fond, .hero.avec-video .fk-fond { display: none; }
+  .hero-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+  .hero-voile { position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(rgba(5,5,5,.35), rgba(5,5,5,.72)); }
+  .hero > .sur, .hero > h1, .hero > .actions, .hero > .chiffres { position: relative; z-index: 2; }
+  .hero .fk-fond { position: absolute; right: -4vw; top: -8vh; font-size: 42vh; font-weight: 800; color: #101010;
+    letter-spacing: -.05em; user-select: none; pointer-events: none; }
+  .hero .sur { color: var(--gris); font-size: 12px; letter-spacing: .34em; text-transform: uppercase; }
+  .hero h1 { font-size: clamp(38px, 8vw, 84px); font-weight: 300; letter-spacing: .08em; line-height: 1.05; margin-top: 16px; }
+  .hero h1 b { font-weight: 800; }
+  .hero .actions { display: flex; gap: 12px; margin-top: 40px; flex-wrap: wrap; }
+  .btn-contour { border: 1px solid #4a4a4a; background: transparent; color: var(--blanc); padding: 13px 30px;
+    font-size: 12px; letter-spacing: .18em; cursor: pointer; transition: background-color 180ms ease, color 180ms ease, transform 160ms var(--ease-out); }
+  .btn-contour:hover { background: var(--blanc); color: var(--noir); }
+  .btn-contour:active { transform: scale(0.97); }
+  .hero .chiffres { display: flex; gap: 38px; margin-top: 54px; flex-wrap: wrap; }
+  .hero .chiffre b { display: block; font-size: 22px; font-weight: 700; }
+  .hero .chiffre span { font-size: 10.5px; color: var(--gris); letter-spacing: .14em; text-transform: uppercase; }
+
+  .titre-section { display: flex; align-items: baseline; gap: 14px; padding: 54px 22px 22px; }
+  .titre-section h2 { font-size: 13px; letter-spacing: .26em; font-weight: 600; }
+  .titre-section span { font-size: 11.5px; color: var(--gris); letter-spacing: .06em; }
+  .titre-section .tout { margin-left: auto; font-size: 11px; letter-spacing: .14em; color: var(--gris);
+    cursor: pointer; border-bottom: 1px solid #333; padding-bottom: 2px; transition: color 150ms ease; }
+  .titre-section .tout:hover { color: var(--blanc); }
+
+  .tuiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1px;
+    background: var(--bord); border-block: 1px solid var(--bord); }
+  .tuile { position: relative; background: var(--tuile); aspect-ratio: 4/5; cursor: pointer; overflow: hidden; }
+  .tuile img { position: absolute; inset: 8%; width: 84%; height: 84%; object-fit: contain; mix-blend-mode: multiply;
+    transition: transform 500ms var(--ease-out); }
+  @media (hover: hover) and (pointer: fine) { .tuile:hover img { transform: scale(1.05); } }
+  .tuile .nom { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 16px;
+    background: linear-gradient(transparent, rgba(255,255,255,.92) 45%); color: var(--encre);
+    font-size: 12px; letter-spacing: .22em; font-weight: 700; }
+  .tuile .nom span { display: block; font-weight: 400; font-size: 10.5px; color: var(--encre2); letter-spacing: .08em; margin-top: 3px; }
+  /* Tuiles marques : logo (web/logos/<MARQUE>.png|svg) ou repli typographique. */
+  .tuile-logo { position: relative; background: var(--tuile); aspect-ratio: 16/10; cursor: pointer;
+    display: grid; place-items: center; overflow: hidden; }
+  .tuile-logo img { max-width: 46%; max-height: 38%; object-fit: contain; mix-blend-mode: multiply;
+    transition: transform 400ms var(--ease-out); }
+  .tuile-logo .wordmark { font-size: clamp(17px, 2.2vw, 24px); font-weight: 800; letter-spacing: .26em;
+    color: var(--encre); padding-left: .26em; transition: transform 400ms var(--ease-out); }
+  @media (hover: hover) and (pointer: fine) {
+    .tuile-logo:hover img, .tuile-logo:hover .wordmark { transform: scale(1.06); }
+  }
+  .tuile-logo .sous-marque { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center;
+    font-size: 10px; color: var(--encre2); letter-spacing: .12em; text-transform: uppercase; }
+
+  .rail { display: flex; gap: 1px; overflow-x: auto; scroll-snap-type: x mandatory; background: var(--hairline);
+    border-block: 1px solid var(--bord); scrollbar-width: none; align-items: stretch; }
+  .rail .carte { display: flex; flex-direction: column; }
+  .rail .carte .infos { flex: 1; }
+  .rail::-webkit-scrollbar { display: none; }
+  .rail .carte { flex: 0 0 min(240px, 62vw); scroll-snap-align: start; }
+
+  .bandeau-noir { padding: 76px 22px; text-align: center; }
+  .bandeau-noir .sur { color: var(--gris); font-size: 11px; letter-spacing: .3em; text-transform: uppercase; }
+  .bandeau-noir h2 { font-size: clamp(22px, 4.5vw, 40px); font-weight: 300; letter-spacing: .12em; margin-top: 14px; }
+  .bandeau-noir h2 b { font-weight: 700; }
+  .bandeau-noir p { color: var(--gris); font-size: 13px; max-width: 520px; margin: 16px auto 0; line-height: 1.7; }
+
+  footer { border-top: 1px solid var(--bord); padding: 34px 22px 44px; display: flex; gap: 20px; flex-wrap: wrap;
+    align-items: center; color: var(--gris); font-size: 11px; letter-spacing: .1em; }
+  footer .logo { font-size: 13px; padding: 0; }
+
+  /* ---------- COLLECTION (surface claire) ---------- */
+  .page-claire { background: var(--papier); color: var(--encre); min-height: 100svh; }
+  .col-tete { padding: 52px 22px 26px; }
+  .col-tete .fil { font-size: 10.5px; letter-spacing: .18em; color: var(--encre2); text-transform: uppercase; cursor: pointer; }
+  .col-tete h1 { font-size: clamp(26px, 5vw, 44px); font-weight: 300; letter-spacing: .14em; margin-top: 10px; }
+  .col-tete h1 b { font-weight: 800; }
+  .col-tete .compte-produits { font-size: 12px; color: var(--encre2); margin-top: 8px; letter-spacing: .05em; }
+  .col-filtres { display: flex; gap: 8px; padding: 0 22px 20px; flex-wrap: wrap; }
+  .puce-claire { border: 1px solid #d8d8d5; background: transparent; color: var(--encre2); border-radius: 999px;
+    padding: 7px 15px; font-size: 12px; cursor: pointer; letter-spacing: .06em;
+    transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, transform 160ms var(--ease-out); }
+  .puce-claire:active { transform: scale(0.97); }
+  .puce-claire.actif { background: var(--encre); color: #fff; border-color: var(--encre); font-weight: 600; }
+
+  .grille-col { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1px;
+    background: var(--hairline); border-top: 1px solid var(--hairline); }
+  .carte { position: relative; background: var(--tuile); cursor: pointer; }
+  .carte .visuel { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .carte img { width: 88%; height: 88%; object-fit: contain; mix-blend-mode: multiply; transition: transform 450ms var(--ease-out); }
+  @media (hover: hover) and (pointer: fine) { .carte:hover img { transform: scale(1.05); } }
+  .carte:active img { transform: scale(0.98); }
+  .carte .infos { padding: 0 16px 16px; background: var(--tuile); }
+  .carte .nom { font-size: 12.5px; color: var(--encre); line-height: 1.4; }
+  .carte .sousnom { font-size: 10.5px; color: var(--encre2); letter-spacing: .1em; margin-top: 2px; text-transform: uppercase; }
+  .carte .prix { font-size: 12px; color: var(--encre2); margin-top: 5px; }
+  .carte .dispo-mini { position: absolute; top: 12px; left: 12px; display: flex; gap: 4px; }
+  .carte .dispo-mini i { width: 7px; height: 7px; border-radius: 999px; display: block; }
+
+  /* ---------- FICHE PRODUIT pleine page (surface claire) ---------- */
+  .prod { display: grid; grid-template-columns: 1fr; }
+  @media (min-width: 900px) { .prod { grid-template-columns: 1.15fr 1fr; } }
+  .prod-visuel { background: var(--tuile); display: flex; align-items: center; justify-content: center;
+    min-height: 52svh; position: sticky; top: 57px; align-self: start; }
+  @media (max-width: 899px) { .prod-visuel { position: static; min-height: 44svh; } }
+  .prod-visuel img { width: min(72%, 560px); aspect-ratio: 1; object-fit: contain; mix-blend-mode: multiply; }
+  .prod-infos { padding: 40px 30px 120px; max-width: 560px; }
+  .prod-infos .fil { font-size: 10.5px; letter-spacing: .18em; color: var(--encre2); text-transform: uppercase; cursor: pointer; }
+  .prod-infos .marque { font-size: 11px; letter-spacing: .3em; color: var(--encre2); margin-top: 22px; text-transform: uppercase; }
+  .prod-infos h1 { font-size: clamp(22px, 3.4vw, 32px); font-weight: 600; letter-spacing: .02em; line-height: 1.2; margin-top: 8px; }
+  .prod-infos .refline { font-size: 12px; color: var(--encre2); margin-top: 10px; letter-spacing: .06em; }
+  .prod-infos .prixgros { font-size: 19px; font-weight: 600; margin-top: 18px; }
+  .prod-infos .prixgros span { font-size: 11.5px; color: var(--encre2); font-weight: 400; margin-left: 8px; }
+
+  .repartition { display: flex; align-items: center; gap: 10px; margin-top: 30px; flex-wrap: wrap; }
+  .repartition label { font-size: 10.5px; color: var(--encre2); letter-spacing: .12em; text-transform: uppercase; }
+  .qte-claire { width: 74px; background: #fff; border: 1px solid #d8d8d5; color: var(--encre); border-radius: 8px;
+    padding: 9px 10px; font-size: 14px; text-align: center; transition: border-color 150ms ease; }
+  .qte-claire:focus { outline: none; border-color: var(--encre); }
+  .qte-claire.trop { border-color: #c0504d; color: #a33; }
+
+  .t-prod { width: 100%; border-collapse: collapse; margin-top: 18px; }
+  .t-prod th { text-align: left; font-size: 10px; color: var(--encre2); letter-spacing: .16em; text-transform: uppercase;
+    padding: 10px 2px 8px; border-bottom: 1px solid var(--encre); font-weight: 600; }
+  .t-prod td { padding: 10px 2px; border-bottom: 1px solid var(--hairline); font-size: 13.5px; }
+  .t-prod td.num, .t-prod th.num { text-align: right; }
+  .pastille { display: inline-block; width: 10px; height: 10px; border-radius: 999px; vertical-align: middle; }
+  .pastille.vert { background: #2e9e4f; }
+  .pastille.orange { background: #d9a441; }
+  .pastille.rouge { background: #c0504d; }
+  tr.epuise td { opacity: .45; }
+  tr.epuise .rupture { font-size: 10px; color: var(--encre2); letter-spacing: .1em; text-transform: uppercase; }
+
+  /* gestion des utilisateurs (admin) */
+  .bloc-clair { background: #fafaf8; border: 1px solid var(--hairline); border-radius: 14px; padding: 20px; }
+  .titre-bloc { font-size: 11px; letter-spacing: .2em; color: var(--encre2); font-weight: 600;
+    text-transform: uppercase; margin-bottom: 14px; }
+  .formu { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--encre); color: #fff;
+    border-radius: 999px; padding: 5px 8px 5px 12px; font-size: 11.5px; letter-spacing: .04em; }
+  .chip small { opacity: .65; }
+  .chip button { background: none; border: 0; color: #fff; cursor: pointer; font-size: 13px; opacity: .7; }
+  .chip.grise { background: #e8e8e5; color: var(--encre); }
+  .chip.grise button { color: var(--encre); }
+  .rang-util { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--hairline); flex-wrap: wrap; }
+  .rang-util:last-child { border-bottom: 0; }
+  .rang-util .qui { min-width: 240px; }
+  .rang-util .qui b { font-size: 13.5px; }
+  .rang-util .qui span { display: block; font-size: 11px; color: var(--encre2); margin-top: 3px; letter-spacing: .08em; text-transform: uppercase; }
+  .rang-util .acces { flex: 1; min-width: 260px; }
+
+  /* merchandising : cartes déplaçables */
+  #grille-merch .carte { cursor: grab; user-select: none; -webkit-user-drag: element; }
+  #grille-merch .carte.saisie { opacity: .35; outline: 2px dashed #999; outline-offset: -2px; }
+  #grille-merch .carte .rang-merch { position: absolute; top: 10px; right: 12px; z-index: 2;
+    background: var(--encre); color: #fff; font-size: 11px; font-weight: 700;
+    border-radius: 999px; padding: 3px 9px; }
+
+  /* légende des pastilles + description produit (modèle Blvck) */
+  .legende { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 16px; padding: 12px 14px;
+    background: #fafaf8; border: 1px solid var(--hairline); border-radius: 10px; }
+  .legende span { font-size: 11.5px; color: var(--encre2); display: flex; align-items: center; gap: 7px; }
+  .legende b { color: var(--encre); font-weight: 600; }
+  .prod-galerie { display: flex; gap: 8px; justify-content: center; padding: 14px 0 4px; flex-wrap: wrap; }
+  .prod-galerie img { width: 54px; height: 54px; object-fit: contain; background: #fff; border: 1px solid var(--hairline);
+    border-radius: 8px; cursor: pointer; padding: 4px; transition: border-color 150ms ease; }
+  .prod-galerie img.actif { border-color: var(--encre); }
+  .prod-description { margin-top: 34px; padding-top: 22px; border-top: 1px solid var(--hairline);
+    font-size: 13.5px; line-height: 1.75; color: #333; }
+  .prod-description h3 { font-size: 11px; letter-spacing: .22em; color: var(--encre2); font-weight: 600;
+    text-transform: uppercase; margin-bottom: 12px; }
+  .prod-description :is(p, ul) { margin-bottom: 10px; }
+  .prod-description ul { padding-left: 18px; }
+  .prod-barre { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; display: none; align-items: center; gap: 14px;
+    padding: 14px 22px; background: rgba(255,255,255,.94); backdrop-filter: blur(10px); border-top: 1px solid var(--hairline);
+    color: var(--encre); }
+  .prod-barre.visible { display: flex; }
+  .prod-barre .total b { font-size: 16px; }
+  .btn-noir { margin-left: auto; background: var(--encre); color: #fff; border: 0; border-radius: 999px;
+    padding: 12px 26px; font-weight: 700; font-size: 12.5px; letter-spacing: .08em; cursor: pointer;
+    transition: transform 160ms var(--ease-out), opacity 150ms ease; }
+  .btn-noir:active { transform: scale(0.97); }
+
+  /* ---------- panier (inchangé, sombre) ---------- */
+  .voile { position: fixed; inset: 0; background: rgba(0,0,0,.72); z-index: 90; opacity: 0; pointer-events: none; transition: opacity 200ms ease; }
+  .voile.ouvert { opacity: 1; pointer-events: auto; }
+  .panier { position: fixed; z-index: 100; top: 0; right: 0; bottom: 0; width: min(430px, 100vw);
+    background: var(--noir2); border-left: 1px solid var(--bord); transform: translateX(105%);
+    transition: transform 420ms var(--ease-drawer); display: flex; flex-direction: column; }
+  .panier.ouvert { transform: none; }
+  .panier-tete { display: flex; align-items: center; padding: 20px 22px; border-bottom: 1px solid var(--bord); }
+  .panier-tete h2 { font-size: 15px; letter-spacing: .2em; font-weight: 600; }
+  .fermer { margin-left: auto; background: var(--noir3); border: 1px solid var(--bord);
+    color: var(--blanc); border-radius: 999px; width: 34px; height: 34px; cursor: pointer; font-size: 15px;
+    transition: transform 160ms var(--ease-out); }
+  .fermer:active { transform: scale(0.92); }
+  .panier-corps { flex: 1; overflow: auto; padding: 8px 22px; }
+  .ligne { display: flex; gap: 12px; padding: 13px 0; border-bottom: 1px solid #1e1e1e; align-items: center; }
+  .ligne .visuel { width: 46px; height: 46px; border-radius: 8px; background: #fff; flex: none; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; }
+  .ligne img { width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+  .ligne .det { flex: 1; min-width: 0; }
+  .ligne .det .n { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ligne .det .d { font-size: 11px; color: var(--gris); margin-top: 3px; }
+  .ligne .m { font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .ligne .sup { background: none; border: 0; color: var(--gris); cursor: pointer; font-size: 15px; }
+  .panier-pied { padding: 18px 22px 24px; border-top: 1px solid var(--bord); }
+  .totaux { display: flex; justify-content: space-between; font-size: 13px; color: var(--gris); margin-bottom: 6px; }
+  .totaux.grand { color: var(--blanc); font-size: 16px; font-weight: 700; margin: 10px 0 16px; }
+  .btn-plein { background: var(--blanc); color: var(--noir); border: 0; border-radius: 999px;
+    padding: 12px 24px; font-weight: 700; font-size: 13px; letter-spacing: .05em; cursor: pointer;
+    transition: transform 160ms var(--ease-out), opacity 150ms ease; }
+  .btn-plein:active { transform: scale(0.97); }
+  .btn-plein:disabled { opacity: .35; cursor: default; }
+  .puce { border: 1px solid var(--bord); background: transparent; color: var(--gris); border-radius: 999px;
+    padding: 7px 15px; font-size: 12px; cursor: pointer; letter-spacing: .06em;
+    transition: color 150ms ease, transform 160ms var(--ease-out); }
+  .puce:active { transform: scale(0.97); }
+  .note { font-size: 11px; color: var(--gris); line-height: 1.5; margin-top: 12px; }
+  .vide { color: var(--gris); text-align: center; padding: 60px 0; font-size: 13px; letter-spacing: .05em; }
+
+  /* ---------- compte (sombre) ---------- */
+  .compte-int { padding: 30px 22px 70px; max-width: 860px; margin: 0 auto; }
+  .compte-int h2 { font-size: 13px; letter-spacing: .22em; color: var(--gris); font-weight: 500; margin: 30px 0 14px; text-transform: uppercase; }
+  .bloc { background: var(--noir2); border: 1px solid var(--bord); border-radius: 14px; overflow: hidden; }
+  .bloc .rang { display: flex; align-items: center; gap: 14px; padding: 15px 18px; border-bottom: 1px solid #1e1e1e; font-size: 13px; flex-wrap: wrap; }
+  .bloc .rang:last-child { border-bottom: 0; }
+  .bloc .rang .fin { margin-left: auto; color: var(--gris); font-size: 12px; }
+  .etiquette { font-size: 10px; letter-spacing: .1em; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--bord); color: var(--gris); }
+  .etiquette.ok { color: #3fae5a; border-color: #24512f; }
+  .etiquette.attente { color: #d9a441; border-color: #57431e; }
+  .mention-demo { font-size: 11px; color: var(--gris); margin-top: 8px; }
+
+  .recherche-globale { display: flex; align-items: center; gap: 10px; margin: 0 22px 18px;
+    background: #fff; border: 1px solid #d8d8d5; border-radius: 999px; padding: 2px 8px 2px 18px; }
+  .recherche-globale input { flex: 1; background: none; border: 0; color: var(--encre); font-size: 13.5px; padding: 10px 0; }
+  .recherche-globale input:focus { outline: none; }
+
+  @media (max-width: 640px) {
+    header { grid-template-columns: auto 1fr; grid-template-areas: "logo droite" "nav nav"; row-gap: 10px; }
+    .logo { grid-area: logo; text-align: left; padding-left: 0; }
+    .h-droite { grid-area: droite; }
+    .h-gauche { grid-area: nav; }
+    select { max-width: 34vw; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .panier, .tuile img, .carte img { transition-duration: 0ms; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="h-gauche">
+    <a href="#/" data-lien="accueil">ACCUEIL</a>
+    <a href="#/collection/TOUT">CATALOGUE</a>
+    <a href="#/compte">MON COMPTE</a>
+    <a href="#/merch" id="lien-merch" style="display:none; color:#d9a441">MERCH</a>
+    <a href="#/utilisateurs" id="lien-utilisateurs" style="display:none; color:#d9a441">UTILISATEURS</a>
+  </div>
+  <div class="logo" onclick="location.hash='#/'">FKB2B</div>
+  <div class="h-droite">
+    <span id="societe-nom" style="font-size:11.5px; color:var(--gris); letter-spacing:.08em; text-align:right"></span>
+    <button class="puce" id="btn-deconnexion" title="Se déconnecter">Quitter</button>
+    <button class="btn-panier" id="btn-panier">Panier<span class="badge" id="badge">0</span></button>
+  </div>
+</header>
+
+<main>
+  <!-- ACCUEIL -->
+  <section class="vue" id="vue-accueil">
+    <div class="hero">
+      <div class="fk-fond">FK</div>
+      <div class="sur">Espace professionnel Footkorner</div>
+      <h1>LA COLLECTION,<br><b>EN DIRECT.</b></h1>
+      <div class="actions">
+        <button class="btn-contour" onclick="location.hash='#/collection/TOUT'">DÉCOUVRIR LE CATALOGUE</button>
+        <button class="btn-contour" onclick="location.hash='#/compte'">MON ESPACE</button>
+      </div>
+      <div class="chiffres" id="chiffres"></div>
+    </div>
+
+    <div class="titre-section"><h2>MARQUES</h2><span>vos catalogues autorisés</span></div>
+    <div class="tuiles" id="tuiles-marques"></div>
+
+    <div class="titre-section"><h2>NOUVEAUTÉS</h2><span>meilleures disponibilités</span>
+      <span class="tout" onclick="location.hash='#/collection/TOUT'">TOUT VOIR</span></div>
+    <div class="rail" id="rail-nouveautes"></div>
+
+    <div class="bandeau-noir">
+      <div class="sur">Commande professionnelle</div>
+      <h2>DU CATALOGUE À FASTMAG,<br><b>SANS RESSAISIE.</b></h2>
+      <p>Tarifs par famille, grilles de tailles, disponibilité en temps réel et transmission directe de vos commandes — l'esthétique d'un site premium, l'efficacité d'un outil métier.</p>
+    </div>
+
+    <div class="titre-section"><h2>RAYONS</h2><span>par univers</span></div>
+    <div class="tuiles" id="tuiles-rayons"></div>
+
+    <footer>
+      <div class="logo">FKB2B</div>
+      <span>Portail privé — accès réservé aux clients autorisés · Maquette de démonstration</span>
+    </footer>
+  </section>
+
+  <!-- COLLECTION -->
+  <section class="vue page-claire" id="vue-collection">
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='#/'">← ACCUEIL</span>
+      <h1 id="col-titre"></h1>
+      <div class="compte-produits" id="col-compte"></div>
+    </div>
+    <div class="recherche-globale">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="2">
+        <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="recherche" type="search" placeholder="Rechercher un produit, une référence…" autocomplete="off">
+    </div>
+    <div class="col-filtres" id="col-filtres"></div>
+    <div class="grille-col" id="grille-col"></div>
+  </section>
+
+  <!-- PRODUIT -->
+  <section class="vue page-claire" id="vue-produit"></section>
+
+  <!-- MERCHANDISING (admin) -->
+  <section class="vue page-claire" id="vue-merch">
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='#/'">← ACCUEIL</span>
+      <h1>MERCHANDISING</h1>
+      <div class="compte-produits">Choisissez un périmètre, partez d'un tri automatique si besoin, puis glissez-déposez et enregistrez. Chaque périmètre garde son propre ordre.</div>
+      <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; align-items:center">
+        <select id="merch-contexte" style="background:#fff; color:var(--encre); border:1px solid #d8d8d5; border-radius:8px; padding:9px 12px; font-size:13px"></select>
+        <button class="puce-claire" id="btn-tri-stock">Tri : stock disponible ↓</button>
+        <button class="puce-claire" id="btn-tri-recent">Tri : du plus récent au plus ancien</button>
+        <button class="btn-noir" id="btn-merch-sauver">ENREGISTRER L'ORDRE</button>
+        <button class="puce-claire" id="btn-merch-reinit">Effacer l'ordre de ce périmètre</button>
+        <span class="compte-produits" id="merch-etat" style="margin:0"></span>
+      </div>
+    </div>
+    <div class="grille-col" id="grille-merch"></div>
+  </section>
+
+  <!-- UTILISATEURS (admin) -->
+  <section class="vue page-claire" id="vue-utilisateurs">
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='#/'">← ACCUEIL</span>
+      <h1>UTILISATEURS</h1>
+      <div class="compte-produits">Créez les comptes clients et attribuez leurs magasins. Un utilisateur multi-magasins choisit son magasin actif en haut du site et commande aux tarifs de celui-ci.</div>
+    </div>
+
+    <div class="bloc-clair" style="margin: 0 22px 26px">
+      <h3 class="titre-bloc">Nouvel utilisateur</h3>
+      <div class="formu">
+        <input class="qte-claire" style="width:240px; text-align:left" id="nu-email" type="email" placeholder="e-mail">
+        <input class="qte-claire" style="width:180px; text-align:left" id="nu-nom" placeholder="nom (optionnel)">
+        <select class="qte-claire" style="width:150px" id="nu-role">
+          <option value="responsable">Responsable</option>
+          <option value="acheteur">Acheteur</option>
+        </select>
+        <input class="qte-claire" style="width:240px; text-align:left" id="nu-societe" list="liste-societes"
+               placeholder="ajouter un magasin (compte)…">
+        <datalist id="liste-societes"></datalist>
+        <button class="puce-claire" id="nu-ajouter-societe">+ magasin</button>
+        <button class="btn-noir" id="nu-creer">CRÉER LE COMPTE</button>
+      </div>
+      <div id="nu-chips" class="chips"></div>
+      <div class="compte-produits" id="nu-etat" style="margin-top:10px"></div>
+    </div>
+
+    <div class="bloc-clair" style="margin: 0 22px 60px">
+      <h3 class="titre-bloc">Comptes existants</h3>
+      <div id="liste-utilisateurs"></div>
+    </div>
+  </section>
+
+  <!-- COMPTE -->
+  <section class="vue" id="vue-compte">
+    <div class="compte-int">
+      <h2>Paniers enregistrés</h2>
+      <div class="bloc" id="bloc-paniers"></div>
+      <h2>Dernières commandes</h2>
+      <div class="bloc" id="bloc-commandes"></div>
+      <h2>Informations société</h2>
+      <div class="bloc" id="bloc-societe"></div>
+    </div>
+  </section>
+</main>
+
+<div class="voile" id="voile"></div>
+
+<aside class="panier" id="panier">
+  <div class="panier-tete">
+    <h2>PANIER</h2>
+    <button class="fermer" id="fermer-panier" style="margin-left:auto">×</button>
+  </div>
+  <div class="panier-corps" id="panier-corps"></div>
+  <div class="panier-pied">
+    <div class="totaux"><span id="t-pieces">0 pièce</span><span id="t-refs">0 référence</span></div>
+    <div class="totaux grand"><span>TOTAL HT</span><span id="t-ht">0,00 €</span></div>
+    <button class="btn-plein" id="btn-export" style="width:100%" disabled>VALIDER LA COMMANDE</button>
+    <button class="puce" id="btn-sauver" style="width:100%; margin-top:10px">Enregistrer le panier pour plus tard</button>
+    <p class="note">À la validation, la commande est transmise avec le fichier Fastmag en pièce jointe — le client ne manipule jamais le fichier. (Dans ce POC, le fichier est téléchargé pour permettre le test de réimport.)</p>
+  </div>
+</aside>
+
+<div class="prod-barre" id="prod-barre">
+  <div class="total" id="total-fiche"></div>
+  <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
+</div>
+
+<script src="config.js"></script>
+<script>
+let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
+let MES_SOCIETES = [], estAdmin = false;
+const panier = new Map();    // clé "ref|taille" -> {produit, taille, qte, prix}
+const selection = new Map(); // saisie en cours sur la fiche ouverte : taille -> qte (rien n'entre au panier avant « Ajouter »)
+
+const eur = n => n.toLocaleString("fr-FR", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €";
+
+// Ordre canonique des tailles : lettres (XS<S<M<L<XL<XXL…), puis pointures, puis âges, TU en fin.
+function cleTaille(taille) {
+  const t = (taille || "").trim().toUpperCase();
+  if (t === "TU" || t === "U" || t === "UNIQUE") return 900;
+  const lettres = { "S/M": 3.5, "M/L": 4.5, "L/XL": 5.5 };
+  if (t in lettres) return lettres[t];
+  let m = /^(\d*)(X*)S$/.exec(t);              // XS, XXS, 2XS…
+  if (m) return 3 - ((+m[1] || 0) + m[2].length);
+  if (t === "M") return 4;
+  m = /^(\d*)(X*)L$/.exec(t);                   // XL, XXL, 3XL…
+  if (m) return 5 + ((+m[1] || 0) + m[2].length);
+  m = /^(\d+(?:[.,]\d+)?)/.exec(t);             // pointures et âges : premier nombre
+  if (m) return (t.includes("AN") ? 500 : 100) + parseFloat(m[1].replace(",", "."));
+  return 800;                                    // inconnu : avant TU, après le reste
+}
+const trierTailles = p => p.tailles.sort((a, b) => cleTaille(a.taille) - cleTaille(b.taille));
+const famille = () => clientActif ? clientActif.famille_tarifaire : "";
+const prixDe = t => t.prix.CLIENT;   // les prix arrivent déjà filtrés par la famille de la société (RLS)
+const prixMini = p => Math.min(...p.tailles.filter(t => t.prix?.CLIENT != null).map(prixDe));
+
+async function init() {
+  if (!sessionCourante()) { location.href = "login.html"; return; }
+  document.getElementById("btn-deconnexion").onclick = deconnexion;
+
+  // Société de l'utilisateur connecté + catalogue à ses tarifs (le serveur filtre tout).
+  let profil;
+  try {
+    [MES_SOCIETES, profil] = await Promise.all([
+      api("/rest/v1/societes?select=id,compte,id_fastmag,nom,famille_tarifaire&order=compte"),
+      api("/rest/v1/profils?select=role&limit=1").then(r => r[0]).catch(() => null),
+    ]);
+  } catch (err) {
+    if (err.statut === 401) { deconnexion(); return; }
+    throw err;
+  }
+  estAdmin = profil?.role === "admin";
+  if (estAdmin) {
+    document.getElementById("lien-merch").style.display = "";
+    document.getElementById("lien-utilisateurs").style.display = "";
+    // l'admin n'est rattaché à aucune société : catalogue toutes familles (prix mini)
+    clientActif = { nom: "Administrateur", famille_tarifaire: "", id_fastmag: null, compte: "ADMIN" };
+    document.getElementById("societe-nom").textContent = "Administrateur — toutes sociétés";
+  } else {
+    const memo = localStorage.getItem("fkb2b-societe");
+    clientActif = MES_SOCIETES.find(s => s.id === memo) || MES_SOCIETES[0]
+      || { nom: sessionCourante().email, famille_tarifaire: "", id_fastmag: null };
+    rendreSelecteurSociete();
+  }
+  DATA = { produits: await api("/rest/v1/rpc/catalogue",
+    { corps: { limite: 300, p_societe: clientActif.id ?? null } }) };
+  DATA.produits.forEach(trierTailles);
+
+  document.getElementById("recherche").oninput = e => { texteRecherche = e.target.value.trim().toLowerCase(); rendreCollection(); };
+  document.getElementById("btn-panier").onclick = () => basculer("panier", true);
+  document.getElementById("fermer-panier").onclick = () => basculer("panier", false);
+  document.getElementById("voile").onclick = () => basculer("panier", false);
+  document.getElementById("btn-export").onclick = validerCommande;
+  document.getElementById("btn-sauver").onclick = sauverPanier;
+
+  restaurerPanier();
+  await chargerMerch();
+  rendreAccueil();
+  window.addEventListener("hashchange", router);
+  router();
+}
+
+// Assainit le HTML de description Shopify : ne conserve que la mise en forme simple.
+function nettoyerHTML(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("script, style, iframe, object, embed, link, meta").forEach(e => e.remove());
+  doc.querySelectorAll("*").forEach(e => {
+    [...e.attributes].forEach(a => {
+      if (a.name.startsWith("on") || (a.name === "href" && !/^https?:/.test(a.value))) e.removeAttribute(a.name);
+    });
+  });
+  return doc.body.innerHTML;
+}
+
+// Essaie logos/<M>.png puis logos/<M>.svg, puis retombe sur le wordmark typographique.
+function logoSuivant(img) {
+  if (img.dataset.essai === "png") {
+    img.dataset.essai = "svg";
+    img.src = `logos/${encodeURIComponent(img.dataset.marque)}.svg`;
+  } else {
+    img.replaceWith(Object.assign(document.createElement("span"),
+      {className: "wordmark", textContent: img.dataset.marque}));
+  }
+}
+
+/* ---------------- sélecteur de société (clients multi-magasins) ---------------- */
+function rendreSelecteurSociete() {
+  const zone = document.getElementById("societe-nom");
+  if (MES_SOCIETES.length <= 1) {
+    zone.textContent = `${clientActif.nom}${clientActif.famille_tarifaire ? " · tarif " + clientActif.famille_tarifaire : ""}`;
+    return;
+  }
+  zone.innerHTML = `<select id="sel-societe" title="Magasin actif">${MES_SOCIETES.map(s =>
+    `<option value="${s.id}" ${s.id === clientActif.id ? "selected" : ""}>${s.nom} — ${s.famille_tarifaire || "?"}</option>`).join("")}</select>`;
+  document.getElementById("sel-societe").onchange = e => changerSociete(e.target.value);
+}
+
+async function changerSociete(id) {
+  clientActif = MES_SOCIETES.find(s => s.id === id);
+  localStorage.setItem("fkb2b-societe", id);
+  // recharge le catalogue aux tarifs de la société choisie
+  DATA.produits = await api("/rest/v1/rpc/catalogue", { corps: { limite: 300, p_societe: id } });
+  DATA.produits.forEach(trierTailles);
+  // le panier suit : on raccroche les lignes aux nouveaux objets produits (prix recalculés)
+  for (const [cle, l] of [...panier]) {
+    const p = DATA.produits.find(x => x.reference === l.produit.reference);
+    const t = p && p.tailles.find(t => t.taille === l.taille);
+    if (t && t.stock > 0) panier.set(cle, { produit: p, taille: l.taille, qte: Math.min(l.qte, t.stock), prix: prixDe(t) });
+    else panier.delete(cle);
+  }
+  rendrePanier();
+  rendreAccueil();
+  router();
+}
+
+/* ---------------- routeur ---------------- */
+function router() {
+  const h = location.hash || "#/";
+  const [, route, ...args] = h.split("/");
+  document.querySelectorAll("main .vue").forEach(v => v.classList.remove("active"));
+  document.getElementById("prod-barre").classList.remove("visible");
+  if (route === "collection") {
+    collectionCourante = decodeURIComponent(args.join("/") || "TOUT");
+    document.getElementById("vue-collection").classList.add("active");
+    rendreCollection();
+  } else if (route === "produit") {
+    document.getElementById("vue-produit").classList.add("active");
+    rendreProduit(decodeURIComponent(args.join("/")));
+  } else if (route === "compte") {
+    document.getElementById("vue-compte").classList.add("active");
+    rendreCompte();
+  } else if (route === "merch") {
+    document.getElementById("vue-merch").classList.add("active");
+    rendreMerch();
+  } else if (route === "utilisateurs") {
+    document.getElementById("vue-utilisateurs").classList.add("active");
+    rendreUtilisateurs();
+  } else {
+    document.getElementById("vue-accueil").classList.add("active");
+  }
+  scrollTo(0, 0);
+}
+
+/* ---------------- accueil ---------------- */
+function rendreAccueil() {
+  const nbRefs = DATA.produits.length;
+  const nbTailles = DATA.produits.reduce((s, p) => s + p.tailles.filter(t => t.stock > 0).length, 0);
+  const marques = [...new Set(DATA.produits.map(p => p.marque).filter(Boolean))];
+  document.getElementById("chiffres").innerHTML = `
+    <div class="chiffre"><b>${nbRefs}</b><span>références en stock</span></div>
+    <div class="chiffre"><b>${nbTailles}</b><span>tailles disponibles</span></div>
+    <div class="chiffre"><b>${marques.length}</b><span>marques</span></div>`;
+
+  // Logo si web/logos/<MARQUE>.png ou .svg existe, sinon wordmark typographique.
+  document.getElementById("tuiles-marques").innerHTML = marques.map(m => {
+    const n = DATA.produits.filter(x => x.marque === m).length;
+    return `<div class="tuile-logo" onclick="location.hash='#/collection/${encodeURIComponent(m)}'">
+      <img loading="lazy" src="logos/${encodeURIComponent(m)}.png" alt="${m}" data-marque="${m}" data-essai="png"
+           onerror="logoSuivant(this)">
+      <div class="sous-marque">${n} référence${n > 1 ? "s" : ""}</div>
+    </div>`;
+  }).join("");
+
+  // Fond de hero : vidéo (hero.mp4) prioritaire, sinon image (hero.jpg), sinon dégradé.
+  const hero = document.querySelector(".hero");
+  fetch("hero.mp4", {method: "HEAD"}).then(r => {
+    if (!r.ok) throw 0;
+    const v = document.createElement("video");
+    v.className = "hero-video";
+    v.src = "hero.mp4";
+    v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
+    const voile = document.createElement("div");
+    voile.className = "hero-voile";
+    hero.prepend(v, voile);
+    hero.classList.add("avec-video");
+  }).catch(() => {
+    const heroImg = new Image();
+    heroImg.onload = () => {
+      hero.style.setProperty("--hero-img", "url('hero.jpg')");
+      hero.classList.add("avec-image");
+    };
+    heroImg.src = "hero.jpg";
+  });
+
+  const nouveautes = [...DATA.produits].sort((a, b) => b.stock_total - a.stock_total).slice(0, 10);
+  document.getElementById("rail-nouveautes").innerHTML = nouveautes.map(carteHTML).join("");
+
+  const rayons = [...new Set(DATA.produits.map(p => p.famille).filter(Boolean))].slice(0, 8);
+  document.getElementById("tuiles-rayons").innerHTML = rayons.map(r => {
+    const p = DATA.produits.find(x => x.famille === r);
+    const n = DATA.produits.filter(x => x.famille === r).length;
+    return `<div class="tuile" onclick="location.hash='#/collection/${encodeURIComponent(r)}'">
+      <img loading="lazy" src="${p.photo}" alt="">
+      <div class="nom">${r}<span>${n} référence${n > 1 ? "s" : ""}</span></div>
+    </div>`;
+  }).join("");
+}
+
+function carteHTML(p) {
+  const pastilles = p.tailles.slice(0, 5).map(t =>
+    `<i style="background:${t.stock === 0 ? "#c0504d" : t.stock > 20 ? "#2e9e4f" : "#d9a441"}"></i>`).join("");
+  return `<div class="carte" onclick="location.hash='#/produit/${encodeURIComponent(p.reference)}'">
+    <div class="dispo-mini">${pastilles}</div>
+    <div class="visuel"><img loading="lazy" src="${p.photo}" alt=""></div>
+    <div class="infos">
+      <div class="nom">${p.designation || p.reference}</div>
+      <div class="sousnom">${p.marque || ""} · ${p.reference}</div>
+      <div class="prix">dès ${eur(prixMini(p))} HT</div>
+    </div>
+  </div>`;
+}
+
+/* ---------------- collection ---------------- */
+function rendreCollection() {
+  const c = collectionCourante;
+  const estMarque = DATA.produits.some(p => p.marque === c);
+  // ordre merchandising du périmètre affiché (repli : ordre catalogue)
+  const contexte = c === "TOUT" ? "TOUT" : (estMarque ? "MARQUE:" + c : "FAMILLE:" + c);
+  const base = ordonner(c === "TOUT" ? DATA.produits
+    : DATA.produits.filter(p => estMarque ? p.marque === c : p.famille === c), contexte);
+  const produits = base.filter(p =>
+    !texteRecherche || [p.designation, p.reference, p.marque, p.famille]
+      .some(x => x && x.toLowerCase().includes(texteRecherche)));
+
+  document.getElementById("col-titre").innerHTML =
+    c === "TOUT" ? "TOUT LE <b>CATALOGUE</b>" : `<b>${c}</b>`;
+  document.getElementById("col-compte").textContent =
+    `${produits.length} référence${produits.length > 1 ? "s" : ""} en stock · tarif ${famille()}`;
+
+  const marques = ["TOUT", ...new Set(DATA.produits.map(p => p.marque).filter(Boolean))];
+  document.getElementById("col-filtres").innerHTML = marques.map(m =>
+    `<button class="puce-claire ${m === c ? "actif" : ""}"
+       onclick="location.hash='#/collection/${encodeURIComponent(m)}'">${m}</button>`).join("");
+
+  document.getElementById("grille-col").innerHTML = produits.map(carteHTML).join("") ||
+    `<div class="vide" style="grid-column:1/-1;color:#777">Aucun produit ne correspond${texteRecherche ? ` à « ${texteRecherche} »` : ""}</div>`;
+}
+
+/* ---------------- fiche produit ---------------- */
+function rendreProduit(ref) {
+  const p = DATA.produits.find(x => x.reference === ref);
+  if (!p) { location.hash = "#/collection/TOUT"; return; }
+  const vue = document.getElementById("vue-produit");
+  vue.dataset.ref = ref;
+  // La sélection démarre des lignes déjà au panier pour ce produit (l'« Ajouter » les remplacera).
+  selection.clear();
+  for (const [cle, l] of panier) if (cle.startsWith(ref + "|")) selection.set(l.taille, l.qte);
+  const galerie = Array.isArray(p.photos) && p.photos.length > 1 ? p.photos : null;
+  vue.innerHTML = `
+    <div class="prod">
+      <div>
+        <div class="prod-visuel"><img id="visuel-principal" src="${p.photo}" alt=""></div>
+        ${galerie ? `<div class="prod-galerie">${galerie.map((u, i) =>
+          `<img src="${u}" class="${i === 0 ? "actif" : ""}"
+            onclick="document.getElementById('visuel-principal').src=this.src;
+                     this.parentNode.querySelectorAll('img').forEach(x=>x.classList.toggle('actif',x===this))">`).join("")}</div>` : ""}
+      </div>
+      <div class="prod-infos">
+        <span class="fil" onclick="history.length > 1 ? history.back() : location.hash='#/collection/TOUT'">← RETOUR</span>
+        <div class="marque">${p.marque || ""}</div>
+        <h1>${p.designation || p.reference}</h1>
+        <div class="refline">${p.reference} · ${p.couleur || ""} ${p.coloris ? "· " + p.coloris : ""} · Saison ${p.saison || "—"}</div>
+        <div class="prixgros">dès ${eur(prixMini(p))} HT<span>tarif ${famille()}</span></div>
+
+        <div class="legende">
+          <span><i class="pastille vert"></i><b>Disponible</b> — plus de 20 pièces</span>
+          <span><i class="pastille orange"></i><b>Stock limité</b> — réassort non garanti, commandez vite</span>
+          <span><i class="pastille rouge"></i><b>Épuisé</b> — commande impossible</span>
+        </div>
+
+        <div class="repartition">
+          <label for="qte-globale">Quantité globale</label>
+          <input class="qte-claire" id="qte-globale" type="number" min="0" inputmode="numeric" placeholder="24">
+          <button class="puce-claire" onclick="repartir('${ref}')">Répartir selon la grille</button>
+        </div>
+
+        <table class="t-prod"><thead>
+          <tr><th>Taille · % grille</th><th class="num">Dispo</th><th class="num">Prix HT</th><th class="num">Quantité</th></tr>
+        </thead><tbody>
+          ${p.tailles.map(t => {
+            const deja = selection.get(t.taille);
+            const niveau = t.stock === 0 ? "rouge" : (t.stock > 20 ? "vert" : "orange");
+            if (t.stock === 0) return `<tr class="epuise">
+              <td><b>${t.taille}</b></td>
+              <td class="num"><span class="pastille rouge"></span></td>
+              <td class="num">${eur(prixDe(t))}</td>
+              <td class="num"><span class="rupture">Épuisé</span></td>
+            </tr>`;
+            return `<tr>
+              <td><b>${t.taille}</b> <span style="color:#999;font-size:11px">${pctGrille(p, t)}%</span></td>
+              <td class="num"><span class="pastille ${niveau}"></span></td>
+              <td class="num">${eur(prixDe(t))}</td>
+              <td class="num"><input class="qte-claire" data-taille="${t.taille}" type="number" min="0" max="${t.stock}" inputmode="numeric"
+                   value="${deja || ""}" placeholder="0"
+                   oninput="majLigne(this, '${ref}', '${t.taille}', ${t.stock})"></td>
+            </tr>`;
+          }).join("")}
+        </tbody></table>
+
+        ${p.description ? `<div class="prod-description"><h3>Description</h3>${nettoyerHTML(p.description)}</div>` : ""}
+      </div>
+    </div>`;
+  document.getElementById("prod-barre").classList.add("visible");
+  const btn = document.getElementById("btn-ajouter");
+  btn.onclick = () => ajouterAuPanier(ref);
+  btn.textContent = "AJOUTER AU PANIER";
+  majTotalFiche(ref);
+}
+
+// Valide la sélection dans le panier : remplace les lignes de ce produit par la saisie.
+function ajouterAuPanier(ref) {
+  const p = DATA.produits.find(x => x.reference === ref);
+  for (const t of p.tailles) {
+    const cle = ref + "|" + t.taille, qte = selection.get(t.taille) || 0;
+    if (qte > 0) panier.set(cle, {produit: p, taille: t.taille, qte, prix: prixDe(t)});
+    else panier.delete(cle);
+  }
+  rendrePanier();
+  const btn = document.getElementById("btn-ajouter");
+  btn.textContent = "AJOUTÉ AU PANIER ✓";
+  setTimeout(() => btn.textContent = "AJOUTER AU PANIER", 1600);
+}
+
+/* ---- grille de tailles : répartition par pourcentages (POC : dérivés du stock) ---- */
+function pctGrille(p, t) {
+  const total = p.tailles.reduce((s, x) => s + x.stock, 0);
+  return total ? Math.round(100 * t.stock / total) : 0;
+}
+
+function repartir(ref) {
+  const p = DATA.produits.find(x => x.reference === ref);
+  const globale = parseInt(document.getElementById("qte-globale").value || "0", 10);
+  if (!globale) return;
+  const dispo = p.tailles.filter(t => t.stock > 0);
+  const totalStock = dispo.reduce((s, t) => s + t.stock, 0);
+  let restant = globale;
+  const parts = dispo.map(t => {
+    const exact = globale * t.stock / totalStock;
+    const base = Math.min(Math.floor(exact), t.stock);
+    return {t, qte: base, reste: exact - Math.floor(exact)};
+  });
+  restant -= parts.reduce((s, x) => s + x.qte, 0);
+  for (const x of parts.sort((a, b) => b.reste - a.reste)) {
+    if (restant <= 0) break;
+    const ajout = Math.min(x.t.stock - x.qte, 1);
+    x.qte += ajout; restant -= ajout;
+  }
+  for (const x of parts) {
+    if (restant <= 0) break;
+    const ajout = Math.min(x.t.stock - x.qte, restant);
+    x.qte += ajout; restant -= ajout;
+  }
+  for (const x of parts) {
+    if (x.qte > 0) selection.set(x.t.taille, x.qte);
+    else selection.delete(x.t.taille);
+    const input = document.querySelector(`#vue-produit input[data-taille="${CSS.escape(x.t.taille)}"]`);
+    if (input) input.value = x.qte || "";
+  }
+  majTotalFiche(ref);
+}
+
+function majLigne(input, ref, taille, stock) {
+  let q = parseInt(input.value || "0", 10);
+  input.classList.toggle("trop", q > stock);
+  if (q > stock) q = stock;
+  if (q > 0) selection.set(taille, q);
+  else selection.delete(taille);
+  majTotalFiche(ref);
+}
+
+function majTotalFiche(ref) {
+  const p = DATA.produits.find(x => x.reference === ref);
+  let pieces = 0, ht = 0;
+  for (const [taille, qte] of selection) {
+    const t = p.tailles.find(x => x.taille === taille);
+    if (t) { pieces += qte; ht += qte * prixDe(t); }
+  }
+  document.getElementById("total-fiche").innerHTML =
+    `${pieces} pièce${pieces > 1 ? "s" : ""} — <b>${eur(ht)}</b>`;
+}
+
+/* ---------------- merchandising (admin) : ordre par périmètre, drag & drop ---------------- */
+let merchInitialise = false;
+let MERCH = {};   // contexte -> { reference: position }
+
+async function chargerMerch() {
+  try {
+    const rows = await api("/rest/v1/merch_positions?select=contexte,reference,position");
+    MERCH = {};
+    for (const r of rows) (MERCH[r.contexte] ??= {})[r.reference] = r.position;
+  } catch (e) { MERCH = {}; }
+}
+
+// Applique l'ordre merchandising d'un contexte (repli : ordre du catalogue = stock).
+function ordonner(produits, contexte) {
+  const pos = MERCH[contexte];
+  if (!pos) return produits;
+  return [...produits].sort((a, b) =>
+    (pos[a.reference] ?? 1e9) - (pos[b.reference] ?? 1e9));
+}
+
+// Récence approximative d'une saison Fastmag ('26 Q3', 'PE22', '24/25'…) : année puis trimestre.
+function cleRecence(saison) {
+  if (!saison) return 0;
+  const annees = [...saison.matchAll(/\d{2}/g)].map(m => +m[0]).filter(a => a > 15 && a < 40);
+  const annee = annees.length ? Math.max(...annees) : 0;
+  const q = /Q(\d)/.exec(saison);
+  return annee * 10 + (q ? +q[1] : 0);
+}
+
+function contexteMerch() { return document.getElementById("merch-contexte").value; }
+function produitsDuContexte(ctx) {
+  if (ctx === "TOUT") return DATA.produits;
+  const [type, val] = ctx.split(":");
+  return DATA.produits.filter(p => type === "MARQUE" ? p.marque === val : p.famille === val);
+}
+
+function rendreMerch() {
+  const sel = document.getElementById("merch-contexte");
+  if (!sel.options.length) {
+    const marques = [...new Set(DATA.produits.map(p => p.marque).filter(Boolean))].sort();
+    const familles = [...new Set(DATA.produits.map(p => p.famille).filter(Boolean))].sort();
+    sel.innerHTML = `<option value="TOUT">Tout le site</option>
+      <optgroup label="Catégories">${familles.map(f => `<option value="FAMILLE:${f}">${f}</option>`).join("")}</optgroup>
+      <optgroup label="Marques">${marques.map(m => `<option value="MARQUE:${m}">${m}</option>`).join("")}</optgroup>`;
+  }
+  const ctx = contexteMerch();
+  const produits = ordonner(produitsDuContexte(ctx), ctx);
+  const grille = document.getElementById("grille-merch");
+  grille.innerHTML = produits.map((p, i) => `
+    <div class="carte" draggable="true" data-ref="${p.reference}">
+      <div class="rang-merch">${i + 1}</div>
+      <div class="visuel"><img loading="lazy" src="${p.photo}" alt="" draggable="false"></div>
+      <div class="infos">
+        <div class="nom">${p.designation || p.reference}</div>
+        <div class="sousnom">${p.marque || ""} · ${p.reference} · ${p.saison || ""} · stock ${p.stock_total}</div>
+      </div>
+    </div>`).join("");
+  document.getElementById("merch-etat").textContent =
+    MERCH[ctx] ? "ordre personnalisé chargé" : "ordre automatique (stock)";
+
+  let saisie = null;
+  grille.querySelectorAll(".carte").forEach(c => {
+    c.addEventListener("dragstart", () => { saisie = c; requestAnimationFrame(() => c.classList.add("saisie")); });
+    c.addEventListener("dragend", () => { c.classList.remove("saisie"); saisie = null; renumeroter(); });
+    c.addEventListener("dragover", e => {
+      e.preventDefault();
+      if (!saisie || saisie === c) return;
+      const r = c.getBoundingClientRect();
+      grille.insertBefore(saisie, (e.clientX - r.left) < r.width / 2 ? c : c.nextSibling);
+    });
+  });
+  grille.addEventListener("dragover", e => e.preventDefault());
+
+  function renumeroter() {
+    grille.querySelectorAll(".carte").forEach((c, i) => c.querySelector(".rang-merch").textContent = i + 1);
+    document.getElementById("merch-etat").textContent = "modifications non enregistrées";
+  }
+
+  // Tris d'aide : réordonnent les cartes à l'écran, à enregistrer ensuite.
+  function retrier(cmp, libelle) {
+    const refs = new Map(produitsDuContexte(contexteMerch()).map(p => [p.reference, p]));
+    [...grille.querySelectorAll(".carte")]
+      .sort((a, b) => cmp(refs.get(a.dataset.ref), refs.get(b.dataset.ref)))
+      .forEach(c => grille.appendChild(c));
+    grille.querySelectorAll(".carte").forEach((c, i) => c.querySelector(".rang-merch").textContent = i + 1);
+    document.getElementById("merch-etat").textContent = libelle + " — à enregistrer";
+  }
+
+  if (!merchInitialise) {
+    merchInitialise = true;
+    sel.onchange = rendreMerch;
+    document.getElementById("btn-tri-stock").onclick = () =>
+      retrier((a, b) => b.stock_total - a.stock_total, "trié par stock");
+    document.getElementById("btn-tri-recent").onclick = () =>
+      retrier((a, b) => cleRecence(b.saison) - cleRecence(a.saison), "trié du plus récent au plus ancien");
+
+    document.getElementById("btn-merch-sauver").onclick = async () => {
+      const etat = document.getElementById("merch-etat");
+      const ctx = contexteMerch();
+      etat.textContent = "enregistrement…";
+      const positions = [...grille.querySelectorAll(".carte")]
+        .map((c, i) => ({ contexte: ctx, reference: c.dataset.ref, position: i + 1 }));
+      try {
+        await api(`/rest/v1/merch_positions?contexte=eq.${encodeURIComponent(ctx)}`, { methode: "DELETE" });
+        await api("/rest/v1/merch_positions", { corps: positions });
+        await chargerMerch();
+        if (ctx === "TOUT") { DATA.produits = await api("/rest/v1/rpc/catalogue", { corps: { limite: 300 } }); DATA.produits.forEach(trierTailles); }
+        etat.textContent = `ordre enregistré ✓ (${positions.length} produits — ${ctx === "TOUT" ? "tout le site" : ctx.split(":")[1]})`;
+      } catch (e) {
+        etat.textContent = "échec : " + (e.donnees?.message || e.message);
+      }
+    };
+    document.getElementById("btn-merch-reinit").onclick = async () => {
+      const etat = document.getElementById("merch-etat");
+      const ctx = contexteMerch();
+      etat.textContent = "suppression…";
+      try {
+        await api(`/rest/v1/merch_positions?contexte=eq.${encodeURIComponent(ctx)}`, { methode: "DELETE" });
+        await chargerMerch();
+        if (ctx === "TOUT") { DATA.produits = await api("/rest/v1/rpc/catalogue", { corps: { limite: 300 } }); DATA.produits.forEach(trierTailles); }
+        rendreMerch();
+      } catch (e) {
+        etat.textContent = "échec : " + (e.donnees?.message || e.message);
+      }
+    };
+  }
+}
+
+/* ---------------- gestion des utilisateurs (admin) ---------------- */
+async function apiFonction(action, corps) {
+  const rep = await fetch(FKB2B.url + "/functions/v1/import-donnees", {
+    method: "POST",
+    headers: { "Content-Type": "application/json",
+               "Authorization": `Bearer ${sessionCourante().access_token}` },
+    body: JSON.stringify({ action, ...corps }),
+  });
+  const texte = await rep.text();
+  if (!rep.ok) throw new Error(texte);
+  return JSON.parse(texte);
+}
+
+let utilisateursInitialise = false;
+const societesChoisies = [];   // comptes en cours d'ajout dans le formulaire de création
+
+function chipsHTML(comptes, editable, prefixe) {
+  return comptes.map(c => {
+    const s = MES_SOCIETES.find(x => x.compte === c);
+    return `<span class="chip">${s ? s.nom : c} <small>${s?.famille_tarifaire || ""}</small>
+      ${editable ? `<button onclick="${prefixe}('${c}')">×</button>` : ""}</span>`;
+  }).join("") || `<span class="chip grise">aucun magasin</span>`;
+}
+
+function retirerSocieteCreation(compte) {
+  societesChoisies.splice(societesChoisies.indexOf(compte), 1);
+  document.getElementById("nu-chips").innerHTML = chipsHTML(societesChoisies, true, "retirerSocieteCreation");
+}
+
+async function rendreUtilisateurs() {
+  // référentiel sociétés pour la saisie (l'admin les voit toutes)
+  document.getElementById("liste-societes").innerHTML =
+    MES_SOCIETES.map(s => `<option value="${s.compte}">${s.nom} — ${s.famille_tarifaire || "?"}</option>`).join("");
+
+  const liste = await api("/rest/v1/rpc/admin_utilisateurs", { corps: {} });
+  document.getElementById("liste-utilisateurs").innerHTML = (liste || []).map(u => `
+    <div class="rang-util" data-user="${u.user_id}">
+      <div class="qui"><b>${u.email}</b><span>${u.nom || "—"} · ${u.role}</span></div>
+      <div class="acces">
+        <div class="chips">${chipsHTML(u.societes.map(s => s.compte), false)}</div>
+        ${u.role !== "admin" ? `
+        <div class="formu" style="margin-top:8px">
+          <input class="qte-claire" style="width:220px; text-align:left" list="liste-societes"
+                 placeholder="modifier les magasins…" id="acc-${u.user_id}">
+          <button class="puce-claire" onclick="ajouterAcces('${u.user_id}')">+ magasin</button>
+          <button class="puce-claire" onclick="sauverAcces('${u.user_id}')">Enregistrer les accès</button>
+          <span class="compte-produits" id="etat-${u.user_id}"></span>
+        </div>
+        <div class="chips" id="edit-${u.user_id}">${chipsHTML(u.societes.map(s => s.compte), true, `retirerAcces_${u.user_id.replaceAll("-", "_")}`)}</div>` : ""}
+      </div>
+    </div>`).join("");
+
+  // éditeurs d'accès : un état par utilisateur
+  for (const u of (liste || [])) {
+    if (u.role === "admin") continue;
+    const etat = { comptes: u.societes.map(s => s.compte) };
+    window[`retirerAcces_${u.user_id.replaceAll("-", "_")}`] = (compte) => {
+      etat.comptes.splice(etat.comptes.indexOf(compte), 1);
+      document.getElementById(`edit-${u.user_id}`).innerHTML =
+        chipsHTML(etat.comptes, true, `retirerAcces_${u.user_id.replaceAll("-", "_")}`);
+    };
+    window[`etatAcces_${u.user_id.replaceAll("-", "_")}`] = etat;
+  }
+
+  window.ajouterAcces = (uid) => {
+    const inp = document.getElementById(`acc-${uid}`);
+    const etat = window[`etatAcces_${uid.replaceAll("-", "_")}`];
+    const compte = inp.value.trim();
+    if (!compte || !MES_SOCIETES.some(s => s.compte === compte)) {
+      document.getElementById(`etat-${uid}`).textContent = "compte de magasin inconnu"; return;
+    }
+    if (!etat.comptes.includes(compte)) etat.comptes.push(compte);
+    inp.value = "";
+    document.getElementById(`edit-${uid}`).innerHTML =
+      chipsHTML(etat.comptes, true, `retirerAcces_${uid.replaceAll("-", "_")}`);
+  };
+  window.sauverAcces = async (uid) => {
+    const etat = window[`etatAcces_${uid.replaceAll("-", "_")}`];
+    const zone = document.getElementById(`etat-${uid}`);
+    zone.textContent = "enregistrement…";
+    try {
+      const r = await apiFonction("modifier_acces", { user_id: uid, comptes_societes: etat.comptes });
+      zone.textContent = `accès enregistrés ✓ (${r.nb_societes} magasin${r.nb_societes > 1 ? "s" : ""})`;
+    } catch (e) { zone.textContent = "échec : " + e.message.slice(0, 120); }
+  };
+
+  if (!utilisateursInitialise) {
+    utilisateursInitialise = true;
+    document.getElementById("nu-ajouter-societe").onclick = () => {
+      const inp = document.getElementById("nu-societe");
+      const compte = inp.value.trim();
+      const etat = document.getElementById("nu-etat");
+      if (!MES_SOCIETES.some(s => s.compte === compte)) { etat.textContent = "compte de magasin inconnu"; return; }
+      if (!societesChoisies.includes(compte)) societesChoisies.push(compte);
+      inp.value = ""; etat.textContent = "";
+      document.getElementById("nu-chips").innerHTML = chipsHTML(societesChoisies, true, "retirerSocieteCreation");
+    };
+    document.getElementById("nu-creer").onclick = async () => {
+      const etat = document.getElementById("nu-etat");
+      const email = document.getElementById("nu-email").value.trim();
+      if (!email) { etat.textContent = "e-mail requis"; return; }
+      if (!societesChoisies.length) { etat.textContent = "ajoutez au moins un magasin"; return; }
+      etat.textContent = "création…";
+      try {
+        const r = await apiFonction("creer_utilisateur", {
+          email, nom: document.getElementById("nu-nom").value.trim() || null,
+          role: document.getElementById("nu-role").value,
+          comptes_societes: societesChoisies,
+        });
+        etat.innerHTML = `Compte créé ✓ — mot de passe provisoire : <b>${r.mot_de_passe}</b>
+          <br>Transmettez-le à l'utilisateur (affiché une seule fois).`;
+        document.getElementById("nu-email").value = ""; document.getElementById("nu-nom").value = "";
+        societesChoisies.length = 0;
+        document.getElementById("nu-chips").innerHTML = "";
+        rendreUtilisateurs();
+      } catch (e) { etat.textContent = "échec : " + e.message.slice(0, 150); }
+    };
+  }
+}
+
+/* ---------------- compte (données réelles, isolées par société) ---------------- */
+const LIBELLES_STATUT = { validee: ["VALIDÉE", "attente"], transmise: ["TRANSMISE", "attente"],
+                          integree: ["INTÉGRÉE FASTMAG", "ok"], annulee: ["ANNULÉE", ""] };
+
+async function rendreCompte() {
+  const c = clientActif;
+  document.getElementById("bloc-societe").innerHTML = `
+    <div class="rang"><b>${c.nom}</b><span class="fin">Compte ${c.compte} · ID Fastmag ${c.id_fastmag ?? "—"}</span></div>
+    <div class="rang">Famille tarifaire<span class="fin">${c.famille_tarifaire ?? "—"}</span></div>
+    <div class="rang">Conditions de règlement<span class="fin">Sur facture — définies dans Fastmag</span></div>`;
+
+  const [commandes, paniersSauves] = await Promise.all([
+    api("/rest/v1/commandes?select=numero,statut,nb_pieces,total_ht,cree_le&order=cree_le.desc&limit=15").catch(() => []),
+    api("/rest/v1/paniers?select=lignes,modifie_le&order=modifie_le.desc&limit=3").catch(() => []),
+  ]);
+
+  document.getElementById("bloc-commandes").innerHTML = commandes.length
+    ? commandes.map(cm => {
+        const [lib, cls] = LIBELLES_STATUT[cm.statut] || [cm.statut, ""];
+        const d = new Date(cm.cree_le).toLocaleDateString("fr-FR");
+        return `<div class="rang"><b>${cm.numero}</b><span class="etiquette ${cls}">${lib}</span>
+          <span class="fin">${d} · ${cm.nb_pieces} pièces · ${eur(Number(cm.total_ht))} HT</span></div>`;
+      }).join("")
+    : `<div class="rang" style="color:var(--gris)">Aucune commande pour le moment</div>`;
+
+  document.getElementById("bloc-paniers").innerHTML = paniersSauves.length
+    ? paniersSauves.map(p => `<div class="rang"><b>Panier du ${new Date(p.modifie_le).toLocaleDateString("fr-FR")}</b>
+        <span class="fin">${p.lignes.reduce((s, l) => s + l.qte, 0)} pièces · ${p.lignes.length} lignes</span></div>`).join("")
+    : `<div class="rang" style="color:var(--gris)">Aucun panier enregistré</div>`;
+}
+
+/* ---------------- panier ---------------- */
+function rendrePanier() {
+  const corps = document.getElementById("panier-corps");
+  let pieces = 0, ht = 0;
+  const refs = new Set();
+  for (const l of panier.values()) {
+    l.prix = prixDe(l.produit.tailles.find(t => t.taille === l.taille));
+    pieces += l.qte; ht += l.qte * l.prix; refs.add(l.produit.reference);
+  }
+  corps.innerHTML = panier.size === 0 ? `<div class="vide">Votre panier est vide</div>` :
+    [...panier.entries()].map(([cle, l]) => `
+      <div class="ligne">
+        <div class="visuel"><img src="${l.produit.photo}" alt=""></div>
+        <div class="det">
+          <div class="n">${l.produit.designation || l.produit.reference}</div>
+          <div class="d">${l.produit.reference} · T. ${l.taille} · ${l.qte} × ${eur(l.prix)}</div>
+        </div>
+        <div class="m">${eur(l.qte * l.prix)}</div>
+        <button class="sup" onclick="panier.delete('${cle}'); rendrePanier()">×</button>
+      </div>`).join("");
+  document.getElementById("badge").textContent = pieces;
+  document.getElementById("t-pieces").textContent = `${pieces} pièce${pieces > 1 ? "s" : ""}`;
+  document.getElementById("t-refs").textContent = `${refs.size} référence${refs.size > 1 ? "s" : ""}`;
+  document.getElementById("t-ht").textContent = eur(ht);
+  document.getElementById("btn-export").disabled = panier.size === 0;
+}
+
+function basculer(id, ouvert) {
+  document.getElementById(id).classList.toggle("ouvert", ouvert);
+  document.getElementById("voile").classList.toggle("ouvert", ouvert);
+}
+
+/* ---- panier enregistré (table `paniers`, isolée par société via RLS) ---- */
+const monUserId = () => JSON.parse(atob(sessionCourante().access_token.split(".")[1])).sub;
+
+async function sauverPanier() {
+  const lignes = [...panier.values()].map(l => ({ref: l.produit.reference, taille: l.taille, qte: l.qte}));
+  const b = document.getElementById("btn-sauver");
+  try {
+    const societe = await api("/rest/v1/societes?select=id");
+    await api("/rest/v1/paniers?user_id=eq." + monUserId(), { methode: "DELETE" });
+    await api("/rest/v1/paniers", { corps: { societe_id: societe[0].id, user_id: monUserId(), lignes } });
+    b.textContent = "Panier enregistré ✓";
+  } catch (e) {
+    b.textContent = "Échec de l'enregistrement";
+  }
+  setTimeout(() => b.textContent = "Enregistrer le panier pour plus tard", 1800);
+}
+
+async function restaurerPanier() {
+  try {
+    const rows = await api("/rest/v1/paniers?select=lignes&order=modifie_le.desc&limit=1");
+    for (const l of (rows[0]?.lignes || [])) {
+      const p = DATA.produits.find(x => x.reference === l.ref);
+      const t = p && p.tailles.find(t => t.taille === l.taille);
+      if (t && t.stock > 0) panier.set(l.ref + "|" + l.taille, {produit: p, taille: l.taille,
+        qte: Math.min(l.qte, t.stock), prix: prixDe(t)});
+    }
+    rendrePanier();
+  } catch (e) { /* pas de panier enregistré */ }
+}
+
+async function validerCommande() {
+  const btn = document.getElementById("btn-export");
+  btn.disabled = true; btn.textContent = "VALIDATION…";
+  const lignes = [...panier.values()].map(l => ({
+    reference: l.produit.reference, couleur: l.produit.couleur || "",
+    taille: l.taille, designation: l.produit.designation || "", quantite: l.qte,
+  }));
+  try {
+    // Validation atomique côté serveur : société de l'utilisateur, stock disponible, prix officiels.
+    const r = await api("/rest/v1/rpc/valider_commande",
+      { corps: { p_lignes: lignes, p_societe: clientActif.id ?? null } });
+    genererFichier(r.numero);
+    await api("/rest/v1/paniers?user_id=eq." + monUserId(), { methode: "DELETE" }).catch(() => {});
+    panier.clear();
+    rendrePanier();
+    document.getElementById("panier-corps").innerHTML = `<div class="vide">Commande <b>${r.numero}</b> transmise ✓<br><br>
+      <span style="font-size:12px">${r.nb_pieces} pièces — ${eur(Number(r.total_ht))} HT<br>
+      Enregistrée côté serveur : le stock est réservé.<br>
+      (POC : le fichier Fastmag est aussi téléchargé pour vérification.)</span></div>`;
+  } catch (e) {
+    document.getElementById("panier-corps").insertAdjacentHTML("afterbegin",
+      `<div class="vide" style="color:#e08a87; padding:20px 0">${String(e.donnees?.message || e.message).replace(/</g, "&lt;")}</div>`);
+  }
+  btn.textContent = "VALIDER LA COMMANDE";
+  btn.disabled = panier.size === 0;
+}
+
+/* ---- génération du fichier d'import Fastmag (TSV ISO-8859-1, 26 colonnes) ---- */
+function genererFichier(numeroServeur) {
+  const auj = new Date();
+  const dj = String(auj.getDate()).padStart(2, "0"), dm = String(auj.getMonth() + 1).padStart(2, "0");
+  const date = `${dj}/${dm}/${auj.getFullYear()}`;
+  const idClient = clientActif.id_fastmag;
+  const numero = numeroServeur || `B2B${date}${idClient}`;
+  const refPreco = `B2B${dj}${dm}${auj.getFullYear()}`;
+
+  const entete = ["Numéro de commande","Date","CLIENT","Commande","escompte","filler","port","frais postaux",
+    "adlivraison","devise","date de liv sou","date de liv prev","Référence PRECO FW15","filler","BarCode",
+    "COULEUR","Taille","DESIGNATION","QUANTITE","PU","remise","total HT","TOTAL TAXES","taux devises","filler","filler"];
+
+  const lignes = [entete.join("\t")];
+  for (const l of panier.values()) {
+    lignes.push([numero, date, idClient, "COMMANDE", "0", "", "0", "0", "LIVRAISON", "EUR", date, date, refPreco, "",
+      l.produit.reference, l.produit.couleur || "", l.taille, l.produit.designation || "",
+      l.qte, l.prix.toFixed(2), "0", "0", "0", "1", "", ""].join("\t"));
+  }
+  const texte = lignes.join("\r\n") + "\r\n";
+  const octets = new Uint8Array(texte.length);
+  for (let i = 0; i < texte.length; i++) {
+    const c = texte.charCodeAt(i);
+    octets[i] = c <= 0xFF ? c : 0x3F;
+  }
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(new Blob([octets], {type: "text/plain;charset=iso-8859-1"}));
+  lien.download = `IMPORT_FASTMAG_FOOTKORNER_${dj}${dm}${auj.getFullYear()}_${clientActif.compte}.txt`;
+  lien.click();
+  URL.revokeObjectURL(lien.href);
+}
+
+init();
+</script>
+</body>
+</html>
