@@ -198,6 +198,13 @@
   #grille-merch .carte .rang-merch { position: absolute; top: 10px; right: 12px; z-index: 2;
     background: var(--encre); color: #fff; font-size: 11px; font-weight: 700;
     border-radius: 999px; padding: 3px 9px; }
+  #grille-merch .coche { position: absolute; top: 8px; left: 10px; z-index: 3; display: flex;
+    align-items: center; gap: 5px; cursor: pointer; }
+  #grille-merch .coche input { width: 17px; height: 17px; accent-color: var(--encre); cursor: pointer; }
+  #grille-merch .ordre-coche { background: #d9a441; color: #fff; font-size: 10.5px; font-weight: 700;
+    border-radius: 999px; padding: 2px 7px; display: none; }
+  #grille-merch .carte.cochee { outline: 2px solid #d9a441; outline-offset: -2px; }
+  #grille-merch .carte.cochee .ordre-coche { display: inline-block; }
 
   /* légende des pastilles + description produit (modèle Blvck) */
   .legende { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 16px; padding: 12px 14px;
@@ -300,6 +307,7 @@
     <a href="#/compte">MON COMPTE</a>
     <a href="#/merch" id="lien-merch" style="display:none; color:#d9a441">MERCH</a>
     <a href="#/utilisateurs" id="lien-utilisateurs" style="display:none; color:#d9a441">UTILISATEURS</a>
+    <a href="#/imports" id="lien-imports" style="display:none; color:#d9a441">IMPORTS</a>
   </div>
   <div class="logo" onclick="location.hash='#/'">FKB2B</div>
   <div class="h-droite">
@@ -378,8 +386,40 @@
         <button class="puce-claire" id="btn-merch-reinit">Effacer l'ordre de ce périmètre</button>
         <span class="compte-produits" id="merch-etat" style="margin:0"></span>
       </div>
+      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; align-items:center">
+        <span class="compte-produits" style="margin:0" id="merch-selection-info">Cochez des produits (l'ordre des clics est conservé), puis :</span>
+        <button class="puce-claire" id="btn-sel-haut">⭱ Tout en haut</button>
+        <button class="puce-claire" id="btn-sel-bas">⭳ Tout en bas</button>
+        <input class="qte-claire" id="sel-position" type="number" min="1" placeholder="n°" style="width:70px">
+        <button class="puce-claire" id="btn-sel-position">→ À cette position</button>
+        <button class="puce-claire" id="btn-sel-vider">Tout décocher</button>
+      </div>
     </div>
     <div class="grille-col" id="grille-merch"></div>
+  </section>
+
+  <!-- IMPORTS (admin) -->
+  <section class="vue page-claire" id="vue-imports">
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='#/'">← ACCUEIL</span>
+      <h1>CENTRE D'IMPORT</h1>
+      <div class="compte-produits">Déposez un export Fastmag : le type est détecté automatiquement, la simulation montre ce qui sera fait, rien n'est écrit sans votre validation.</div>
+    </div>
+
+    <div class="bloc-clair" style="margin: 0 22px 26px">
+      <label id="zone-depot" style="display:block; border:2px dashed #ccc; border-radius:12px; padding:38px;
+             text-align:center; cursor:pointer; color:var(--encre2); font-size:13.5px; transition:border-color 150ms ease">
+        Glissez un fichier ici ou cliquez pour choisir<br>
+        <span style="font-size:11px">fiches produits · stock · tarifs · clients — .csv / .xls / .txt</span>
+        <input id="fichier-import" type="file" style="display:none">
+      </label>
+      <div id="rapport-import" style="margin-top:18px"></div>
+    </div>
+
+    <div class="bloc-clair" style="margin: 0 22px 60px">
+      <h3 class="titre-bloc">Historique des imports</h3>
+      <div id="journal-imports"></div>
+    </div>
   </section>
 
   <!-- UTILISATEURS (admin) -->
@@ -451,6 +491,7 @@
 </div>
 
 <script src="config.js"></script>
+<script src="imports.js"></script>
 <script>
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
 let MES_SOCIETES = [], estAdmin = false;
@@ -498,6 +539,7 @@ async function init() {
   if (estAdmin) {
     document.getElementById("lien-merch").style.display = "";
     document.getElementById("lien-utilisateurs").style.display = "";
+    document.getElementById("lien-imports").style.display = "";
     // l'admin n'est rattaché à aucune société : catalogue toutes familles (prix mini)
     clientActif = { nom: "Administrateur", famille_tarifaire: "", id_fastmag: null, compte: "ADMIN" };
     document.getElementById("societe-nom").textContent = "Administrateur — toutes sociétés";
@@ -600,6 +642,9 @@ function router() {
   } else if (route === "utilisateurs") {
     document.getElementById("vue-utilisateurs").classList.add("active");
     rendreUtilisateurs();
+  } else if (route === "imports") {
+    document.getElementById("vue-imports").classList.add("active");
+    rendreImports();
   } else {
     document.getElementById("vue-accueil").classList.add("active");
   }
@@ -894,6 +939,9 @@ function rendreMerch() {
   const grille = document.getElementById("grille-merch");
   grille.innerHTML = produits.map((p, i) => `
     <div class="carte" draggable="true" data-ref="${p.reference}">
+      <label class="coche" draggable="false">
+        <input type="checkbox"><span class="ordre-coche"></span>
+      </label>
       <div class="rang-merch">${i + 1}</div>
       <div class="visuel"><img loading="lazy" src="${p.photo}" alt="" draggable="false"></div>
       <div class="infos">
@@ -901,6 +949,50 @@ function rendreMerch() {
         <div class="sousnom">${p.marque || ""} · ${p.reference} · ${p.saison || ""} · stock ${p.stock_total}</div>
       </div>
     </div>`).join("");
+
+  // sélection multiple : l'ordre des clics est conservé
+  const selectionMerch = [];
+  function majSelection() {
+    grille.querySelectorAll(".carte").forEach(c => {
+      const idx = selectionMerch.indexOf(c.dataset.ref);
+      c.classList.toggle("cochee", idx >= 0);
+      c.querySelector(".ordre-coche").textContent = idx >= 0 ? idx + 1 : "";
+      c.querySelector(".coche input").checked = idx >= 0;
+    });
+    document.getElementById("merch-selection-info").textContent = selectionMerch.length
+      ? `${selectionMerch.length} produit${selectionMerch.length > 1 ? "s" : ""} coché${selectionMerch.length > 1 ? "s" : ""} (dans l'ordre des clics) :`
+      : "Cochez des produits (l'ordre des clics est conservé), puis :";
+  }
+  grille.querySelectorAll(".coche input").forEach(inp => {
+    inp.addEventListener("click", e => e.stopPropagation());
+    inp.addEventListener("change", () => {
+      const ref = inp.closest(".carte").dataset.ref;
+      const idx = selectionMerch.indexOf(ref);
+      if (idx >= 0) selectionMerch.splice(idx, 1); else selectionMerch.push(ref);
+      majSelection();
+    });
+  });
+
+  // déplacements groupés : les cochés partent à la cible, dans l'ordre des clics
+  function deplacerSelection(cible) {
+    if (!selectionMerch.length) return;
+    const cartes = [...grille.querySelectorAll(".carte")];
+    const selection = selectionMerch.map(ref => cartes.find(c => c.dataset.ref === ref)).filter(Boolean);
+    const restantes = cartes.filter(c => !selectionMerch.includes(c.dataset.ref));
+    const pos = Math.max(0, Math.min(cible, restantes.length));
+    const nouvelOrdre = [...restantes.slice(0, pos), ...selection, ...restantes.slice(pos)];
+    nouvelOrdre.forEach(c => grille.appendChild(c));
+    selectionMerch.length = 0;
+    majSelection();
+    renumeroter();
+  }
+  document.getElementById("btn-sel-haut").onclick = () => deplacerSelection(0);
+  document.getElementById("btn-sel-bas").onclick = () => deplacerSelection(1e9);
+  document.getElementById("btn-sel-position").onclick = () => {
+    const n = parseInt(document.getElementById("sel-position").value || "0", 10);
+    if (n >= 1) deplacerSelection(n - 1);
+  };
+  document.getElementById("btn-sel-vider").onclick = () => { selectionMerch.length = 0; majSelection(); };
   document.getElementById("merch-etat").textContent =
     MERCH[ctx] ? "ordre personnalisé chargé" : "ordre automatique (stock)";
 
@@ -970,6 +1062,84 @@ function rendreMerch() {
       }
     };
   }
+}
+
+/* ---------------- centre d'import (admin) ---------------- */
+let importsInitialise = false;
+let analyseCourante = null;
+
+async function rendreImports() {
+  await rendreJournalImports();
+  if (importsInitialise) return;
+  importsInitialise = true;
+  const zone = document.getElementById("zone-depot");
+  const champ = document.getElementById("fichier-import");
+  champ.onchange = () => champ.files[0] && traiterFichier(champ.files[0]);
+  zone.ondragover = e => { e.preventDefault(); zone.style.borderColor = "#111"; };
+  zone.ondragleave = () => zone.style.borderColor = "#ccc";
+  zone.ondrop = e => {
+    e.preventDefault(); zone.style.borderColor = "#ccc";
+    if (e.dataTransfer.files[0]) traiterFichier(e.dataTransfer.files[0]);
+  };
+}
+
+async function rendreJournalImports() {
+  const rows = await api("/rest/v1/journal_imports?select=horodatage,fichier,modele,lignes_lues,quarantaine,statut&order=horodatage.desc&limit=10").catch(() => []);
+  document.getElementById("journal-imports").innerHTML = rows.length
+    ? rows.map(j => `<div class="rang-util"><div class="qui"><b>${j.fichier}</b>
+        <span>${new Date(j.horodatage).toLocaleString("fr-FR")} · ${j.modele}</span></div>
+        <div class="fin" style="margin-left:auto; font-size:12px; color:var(--encre2)">
+          ${j.lignes_lues} lignes · ${j.quarantaine} en quarantaine · ${j.statut}</div></div>`).join("")
+    : `<div class="compte-produits">Aucun import pour le moment.</div>`;
+}
+
+async function traiterFichier(fichier) {
+  const zone = document.getElementById("rapport-import");
+  zone.innerHTML = `<div class="compte-produits">Analyse de ${fichier.name}…</div>`;
+  analyseCourante = await analyserFichierFastmag(fichier);
+  const a = analyseCourante;
+  if (a.erreur) {
+    zone.innerHTML = `<div class="compte-produits" style="color:#a33"><b>${a.erreur}</b></div>`;
+    return;
+  }
+  // anti-rejeu : ce fichier exact a-t-il déjà été importé ?
+  const deja = await api(`/rest/v1/journal_imports?empreinte=eq.${a.empreinte}&select=horodatage`).catch(() => []);
+  const plans = mapperVersTables(a);
+  const nbEcrire = plans.reduce((s, p) => s + p.rows.length, 0);
+  zone.innerHTML = `
+    <h3 class="titre-bloc">Simulation — ${a.libelle}</h3>
+    <div class="chips">
+      <span class="chip grise">${a.lues} lignes lues</span>
+      <span class="chip grise">${nbEcrire} à écrire</span>
+      <span class="chip grise">${a.quarantaine.length} en quarantaine</span>
+      <span class="chip grise">${a.stats.trim} nettoyages</span>
+      ${a.stats.prefixe ? `<span class="chip grise">${a.stats.prefixe} préfixes retirés</span>` : ""}
+      ${a.stats.decimales ? `<span class="chip grise">${a.stats.decimales} décimales converties</span>` : ""}
+      ${a.spec.remplacement_complet ? `<span class="chip">remplacement complet du stock + recalcul des actifs</span>` : ""}
+    </div>
+    ${a.quarantaine.length ? `<div class="compte-produits" style="margin-top:10px">Quarantaine (extrait) :
+      ${a.quarantaine.slice(0, 5).map(q => `ligne ${q.ligne} · ${q.valeur}`).join(" — ")}</div>` : ""}
+    ${deja.length ? `<div class="compte-produits" style="color:#a33; margin-top:12px">
+        <b>Fichier déjà importé le ${new Date(deja[0].horodatage).toLocaleString("fr-FR")}</b> — réimport bloqué (anti-rejeu).</div>`
+      : `<div style="margin-top:14px; display:flex; gap:10px; align-items:center">
+        <button class="btn-noir" id="btn-executer-import">EXÉCUTER L'IMPORT</button>
+        <span class="compte-produits" id="progres-import"></span></div>`}`;
+  const btn = document.getElementById("btn-executer-import");
+  if (btn) btn.onclick = async () => {
+    btn.disabled = true;
+    const progres = document.getElementById("progres-import");
+    try {
+      const total = await executerImport(a, msg => progres.textContent = msg);
+      progres.innerHTML = `<b>Import terminé ✓</b> — ${total} lignes écrites.`;
+      await rendreJournalImports();
+      DATA.produits = await api("/rest/v1/rpc/catalogue",
+        { corps: { limite: 300, p_societe: clientActif.id ?? null } });
+      DATA.produits.forEach(trierTailles);
+    } catch (e) {
+      progres.textContent = "échec : " + (e.message || e).toString().slice(0, 160);
+      btn.disabled = false;
+    }
+  };
 }
 
 /* ---------------- gestion des utilisateurs (admin) ---------------- */
