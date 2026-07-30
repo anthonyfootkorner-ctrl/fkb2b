@@ -1188,6 +1188,7 @@ async function rendreUtilisateurs() {
                  placeholder="modifier les magasins…" id="acc-${u.user_id}">
           <button class="puce-claire" onclick="ajouterAcces('${u.user_id}')">+ magasin</button>
           <button class="puce-claire" onclick="sauverAcces('${u.user_id}')">Enregistrer les accès</button>
+          <button class="puce-claire" onclick="reinitialiserMdp('${u.user_id}', '${u.email}')">Réinitialiser le mot de passe</button>
           <span class="compte-produits" id="etat-${u.user_id}"></span>
         </div>
         <div class="chips" id="edit-${u.user_id}">${chipsHTML(u.societes.map(s => s.compte), true, `retirerAcces_${u.user_id.replaceAll("-", "_")}`)}</div>` : ""}
@@ -1218,6 +1219,21 @@ async function rendreUtilisateurs() {
     document.getElementById(`edit-${uid}`).innerHTML =
       chipsHTML(etat.comptes, true, `retirerAcces_${uid.replaceAll("-", "_")}`);
   };
+  // Réinitialisation de mot de passe par l'admin : génère un mot de passe lisible,
+  // le définit côté serveur, l'affiche une seule fois.
+  window.reinitialiserMdp = async (uid, email) => {
+    if (!confirm(`Réinitialiser le mot de passe de ${email} ?\nL'ancien ne fonctionnera plus.`)) return;
+    const zone = document.getElementById(`etat-${uid}`);
+    zone.textContent = "réinitialisation…";
+    const mots = ["korner", "maillot", "vestiaire", "crampon", "tribune", "parquet", "stade", "capitaine"];
+    const alea = new Uint32Array(3); crypto.getRandomValues(alea);
+    const mdp = `${mots[alea[0] % mots.length]}-${mots[alea[1] % mots.length]}-${100 + alea[2] % 900}`;
+    try {
+      await apiFonction("definir_mot_de_passe", { email, mot_de_passe: mdp });
+      zone.innerHTML = `Nouveau mot de passe : <b>${mdp}</b> — transmettez-le (affiché une seule fois).`;
+    } catch (e) { zone.textContent = "échec : " + e.message.slice(0, 120); }
+  };
+
   window.sauverAcces = async (uid) => {
     const etat = window[`etatAcces_${uid.replaceAll("-", "_")}`];
     const zone = document.getElementById(`etat-${uid}`);
