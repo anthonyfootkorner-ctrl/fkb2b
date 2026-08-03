@@ -1231,14 +1231,17 @@ async function traiterFichierShopify(fichier) {
     return;
   }
   // mémorise le fichier : les collections restent disponibles aux prochaines sessions
-  try {
-    await api("/rest/v1/merch_shopify_fichier?cle=eq.dernier", { methode: "DELETE" });
-    await api("/rest/v1/merch_shopify_fichier", { corps: {
-      cle: "dernier", nom_fichier: fichier.name,
-      donnees: { fichier: shopifyDonnees.fichier, entete: shopifyDonnees.entete,
-                 lignes: shopifyDonnees.lignes, cols: shopifyDonnees.cols,
-                 collections: shopifyDonnees.collections } } });
-  } catch (e) { /* mémorisation non bloquante */ }
+  // (plafonné — l'export Smart complet fait >100 000 lignes, trop lourd à conserver)
+  if (shopifyDonnees.lignes.length <= 20000) {
+    try {
+      await api("/rest/v1/merch_shopify_fichier?cle=eq.dernier", { methode: "DELETE" });
+      await api("/rest/v1/merch_shopify_fichier", { corps: {
+        cle: "dernier", nom_fichier: fichier.name,
+        donnees: { fichier: shopifyDonnees.fichier, entete: shopifyDonnees.entete,
+                   lignes: shopifyDonnees.lignes, cols: shopifyDonnees.cols,
+                   collections: shopifyDonnees.collections } } });
+    } catch (e) { /* mémorisation non bloquante */ }
+  }
   const noms = Object.keys(shopifyDonnees.collections);
   document.getElementById("sel-collection").innerHTML =
     noms.map(h => `<option value="${h}">${h} (${shopifyDonnees.collections[h].length} produits)</option>`).join("");
