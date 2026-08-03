@@ -552,10 +552,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1785793068"></script>
-<script src="imports.js?v=1785793068"></script>
-<script src="merch-shopify.js?v=1785793068"></script>
-<script src="moteur-merch.js?v=1785793068"></script>
+<script src="config.js?v=1785793337"></script>
+<script src="imports.js?v=1785793337"></script>
+<script src="merch-shopify.js?v=1785793337"></script>
+<script src="moteur-merch.js?v=1785793337"></script>
 <script>
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
 let MES_SOCIETES = [], estAdmin = false;
@@ -968,7 +968,7 @@ let VENTES = null; // reference -> { qte_7j, qte_30j } (admin uniquement)
 async function chargerVentes() {
   if (VENTES) return VENTES;
   try {
-    const rows = await api("/rest/v1/ventes_recentes?select=reference,qte_7j,qte_30j");
+    const rows = await apiTout("/rest/v1/ventes_recentes?select=reference,qte_7j,qte_30j");
     VENTES = Object.fromEntries(rows.map(r => [r.reference, r]));
   } catch (e) { VENTES = {}; }
   return VENTES;
@@ -992,7 +992,7 @@ function resumeProduit(p) {
 
 async function chargerMerch() {
   try {
-    const rows = await api("/rest/v1/merch_positions?select=contexte,reference,position");
+    const rows = await apiTout("/rest/v1/merch_positions?select=contexte,reference,position");
     MERCH = {};
     for (const r of rows) (MERCH[r.contexte] ??= {})[r.reference] = r.position;
   } catch (e) { MERCH = {}; }

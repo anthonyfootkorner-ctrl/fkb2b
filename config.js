@@ -60,6 +60,18 @@ async function api(chemin, { corps, methode, jwt } = {}) {
   return donnees;
 }
 
+// Lecture complète d'une table/vue en pages de 1000 (PostgREST plafonne chaque réponse).
+async function apiTout(chemin) {
+  const tout = [];
+  for (let debut = 0; ; debut += 1000) {
+    const sep = chemin.includes("?") ? "&" : "?";
+    const page = await api(`${chemin}${sep}limit=1000&offset=${debut}`);
+    tout.push(...page);
+    if (page.length < 1000) break;
+  }
+  return tout;
+}
+
 function deconnexion() {
   localStorage.removeItem("fkb2b-session");
   location.href = "login.html";
