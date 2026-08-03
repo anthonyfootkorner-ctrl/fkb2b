@@ -413,7 +413,7 @@
         <span class="compte-produits" id="merch-etat" style="margin:0"></span>
       </div>
       <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; align-items:center">
-        <span class="compte-produits" style="margin:0" id="merch-selection-info">Cochez des produits (l'ordre des clics est conservé), puis :</span>
+        <span class="compte-produits" style="margin:0" id="merch-selection-info">Cochez des produits : déplacements groupés ci-dessous, et les cochés gardent leur position lors des tris ⚡ :</span>
         <button class="puce-claire" id="btn-sel-haut">⭱ Tout en haut</button>
         <button class="puce-claire" id="btn-sel-bas">⭳ Tout en bas</button>
         <input class="qte-claire" id="sel-position" type="number" min="1" placeholder="n°" style="width:70px">
@@ -1117,11 +1117,16 @@ async function rendreMerch() {
   // Tris d'aide : réordonnent les cartes à l'écran, à enregistrer ensuite.
   function retrier(cmp, libelle) {
     const refs = new Map(produitsDuContexte(contexteMerch()).map(p => [p.reference, p]));
-    [...grille.querySelectorAll(".carte")]
-      .sort((a, b) => cmp(refs.get(a.dataset.ref), refs.get(b.dataset.ref)))
-      .forEach(c => grille.appendChild(c));
+    const cartes = new Map([...grille.querySelectorAll(".carte")].map(x => [x.dataset.ref, x]));
+    const actuel = [...cartes.keys()];
+    const trie = [...actuel].sort((a, b) => cmp(refs.get(a), refs.get(b)));
+    // les produits cochés restent à leur place, le tri s'applique autour d'eux
+    const final = ordreAvecEpingles(actuel, selectionMerch, trie);
+    final.forEach(ref => grille.appendChild(cartes.get(ref)));
     grille.querySelectorAll(".carte").forEach((c, i) => c.querySelector(".rang-merch").textContent = i + 1);
-    document.getElementById("merch-etat").textContent = libelle + " — à enregistrer";
+    document.getElementById("merch-etat").textContent = libelle
+      + (selectionMerch.length ? ` (${selectionMerch.length} épinglé·s en place)` : "") + " — à enregistrer";
+    travailNonEnregistre = true;
   }
 
   if (!merchInitialise) {
@@ -1488,6 +1493,19 @@ async function rendreSuiviShopify() {
     : `<div class="compte-produits">Aucune collection merchandisée pour le moment.</div>`;
 }
 
+/* ---------------- épinglage : les produits cochés gardent leur position lors des tris ---------------- */
+function ordreAvecEpingles(ordreActuel, epingles, ordreTrie) {
+  const fixes = {};
+  ordreActuel.forEach((cle, i) => { if (epingles.includes(cle)) fixes[i] = cle; });
+  const mobiles = ordreTrie.filter(cle => !epingles.includes(cle));
+  const resultat = [];
+  let j = 0;
+  for (let i = 0; i < ordreActuel.length; i++) {
+    resultat.push(fixes[i] !== undefined ? fixes[i] : mobiles[j++]);
+  }
+  return resultat.filter(Boolean);
+}
+
 /* ---------------- classement automatique (moteur de merchandising) ---------------- */
 let DERNIER_RAPPORT = null;
 
@@ -1518,8 +1536,11 @@ async function classementAutoB2B() {
   const res = classementAutomatique(prods, VENTES);
   const grille = document.getElementById("grille-merch");
   const cartes = new Map([...grille.querySelectorAll(".carte")].map(x => [x.dataset.ref, x]));
-  for (const ref of res.ordre) { const x = cartes.get(ref); if (x) { grille.appendChild(x); annoterCarte(x, res.scores[ref]); } }
-  for (const [ref, x] of cartes) if (!res.ordre.includes(ref)) { grille.appendChild(x); annoterCarte(x, null); }
+  const actuel = [...cartes.keys()];
+  const complet = [...res.ordre, ...actuel.filter(r => !res.ordre.includes(r))];
+  const epingles = (typeof selectionMerch !== "undefined") ? selectionMerch : [];
+  const final = ordreAvecEpingles(actuel, epingles, complet);
+  for (const ref of final) { const x = cartes.get(ref); if (x) { grille.appendChild(x); annoterCarte(x, res.scores[ref] || null); } }
   grille.querySelectorAll(".carte").forEach((x, i) => x.querySelector(".rang-merch").textContent = i + 1);
   travailNonEnregistre = true;
   DERNIER_RAPPORT = res.rapport;
@@ -1547,12 +1568,16 @@ async function classementAutoShopify() {
   if (!prods.length) { etat.textContent = "aucune donnée produit exploitable pour classer"; return; }
   const res = classementAutomatique(prods, VENTES);
   const parHandle = new Map(cartes.map(x => [x.dataset.handle, x]));
-  for (const ref of res.ordre) {
-    const x = parHandle.get(handleParRef[ref]);
-    if (x) { grille.appendChild(x); annoterCarte(x, res.scores[ref]); }
-  }
-  for (const x of cartes) if (![...res.ordre].some(r => handleParRef[r] === x.dataset.handle)) {
-    grille.appendChild(x); annoterCarte(x, null);
+  const actuel = cartes.map(x => x.dataset.handle);
+  const ordreHandles = res.ordre.map(r => handleParRef[r]).filter(Boolean);
+  const complet = [...ordreHandles, ...actuel.filter(h => !ordreHandles.includes(h))];
+  const final = ordreAvecEpingles(actuel, selectionShopify, complet);
+  for (const h of final) {
+    const x = parHandle.get(h);
+    if (!x) continue;
+    grille.appendChild(x);
+    const ref = refParHandle[h];
+    annoterCarte(x, ref ? res.scores[ref] || null : null);
   }
   renumShopify();
   DERNIER_RAPPORT = res.rapport;
