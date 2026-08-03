@@ -26,6 +26,15 @@
   .h-gauche { display: flex; gap: 16px; align-items: center; }
   .h-gauche a { font-size: 11.5px; letter-spacing: .16em; color: var(--gris); transition: color 150ms ease; }
   .h-gauche a:hover, .h-gauche a.actif { color: var(--blanc); }
+  .menu-deroulant { position: relative; }
+  .menu-deroulant > a { cursor: pointer; }
+  .sous-menu { position: absolute; top: 100%; left: -10px; padding-top: 10px; display: none; z-index: 60; }
+  .menu-deroulant:hover .sous-menu, .sous-menu:hover { display: block; }
+  .sous-menu a { display: block; white-space: nowrap; background: var(--noir2); border: 1px solid var(--bord);
+    padding: 11px 18px; font-size: 11.5px; letter-spacing: .12em; }
+  .sous-menu a:first-child { border-radius: 10px 10px 0 0; }
+  .sous-menu a:last-child { border-radius: 0 0 10px 10px; border-top: 0; }
+  .sous-menu a:hover { background: var(--noir3); color: var(--blanc); }
   .logo { font-size: 19px; font-weight: 700; letter-spacing: .42em; cursor: pointer; text-align: center; padding-left: .42em; }
   .h-droite { display: flex; align-items: center; gap: 12px; justify-content: flex-end; }
   select { background: var(--noir3); color: var(--blanc); border: 1px solid var(--bord); border-radius: 8px;
@@ -305,7 +314,13 @@
     <a href="#/" data-lien="accueil">ACCUEIL</a>
     <a href="#/collection/TOUT">CATALOGUE</a>
     <a href="#/compte">MON COMPTE</a>
-    <a href="#/merch" id="lien-merch" style="display:none; color:#d9a441">MERCH</a>
+    <div class="menu-deroulant" id="lien-merch" style="display:none">
+      <a style="color:#d9a441">MERCH ▾</a>
+      <div class="sous-menu">
+        <a href="#/merch">Merch B2B</a>
+        <a href="#/merch-shopify">Merch Shopify</a>
+      </div>
+    </div>
     <a href="#/utilisateurs" id="lien-utilisateurs" style="display:none; color:#d9a441">UTILISATEURS</a>
     <a href="#/imports" id="lien-imports" style="display:none; color:#d9a441">IMPORTS</a>
   </div>
@@ -414,7 +429,9 @@
         <input id="fichier-shopify" type="file" accept=".csv" style="display:none">
       </label>
       <div class="formu" style="margin-top:14px; display:none" id="barre-shopify">
-        <select class="qte-claire" id="sel-collection" style="width:280px; text-align:left"></select>
+        <input class="qte-claire" id="sel-collection" list="liste-collections" style="width:280px; text-align:left"
+               placeholder="chercher une collection… (tapez ou choisissez)">
+        <datalist id="liste-collections"></datalist>
         <button class="puce-claire" id="btn-shopify-haut">⭱ Tout en haut</button>
         <button class="puce-claire" id="btn-shopify-bas">⭳ Tout en bas</button>
         <input class="qte-claire" id="shopify-position" type="number" min="1" placeholder="n°" style="width:70px">
@@ -1193,8 +1210,9 @@ async function rendreMerchShopify() {
       if (rows[0]) {
         shopifyDonnees = rows[0].donnees;
         const noms = Object.keys(shopifyDonnees.collections);
-        document.getElementById("sel-collection").innerHTML =
-          noms.map(h => `<option value="${h}">${h} (${shopifyDonnees.collections[h].length} produits)</option>`).join("");
+        document.getElementById("liste-collections").innerHTML =
+          noms.map(h => `<option value="${h}">${shopifyDonnees.collections[h].length} produits</option>`).join("");
+        document.getElementById("sel-collection").value = noms[0] || "";
         document.getElementById("barre-shopify").style.display = "flex";
         document.getElementById("etat-shopify").textContent =
           `${noms.length} collections — export « ${rows[0].nom_fichier} » du ${new Date(rows[0].depose_le).toLocaleDateString("fr-FR")}`;
@@ -1212,7 +1230,10 @@ async function rendreMerchShopify() {
   zone.ondrop = e => { e.preventDefault(); zone.style.borderColor = "#ccc";
     if (e.dataTransfer.files[0]) traiterFichierShopify(e.dataTransfer.files[0]); };
 
-  document.getElementById("sel-collection").onchange = () => rendreCollectionShopify();
+  document.getElementById("sel-collection").onchange = () => {
+    const v = document.getElementById("sel-collection").value.trim();
+    if (shopifyDonnees?.collections?.[v]) rendreCollectionShopify();
+  };
   document.getElementById("btn-shopify-haut").onclick = () => deplacerShopify(0);
   document.getElementById("btn-shopify-bas").onclick = () => deplacerShopify(1e9);
   document.getElementById("btn-shopify-pos").onclick = () => {
@@ -1243,8 +1264,9 @@ async function traiterFichierShopify(fichier) {
     } catch (e) { /* mémorisation non bloquante */ }
   }
   const noms = Object.keys(shopifyDonnees.collections);
-  document.getElementById("sel-collection").innerHTML =
-    noms.map(h => `<option value="${h}">${h} (${shopifyDonnees.collections[h].length} produits)</option>`).join("");
+  document.getElementById("liste-collections").innerHTML =
+    noms.map(h => `<option value="${h}">${shopifyDonnees.collections[h].length} produits</option>`).join("");
+  document.getElementById("sel-collection").value = noms[0] || "";
   document.getElementById("barre-shopify").style.display = "flex";
   etat.textContent = `${noms.length} collection${noms.length > 1 ? "s" : ""} dans le fichier`;
   rendreCollectionShopify();
