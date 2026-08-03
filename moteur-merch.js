@@ -78,10 +78,17 @@ function scorerProduit(p, ventes) {
     else if (rythmeRecent < rythmeMoyen * 0.5) { tendance = 1; statutTendance = "PRODUIT_EN_BAISSE"; }
   }
 
-  // hiérarchie demandée : 1) % tailles cœur (50), 2) ventes (30), 3) stock total (20).
-  // nouveauté/tendance restent des statuts informatifs (bonus marginal ≤ 3).
-  const ptsStock = Math.min(20, (Math.log1p(st.stockTotal) / Math.log1p(500)) * 20);
-  let score = st.tauxCoeur * 50 + (vitesse / 30) * 30 + ptsStock
+  // poids de saison : les saisons récentes comptent plein pot, les anciennes (AH21…) très peu
+  const facteurSaison = rangSaison < 0 ? 0.5
+    : rangSaison <= 1 ? 1.0      // deux saisons les plus récentes (ex. 26 Q3, 26 Q2)
+    : rangSaison <= 3 ? 0.85
+    : rangSaison <= 6 ? 0.7
+    : 0.3;                        // fonds de saison type AH21
+
+  // hiérarchie : 1) % tailles cœur, 2) ventes × fraîcheur de saison, 3) stock total.
+  const ptsStock = Math.min(15, (Math.log1p(st.stockTotal) / Math.log1p(500)) * 15);
+  let score = st.tauxCoeur * 45 + (vitesse / 30) * 30 * facteurSaison + ptsStock
+              + facteurSaison * 10
               + (nouveaute / 20) * 2 + (tendance / 10) * 1;
 
   // pénalités et statut principal
@@ -99,8 +106,9 @@ function scorerProduit(p, ventes) {
 
   return { reference: p.reference, produit: p, score: Math.round(Math.min(100, score)),
            statut, q7, q30, alertes,
-           bandeCoeur: Math.round(st.tauxCoeur * 10), ventesCle: q7 * 2 + q30,
-           stockTotal: st.stockTotal };
+           bandeCoeur: Math.round(st.tauxCoeur * 10),
+           ventesCle: (q7 * 2 + q30) * facteurSaison + (rangSaison >= 0 && rangSaison <= 1 ? 5 : 0),
+           facteurSaison, stockTotal: st.stockTotal };
 }
 
 // --- compatibilité de deux produits pour former un duo ---
