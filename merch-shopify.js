@@ -69,7 +69,7 @@ async function chargerVignettesShopify(handles) {
   const vignettes = {};
   for (let i = 0; i < handles.length; i += 80) {
     const lot = handles.slice(i, i + 80).map(h => '"' + h.replaceAll('"', "") + '"').join(",");
-    const rows = await api(`/rest/v1/photos?handle=in.(${encodeURIComponent(lot)})&select=handle,url,reference`)
+    const rows = await api(`/rest/v1/photos?handle=in.(${encodeURIComponent(lot)})&select=handle,url,reference,promo_pct`)
       .catch(() => []);
     for (const r of rows) vignettes[r.handle] = r;
   }

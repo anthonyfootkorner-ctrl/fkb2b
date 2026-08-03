@@ -100,6 +100,8 @@ function scorerProduit(p, ventes) {
   if (st.presqueEpuise) { score *= 0.5; statut = "PRESQUE_EPUISE"; alertes.push("presque épuisé"); }
   if (q30 === 0 && !estNouveaute) { score *= 0.7; statut = "DORMANT"; alertes.push("aucune vente sur 30 j"); }
   if (q7 * 2 + q30 > st.stockTotal * 2) alertes.push("stock possiblement insuffisant pour la demande");
+  // spec : une forte remise n'est jamais une preuve de performance — remisé fort ET peu vendu = pénalisé
+  if ((p.promo_pct || 0) >= 30 && q30 <= 2) { score *= 0.8; alertes.push(`remise −${p.promo_pct}% sans effet sur les ventes`); }
 
   if (statut === "PRODUIT_STABLE" && score >= 55 && q30 >= 8) statut = "BEST_SELLER";
   if (score < 15 && !estNouveaute) statut = "A_DECLASSER";
