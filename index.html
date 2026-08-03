@@ -546,6 +546,10 @@
 <script>
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
 let MES_SOCIETES = [], estAdmin = false;
+let travailNonEnregistre = false;
+window.addEventListener("beforeunload", e => {
+  if (travailNonEnregistre) { e.preventDefault(); e.returnValue = ""; }
+});
 const panier = new Map();    // clé "ref|taille" -> {produit, taille, qte, prix}
 const selection = new Map(); // saisie en cours sur la fiche ouverte : taille -> qte (rien n'entre au panier avant « Ajouter »)
 
@@ -1088,6 +1092,7 @@ async function rendreMerch() {
   function renumeroter() {
     grille.querySelectorAll(".carte").forEach((c, i) => c.querySelector(".rang-merch").textContent = i + 1);
     document.getElementById("merch-etat").textContent = "modifications non enregistrées";
+    travailNonEnregistre = true;
   }
 
   // Tris d'aide : réordonnent les cartes à l'écran, à enregistrer ensuite.
@@ -1119,6 +1124,7 @@ async function rendreMerch() {
         await api("/rest/v1/merch_positions", { corps: positions });
         await chargerMerch();
         if (ctx === "TOUT") { DATA.produits = await api("/rest/v1/rpc/catalogue", { corps: { limite: 300 } }); DATA.produits.forEach(trierTailles); }
+        travailNonEnregistre = false;
         etat.textContent = `ordre enregistré ✓ (${positions.length} produits — ${ctx === "TOUT" ? "tout le site" : ctx.split(":")[1]})`;
       } catch (e) {
         etat.textContent = "échec : " + (e.donnees?.message || e.message);
@@ -1402,6 +1408,7 @@ function renumShopify() {
   const grille = document.getElementById("grille-shopify");
   ordreShopify = [...grille.querySelectorAll(".carte")].map(c => c.dataset.handle);
   grille.querySelectorAll(".carte").forEach((c, i) => c.querySelector(".rang-merch").textContent = i + 1);
+  travailNonEnregistre = true;
 }
 
 function deplacerShopify(cible) {
@@ -1430,6 +1437,7 @@ async function exporterShopify() {
   lien.download = shopifyDonnees.fichier.replace(/\.csv$/i, "") + "_merch.csv";
   lien.click();
   URL.revokeObjectURL(lien.href);
+  travailNonEnregistre = false;
   document.getElementById("etat-shopify").textContent =
     `CSV généré pour « ${collection} » — importez-le dans Matrixify (l'ordre de tri de la collection doit être « Manuel » dans Shopify).`;
   // suivi : date du dernier passage sur cette collection
@@ -1648,6 +1656,11 @@ function rendrePanier() {
   document.getElementById("t-refs").textContent = `${refs.size} référence${refs.size > 1 ? "s" : ""}`;
   document.getElementById("t-ht").textContent = eur(ht);
   document.getElementById("btn-export").disabled = panier.size === 0;
+  // filet de sécurité : le panier en cours survit à une actualisation (localStorage)
+  try {
+    localStorage.setItem("fkb2b-panier-auto", JSON.stringify(
+      [...panier.values()].map(l => ({ref: l.produit.reference, taille: l.taille, qte: l.qte}))));
+  } catch (e) { /* stockage local indisponible */ }
 }
 
 function basculer(id, ouvert) {
@@ -1674,7 +1687,10 @@ async function sauverPanier() {
 
 async function restaurerPanier() {
   try {
-    const rows = await api("/rest/v1/paniers?select=lignes&order=modifie_le.desc&limit=1");
+    // priorité au panier en cours (sauvegarde auto locale), sinon au panier enregistré en base
+    const auto = JSON.parse(localStorage.getItem("fkb2b-panier-auto") || "[]");
+    const rows = auto.length ? [{ lignes: auto }]
+      : await api("/rest/v1/paniers?select=lignes&order=modifie_le.desc&limit=1");
     for (const l of (rows[0]?.lignes || [])) {
       const p = DATA.produits.find(x => x.reference === l.ref);
       const t = p && p.tailles.find(t => t.taille === l.taille);
@@ -1697,6 +1713,7 @@ async function validerCommande() {
     const r = await api("/rest/v1/rpc/valider_commande",
       { corps: { p_lignes: lignes, p_societe: clientActif.id ?? null } });
     genererFichier(r.numero);
+    localStorage.removeItem("fkb2b-panier-auto");
     await api("/rest/v1/paniers?user_id=eq." + monUserId(), { methode: "DELETE" }).catch(() => {});
     panier.clear();
     rendrePanier();
