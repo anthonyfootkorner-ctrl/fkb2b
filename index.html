@@ -384,6 +384,7 @@
         <button class="puce-claire" id="btn-tri-recent">Tri : du plus récent au plus ancien</button>
         <button class="btn-noir" id="btn-merch-sauver">ENREGISTRER L'ORDRE</button>
         <button class="puce-claire" id="btn-merch-reinit">Effacer l'ordre de ce périmètre</button>
+        <button class="puce-claire" onclick="location.hash='#/merch-shopify'" style="border-color:#95bf47; color:#5e8e3e">Merch Shopify (collections) →</button>
         <span class="compte-produits" id="merch-etat" style="margin:0"></span>
       </div>
       <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; align-items:center">
@@ -396,6 +397,38 @@
       </div>
     </div>
     <div class="grille-col" id="grille-merch"></div>
+  </section>
+
+  <!-- MERCH SHOPIFY (admin) -->
+  <section class="vue page-claire" id="vue-merch-shopify">
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='#/merch'">← MERCH FKB2B</span>
+      <h1>MERCH <b>SHOPIFY</b></h1>
+      <div class="compte-produits">Exportez vos collections depuis Matrixify (entité « Custom Collections », format CSV),
+        réordonnez ici, puis réimportez le fichier généré dans Matrixify. Seules les positions changent.</div>
+    </div>
+    <div class="bloc-clair" style="margin: 0 22px 26px">
+      <label id="zone-depot-shopify" style="display:block; border:2px dashed #ccc; border-radius:12px; padding:32px;
+             text-align:center; cursor:pointer; color:var(--encre2); font-size:13.5px">
+        Glissez l'export CSV Matrixify des collections ici (ou cliquez)
+        <input id="fichier-shopify" type="file" accept=".csv" style="display:none">
+      </label>
+      <div class="formu" style="margin-top:14px; display:none" id="barre-shopify">
+        <select class="qte-claire" id="sel-collection" style="width:280px; text-align:left"></select>
+        <button class="puce-claire" id="btn-shopify-haut">⭱ Tout en haut</button>
+        <button class="puce-claire" id="btn-shopify-bas">⭳ Tout en bas</button>
+        <input class="qte-claire" id="shopify-position" type="number" min="1" placeholder="n°" style="width:70px">
+        <button class="puce-claire" id="btn-shopify-pos">→ À cette position</button>
+        <button class="btn-noir" id="btn-shopify-export">TÉLÉCHARGER LE CSV POUR MATRIXIFY</button>
+        <span class="compte-produits" id="etat-shopify"></span>
+      </div>
+    </div>
+    <div class="bloc-clair" style="margin: 0 22px 26px">
+      <h3 class="titre-bloc">Suivi des collections merchandisées</h3>
+      <div class="compte-produits" style="margin-bottom:10px">Une collection en tri manuel n'évolue plus seule : repassez dessus régulièrement (les nouveautés arrivent sans position).</div>
+      <div id="suivi-shopify"></div>
+    </div>
+    <div class="grille-col" id="grille-shopify"></div>
   </section>
 
   <!-- IMPORTS (admin) -->
@@ -492,6 +525,7 @@
 
 <script src="config.js"></script>
 <script src="imports.js"></script>
+<script src="merch-shopify.js"></script>
 <script>
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
 let MES_SOCIETES = [], estAdmin = false;
@@ -645,6 +679,9 @@ function router() {
   } else if (route === "imports") {
     document.getElementById("vue-imports").classList.add("active");
     rendreImports();
+  } else if (route === "merch-shopify") {
+    document.getElementById("vue-merch-shopify").classList.add("active");
+    rendreMerchShopify();
   } else {
     document.getElementById("vue-accueil").classList.add("active");
   }
@@ -1140,6 +1177,169 @@ async function traiterFichier(fichier) {
       btn.disabled = false;
     }
   };
+}
+
+/* ---------------- merch Shopify (admin) : réordonner les collections du site public ---------------- */
+let merchShopifyInitialise = false;
+let ordreShopify = [];        // handles produits de la collection affichée, dans l'ordre courant
+let selectionShopify = [];    // handles cochés, dans l'ordre des clics
+
+async function rendreMerchShopify() {
+  rendreSuiviShopify();
+  if (merchShopifyInitialise) return;
+  merchShopifyInitialise = true;
+  const zone = document.getElementById("zone-depot-shopify");
+  const champ = document.getElementById("fichier-shopify");
+  champ.onchange = () => champ.files[0] && traiterFichierShopify(champ.files[0]);
+  zone.ondragover = e => { e.preventDefault(); zone.style.borderColor = "#111"; };
+  zone.ondragleave = () => zone.style.borderColor = "#ccc";
+  zone.ondrop = e => { e.preventDefault(); zone.style.borderColor = "#ccc";
+    if (e.dataTransfer.files[0]) traiterFichierShopify(e.dataTransfer.files[0]); };
+
+  document.getElementById("sel-collection").onchange = () => rendreCollectionShopify();
+  document.getElementById("btn-shopify-haut").onclick = () => deplacerShopify(0);
+  document.getElementById("btn-shopify-bas").onclick = () => deplacerShopify(1e9);
+  document.getElementById("btn-shopify-pos").onclick = () => {
+    const n = parseInt(document.getElementById("shopify-position").value || "0", 10);
+    if (n >= 1) deplacerShopify(n - 1);
+  };
+  document.getElementById("btn-shopify-export").onclick = exporterShopify;
+}
+
+async function traiterFichierShopify(fichier) {
+  const etat = document.getElementById("etat-shopify");
+  shopifyDonnees = await analyserFichierShopify(fichier);
+  if (shopifyDonnees.erreur) {
+    document.getElementById("grille-shopify").innerHTML =
+      `<div class="vide" style="grid-column:1/-1; color:#a33">${shopifyDonnees.erreur}</div>`;
+    return;
+  }
+  const noms = Object.keys(shopifyDonnees.collections);
+  document.getElementById("sel-collection").innerHTML =
+    noms.map(h => `<option value="${h}">${h} (${shopifyDonnees.collections[h].length} produits)</option>`).join("");
+  document.getElementById("barre-shopify").style.display = "flex";
+  etat.textContent = `${noms.length} collection${noms.length > 1 ? "s" : ""} dans le fichier`;
+  rendreCollectionShopify();
+}
+
+async function rendreCollectionShopify() {
+  const d = shopifyDonnees;
+  const collection = document.getElementById("sel-collection").value;
+  const { entete, lignes, cols } = d;
+  const iPH = entete.indexOf(cols.prodHandle || cols.prodTitre);
+  const iPos = entete.indexOf(cols.position);
+  const iPT = cols.prodTitre ? entete.indexOf(cols.prodTitre) : -1;
+
+  // ordre initial = positions du fichier
+  const items = d.collections[collection]
+    .map(i => ({ handle: lignes[i][iPH], titre: iPT >= 0 ? lignes[i][iPT] : lignes[i][iPH],
+                 pos: parseInt(lignes[i][iPos] || "0", 10) || 9999 }))
+    .filter(x => x.handle)
+    .sort((a, b) => a.pos - b.pos);
+  ordreShopify = items.map(x => x.handle);
+  selectionShopify = [];
+
+  const grille = document.getElementById("grille-shopify");
+  grille.innerHTML = `<div class="vide" style="grid-column:1/-1">Chargement des visuels…</div>`;
+  const vignettes = await chargerVignettesShopify(ordreShopify);
+
+  grille.innerHTML = items.map((x, i) => {
+    const v = vignettes[x.handle];
+    return `<div class="carte" draggable="true" data-handle="${x.handle}">
+      <label class="coche" draggable="false"><input type="checkbox"><span class="ordre-coche"></span></label>
+      <div class="rang-merch">${i + 1}</div>
+      <div class="visuel">${v ? `<img loading="lazy" src="${v.url}" alt="" draggable="false">`
+        : `<span style="font-size:11px; color:#999; padding:20px; text-align:center">${x.titre}</span>`}</div>
+      <div class="infos"><div class="nom">${x.titre}</div>
+        <div class="sousnom">${v?.reference || x.handle}</div></div>
+    </div>`;
+  }).join("");
+  document.getElementById("etat-shopify").textContent =
+    `${items.length} produits · ${Object.keys(vignettes).length} visuels reconnus`;
+
+  // drag & drop + cases à cocher (mêmes gestes que le merch FKB2B)
+  let saisie = null;
+  grille.querySelectorAll(".carte").forEach(c => {
+    c.addEventListener("dragstart", () => { saisie = c; requestAnimationFrame(() => c.classList.add("saisie")); });
+    c.addEventListener("dragend", () => { c.classList.remove("saisie"); saisie = null; renumShopify(); });
+    c.addEventListener("dragover", e => {
+      e.preventDefault();
+      if (!saisie || saisie === c) return;
+      const r = c.getBoundingClientRect();
+      grille.insertBefore(saisie, (e.clientX - r.left) < r.width / 2 ? c : c.nextSibling);
+    });
+    const inp = c.querySelector(".coche input");
+    inp.addEventListener("click", e => e.stopPropagation());
+    inp.addEventListener("change", () => {
+      const h = c.dataset.handle;
+      const idx = selectionShopify.indexOf(h);
+      if (idx >= 0) selectionShopify.splice(idx, 1); else selectionShopify.push(h);
+      grille.querySelectorAll(".carte").forEach(x => {
+        const j = selectionShopify.indexOf(x.dataset.handle);
+        x.classList.toggle("cochee", j >= 0);
+        x.querySelector(".ordre-coche").textContent = j >= 0 ? j + 1 : "";
+      });
+    });
+  });
+  grille.addEventListener("dragover", e => e.preventDefault());
+}
+
+function renumShopify() {
+  const grille = document.getElementById("grille-shopify");
+  ordreShopify = [...grille.querySelectorAll(".carte")].map(c => c.dataset.handle);
+  grille.querySelectorAll(".carte").forEach((c, i) => c.querySelector(".rang-merch").textContent = i + 1);
+}
+
+function deplacerShopify(cible) {
+  if (!selectionShopify.length) return;
+  const grille = document.getElementById("grille-shopify");
+  const cartes = [...grille.querySelectorAll(".carte")];
+  const choisis = selectionShopify.map(h => cartes.find(c => c.dataset.handle === h)).filter(Boolean);
+  const restants = cartes.filter(c => !selectionShopify.includes(c.dataset.handle));
+  const pos = Math.max(0, Math.min(cible, restants.length));
+  [...restants.slice(0, pos), ...choisis, ...restants.slice(pos)].forEach(c => grille.appendChild(c));
+  selectionShopify = [];
+  grille.querySelectorAll(".carte").forEach(c => {
+    c.classList.remove("cochee");
+    c.querySelector(".ordre-coche").textContent = "";
+    c.querySelector(".coche input").checked = false;
+  });
+  renumShopify();
+}
+
+async function exporterShopify() {
+  renumShopify();
+  const collection = document.getElementById("sel-collection").value;
+  const csv = genererCSVShopify(shopifyDonnees, collection, ordreShopify);
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  lien.download = shopifyDonnees.fichier.replace(/\.csv$/i, "") + "_merch.csv";
+  lien.click();
+  URL.revokeObjectURL(lien.href);
+  document.getElementById("etat-shopify").textContent =
+    `CSV généré pour « ${collection} » — importez-le dans Matrixify (l'ordre de tri de la collection doit être « Manuel » dans Shopify).`;
+  // suivi : date du dernier passage sur cette collection
+  try {
+    await api(`/rest/v1/merch_shopify_suivi?collection=eq.${encodeURIComponent(collection)}`, { methode: "DELETE" });
+    await api("/rest/v1/merch_shopify_suivi",
+      { corps: { collection, fait_le: new Date().toISOString(), nb_produits: ordreShopify.length } });
+    rendreSuiviShopify();
+  } catch (e) { /* suivi non bloquant */ }
+}
+
+async function rendreSuiviShopify() {
+  const rows = await api("/rest/v1/merch_shopify_suivi?select=*&order=fait_le.asc").catch(() => []);
+  document.getElementById("suivi-shopify").innerHTML = rows.length
+    ? rows.map(s => {
+        const jours = Math.floor((Date.now() - new Date(s.fait_le)) / 86400000);
+        const [cls, lib] = jours >= 30 ? ["rouge", "à repasser"] : jours >= 14 ? ["orange", "bientôt à revoir"] : ["vert", "à jour"];
+        return `<div class="rang-util"><div class="qui"><b>${s.collection}</b>
+          <span>${s.nb_produits ?? "?"} produits · fait le ${new Date(s.fait_le).toLocaleDateString("fr-FR")}</span></div>
+          <div style="margin-left:auto; display:flex; align-items:center; gap:8px">
+            <span class="pastille ${cls}"></span>
+            <span style="font-size:12px; color:var(--encre2)">${lib} (${jours} j)</span></div></div>`;
+      }).join("")
+    : `<div class="compte-produits">Aucune collection merchandisée pour le moment.</div>`;
 }
 
 /* ---------------- gestion des utilisateurs (admin) ---------------- */
