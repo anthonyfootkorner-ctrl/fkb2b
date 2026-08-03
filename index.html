@@ -188,6 +188,8 @@
   #grille-merch .carte .nom, #grille-shopify .carte .nom { font-size: 11px; height: auto; }
   #grille-merch .carte .infos, #grille-shopify .carte .infos { padding: 0 10px 12px; }
   .ligne-info { font-size: 10.5px; color: #a68a3d; letter-spacing: .04em; margin-top: 2px; }
+  .pastille-promo { position: absolute; bottom: 8px; left: 8px; z-index: 2; background: #c0504d; color: #fff;
+    font-size: 10.5px; font-weight: 800; border-radius: 999px; padding: 3px 8px; letter-spacing: .03em; }
   .ligne-info b { color: #8a7020; font-weight: 700; }
 
   /* gestion des utilisateurs (admin) */
@@ -554,10 +556,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1785794646"></script>
-<script src="imports.js?v=1785794646"></script>
-<script src="merch-shopify.js?v=1785794646"></script>
-<script src="moteur-merch.js?v=1785794646"></script>
+<script src="config.js?v=1785794718"></script>
+<script src="imports.js?v=1785794718"></script>
+<script src="merch-shopify.js?v=1785794718"></script>
+<script src="moteur-merch.js?v=1785794718"></script>
 <script>
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
 let MES_SOCIETES = [], estAdmin = false;
@@ -1048,7 +1050,8 @@ async function rendreMerch() {
         <input type="checkbox"><span class="ordre-coche"></span>
       </label>
       <div class="rang-merch">${i + 1}</div>
-      <div class="visuel"><img loading="lazy" src="${p.photo}" alt="" draggable="false"></div>
+      <div class="visuel"><img loading="lazy" src="${p.photo}" alt="" draggable="false">
+        ${p.promo_pct ? `<span class="pastille-promo">−${p.promo_pct}%</span>` : ""}</div>
       <div class="infos">
         <div class="nom">${p.designation || p.reference}</div>
         <div class="sousnom">${p.marque || ""} · ${p.reference} · ${p.saison || ""}</div>
