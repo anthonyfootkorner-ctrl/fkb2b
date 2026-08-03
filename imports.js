@@ -133,12 +133,16 @@ function mapperVersTables(analyse) {
         .filter(r => r.famille_tarifaire && !isNaN(r.prix)) }];
     case "stock_shopify": {
       const REF = "Metafield: fmsync.reference [single_line_text_field]";
-      const refParId = {};
-      for (const l of L) if (l.ID && l[REF]) refParId[l.ID] ??= l[REF].trim();
+      const refParId = {}, statutParId = {};
+      for (const l of L) {
+        if (l.ID && l[REF]) refParId[l.ID] ??= l[REF].trim();
+        if (l.ID && l.Status) statutParId[l.ID] ??= l.Status.trim();
+      }
       const parCle = new Map();
       for (const l of L) {
         const ref = refParId[l.ID];
         if (!ref || !l["Variant ID"] || !l["Option1 Value"]) continue;
+        if ((statutParId[l.ID] || "").toLowerCase() !== "active") continue; // seuls les produits actifs Shopify
         const q = parseInt(parseFloat(l["Inventory Available: Duhamel"] || 0), 10) || 0;
         if (q <= 0) continue;
         const cle = ref + "|" + l["Option1 Value"];
