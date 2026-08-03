@@ -105,9 +105,13 @@ function scorerProduit(p, ventes) {
 
   if (statut === "PRODUIT_STABLE" && score >= 55 && q30 >= 8) statut = "BEST_SELLER";
   if (score < 15 && !estNouveaute) statut = "A_DECLASSER";
+  // un produit qui ne peut plus servir la demande passe derrière tous les produits sains
+  const degrade = st.monoTaille || st.presqueEpuise || st.sansCoeur
+    || st.stockTotal < q7 || statut === "A_DECLASSER";
+  if (degrade && !alertes.length) alertes.push("disponibilité insuffisante");
 
   return { reference: p.reference, produit: p, score: Math.round(Math.min(100, score)),
-           statut, q7, q30, alertes,
+           statut, q7, q30, alertes, degrade,
            bandeCoeur: Math.round(st.tauxCoeur * 10),
            ventesCle: (q7 * 2 + q30) * facteurSaison + (rangSaison >= 0 && rangSaison <= 1 ? 5 : 0),
            facteurSaison, stockTotal: st.stockTotal };
@@ -150,8 +154,10 @@ function raisonDuo(a, b, types) {
 // --- classement complet : scores, rotation, duos ---
 function classementAutomatique(produits, ventes) {
   let notes = produits.map(p => scorerProduit(p, ventes)).filter(Boolean);
-  // hiérarchie stricte : 1) taux de tailles cœur (tranches de 10 %), 2) ventes, 3) stock total
-  notes.sort((x, y) => (y.bandeCoeur - x.bandeCoeur)
+  // hiérarchie : 0) produits sains avant produits dégradés (mono-taille, presque épuisés…),
+  // 1) taux de tailles cœur (tranches de 10 %), 2) ventes pondérées, 3) stock total
+  notes.sort((x, y) => ((x.degrade ? 1 : 0) - (y.degrade ? 1 : 0))
+    || (y.bandeCoeur - x.bandeCoeur)
     || (y.ventesCle - x.ventesCle)
     || (y.stockTotal - x.stockTotal));
 

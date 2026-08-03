@@ -556,10 +556,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1785795364"></script>
-<script src="imports.js?v=1785795364"></script>
-<script src="merch-shopify.js?v=1785795364"></script>
-<script src="moteur-merch.js?v=1785795364"></script>
+<script src="config.js?v=1785795647"></script>
+<script src="imports.js?v=1785795647"></script>
+<script src="merch-shopify.js?v=1785795647"></script>
+<script src="moteur-merch.js?v=1785795647"></script>
 <script>
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
 let MES_SOCIETES = [], estAdmin = false;
@@ -1360,11 +1360,18 @@ async function chargerStocksRefs(references) {
   STOCKS_REFS = {};
   for (let i = 0; i < references.length; i += 80) {
     const lot = references.slice(i, i + 80).map(r => '"' + r.replaceAll('"', "") + '"').join(",");
-    const rows = await api(`/rest/v1/stock_disponible?reference=in.(${encodeURIComponent(lot)})&select=reference,taille,disponible`)
-      .catch(() => []);
+    const [rows, grilles] = await Promise.all([
+      api(`/rest/v1/stock_disponible?reference=in.(${encodeURIComponent(lot)})&select=reference,taille,disponible`).catch(() => []),
+      api(`/rest/v1/variantes?reference=in.(${encodeURIComponent(lot)})&select=reference,taille`).catch(() => []),
+    ]);
+    for (const g of grilles) {
+      const e = STOCKS_REFS[g.reference] ??= { total: 0, tailles: [], detail: [] };
+      if (!e.detail.some(d => d.taille === g.taille)) e.detail.push({ taille: g.taille, stock: 0 });
+    }
     for (const r of rows) {
       const e = STOCKS_REFS[r.reference] ??= { total: 0, tailles: [], detail: [] };
-      e.detail.push({ taille: r.taille, stock: r.disponible });
+      const d = e.detail.find(d => d.taille === r.taille);
+      if (d) d.stock = r.disponible; else e.detail.push({ taille: r.taille, stock: r.disponible });
       if (r.disponible > 0) { e.total += r.disponible; e.tailles.push(r.taille); }
     }
   }
