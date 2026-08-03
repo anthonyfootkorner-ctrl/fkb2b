@@ -1230,9 +1230,24 @@ async function rendreMerchShopify() {
   zone.ondrop = e => { e.preventDefault(); zone.style.borderColor = "#ccc";
     if (e.dataTransfer.files[0]) traiterFichierShopify(e.dataTransfer.files[0]); };
 
-  document.getElementById("sel-collection").onchange = () => {
-    const v = document.getElementById("sel-collection").value.trim();
-    if (shopifyDonnees?.collections?.[v]) rendreCollectionShopify();
+  const champCollection = document.getElementById("sel-collection");
+  // au focus : champ vidé pour dérouler TOUTES les collections ; taper filtre la liste
+  champCollection.onfocus = () => {
+    champCollection.dataset.precedent = champCollection.value;
+    champCollection.value = "";
+  };
+  champCollection.onblur = () => {
+    if (!shopifyDonnees?.collections?.[champCollection.value.trim()]) {
+      champCollection.value = champCollection.dataset.precedent || "";
+    }
+  };
+  champCollection.onchange = () => {
+    const v = champCollection.value.trim();
+    if (shopifyDonnees?.collections?.[v]) {
+      champCollection.dataset.precedent = v;
+      champCollection.blur();
+      rendreCollectionShopify();
+    }
   };
   document.getElementById("btn-shopify-haut").onclick = () => deplacerShopify(0);
   document.getElementById("btn-shopify-bas").onclick = () => deplacerShopify(1e9);
