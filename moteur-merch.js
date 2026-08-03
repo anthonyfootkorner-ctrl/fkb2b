@@ -177,12 +177,17 @@ function classementAutomatique(produits, ventes) {
     for (const b of restants.slice(0, 40)) {
       const c = compatibilite(a, b);
       if (c.doublon) continue;
+      // spec : jamais un produit presque épuisé/dégradé en partenaire d'un produit sain
+      if (!a.degrade && b.degrade) continue;
       if (memeMarqueBloquee && b.produit.marque === a.produit.marque && c.types.length <= 1) continue;
       // jamais remonter un mauvais produit juste pour compléter : compatibilité pondérée par le score
       const poids = c.poids * 10 + b.score;
       if (poids > meilleurPoids) { meilleurPoids = poids; meilleur = { b, c }; }
     }
-    if (!meilleur) meilleur = { b: restants[0], c: { types: [], doublon: false } };
+    if (!meilleur) {
+      const secours = restants.find(b => a.degrade || !b.degrade) || restants[0];
+      meilleur = { b: secours, c: { types: [], doublon: false } };
+    }
     restants.splice(restants.indexOf(meilleur.b), 1);
     const types = meilleur.c.types.length ? meilleur.c.types : ["DUO_PAR_DEFAUT"];
     duos.push({ a, b: meilleur.b, types });
