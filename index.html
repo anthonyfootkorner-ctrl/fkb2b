@@ -403,6 +403,7 @@
       <div class="compte-produits">Choisissez un périmètre, partez d'un tri automatique si besoin, puis glissez-déposez et enregistrez. Chaque périmètre garde son propre ordre.</div>
       <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; align-items:center">
         <select id="merch-contexte" style="background:#fff; color:var(--encre); border:1px solid #d8d8d5; border-radius:8px; padding:9px 12px; font-size:13px"></select>
+        <input class="qte-claire" id="merch-figer" type="number" min="0" placeholder="figer N premiers" style="width:130px; text-align:left" title="Les N premiers produits ne bougent pas lors des tris">
         <button class="puce-claire" id="btn-tri-stock">Tri : stock disponible ↓</button>
         <button class="puce-claire" id="btn-tri-recent">Tri : du plus récent au plus ancien</button>
         <button class="btn-noir" id="btn-merch-sauver">ENREGISTRER L'ORDRE</button>
@@ -442,6 +443,7 @@
         <input class="qte-claire" id="sel-collection" list="liste-collections" style="width:280px; text-align:left"
                placeholder="chercher une collection… (tapez ou choisissez)">
         <datalist id="liste-collections"></datalist>
+        <input class="qte-claire" id="shopify-figer" type="number" min="0" placeholder="figer N premiers" style="width:130px; text-align:left" title="Les N premiers produits ne bougent pas lors des tris">
         <button class="puce-claire" id="btn-shopify-haut">⭱ Tout en haut</button>
         <button class="puce-claire" id="btn-shopify-bas">⭳ Tout en bas</button>
         <input class="qte-claire" id="shopify-position" type="number" min="1" placeholder="n°" style="width:70px">
@@ -552,10 +554,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1785793657"></script>
-<script src="imports.js?v=1785793657"></script>
-<script src="merch-shopify.js?v=1785793657"></script>
-<script src="moteur-merch.js?v=1785793657"></script>
+<script src="config.js?v=1785793895"></script>
+<script src="imports.js?v=1785793895"></script>
+<script src="merch-shopify.js?v=1785793895"></script>
+<script src="moteur-merch.js?v=1785793895"></script>
 <script>
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
 let MES_SOCIETES = [], estAdmin = false;
@@ -1126,8 +1128,8 @@ async function rendreMerch() {
     const cartes = new Map([...grille.querySelectorAll(".carte")].map(x => [x.dataset.ref, x]));
     const actuel = [...cartes.keys()];
     const trie = [...actuel].sort((a, b) => cmp(refs.get(a), refs.get(b)));
-    // les produits cochés restent à leur place, le tri s'applique autour d'eux
-    const final = ordreAvecEpingles(actuel, selectionMerch, trie);
+    // cochés + N premiers figés restent en place, le tri s'applique autour
+    const final = ordreAvecEpingles(actuel, epinglesEffectives(actuel, selectionMerch, "merch-figer"), trie);
     final.forEach(ref => grille.appendChild(cartes.get(ref)));
     grille.querySelectorAll(".carte").forEach((c, i) => c.querySelector(".rang-merch").textContent = i + 1);
     document.getElementById("merch-etat").textContent = libelle
@@ -1512,6 +1514,12 @@ function ordreAvecEpingles(ordreActuel, epingles, ordreTrie) {
   return resultat.filter(Boolean);
 }
 
+// Épingles effectives d'une grille : produits cochés + les N premiers figés (champ « figer »).
+function epinglesEffectives(ordreActuel, coches, idChampFiger) {
+  const n = parseInt(document.getElementById(idChampFiger)?.value || "0", 10) || 0;
+  return [...new Set([...(coches || []), ...ordreActuel.slice(0, Math.max(0, n))])];
+}
+
 /* ---------------- classement automatique (moteur de merchandising) ---------------- */
 let DERNIER_RAPPORT = null;
 
@@ -1544,7 +1552,7 @@ async function classementAutoB2B() {
   const cartes = new Map([...grille.querySelectorAll(".carte")].map(x => [x.dataset.ref, x]));
   const actuel = [...cartes.keys()];
   const complet = [...res.ordre, ...actuel.filter(r => !res.ordre.includes(r))];
-  const epingles = window.selectionMerchActive || [];
+  const epingles = epinglesEffectives(actuel, window.selectionMerchActive || [], "merch-figer");
   const final = ordreAvecEpingles(actuel, epingles, complet);
   for (const ref of final) { const x = cartes.get(ref); if (x) { grille.appendChild(x); annoterCarte(x, res.scores[ref] || null); } }
   grille.querySelectorAll(".carte").forEach((x, i) => x.querySelector(".rang-merch").textContent = i + 1);
@@ -1577,7 +1585,7 @@ async function classementAutoShopify() {
   const actuel = cartes.map(x => x.dataset.handle);
   const ordreHandles = res.ordre.map(r => handleParRef[r]).filter(Boolean);
   const complet = [...ordreHandles, ...actuel.filter(h => !ordreHandles.includes(h))];
-  const final = ordreAvecEpingles(actuel, selectionShopify, complet);
+  const final = ordreAvecEpingles(actuel, epinglesEffectives(actuel, selectionShopify, "shopify-figer"), complet);
   for (const h of final) {
     const x = parHandle.get(h);
     if (!x) continue;
