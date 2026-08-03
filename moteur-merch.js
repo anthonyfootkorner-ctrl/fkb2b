@@ -26,6 +26,9 @@ function scoreTailles(p) {
   }
   const coeursDispo = coeurs.filter(c => dispo.some(t => t.taille === c));
   const sansCoeur = coeurs.length > 0 && coeursDispo.length === 0;
+  // taux de tailles cœur : critère de classement n° 1 (en % — 3/4 bat 4/12)
+  const tauxCoeur = coeurs.length ? coeursDispo.length / coeurs.length
+                                  : dispo.length / Math.max(total, 1);
   if (coeurs.length) pts = pts * 0.55 + 25 * 0.45 * (coeursDispo.length / coeurs.length);
 
   // équilibre : stock concentré sur une seule taille = pénalisé
@@ -33,7 +36,7 @@ function scoreTailles(p) {
   const concentration = Math.max(...dispo.map(t => t.stock)) / stockTotal;
   if (dispo.length > 1 && concentration > 0.7) pts *= 0.75;
 
-  return { pts: Math.max(0, Math.min(25, pts)),
+  return { pts: Math.max(0, Math.min(25, pts)), tauxCoeur,
            monoTaille: dispo.length === 1, sansCoeur,
            fragmentee: total >= 4 && dispo.length / total < 0.5,
            presqueEpuise: stockTotal <= 3, stockTotal };
@@ -75,7 +78,11 @@ function scorerProduit(p, ventes) {
     else if (rythmeRecent < rythmeMoyen * 0.5) { tendance = 1; statutTendance = "PRODUIT_EN_BAISSE"; }
   }
 
-  let score = (vitesse + st.pts + nouveaute + tendance) * REDIST;
+  // hiérarchie demandée : 1) % tailles cœur (50), 2) ventes (30), 3) stock total (20).
+  // nouveauté/tendance restent des statuts informatifs (bonus marginal ≤ 3).
+  const ptsStock = Math.min(20, (Math.log1p(st.stockTotal) / Math.log1p(500)) * 20);
+  let score = st.tauxCoeur * 50 + (vitesse / 30) * 30 + ptsStock
+              + (nouveaute / 20) * 2 + (tendance / 10) * 1;
 
   // pénalités et statut principal
   const alertes = [];
@@ -91,7 +98,9 @@ function scorerProduit(p, ventes) {
   if (score < 15 && !estNouveaute) statut = "A_DECLASSER";
 
   return { reference: p.reference, produit: p, score: Math.round(Math.min(100, score)),
-           statut, q7, q30, alertes };
+           statut, q7, q30, alertes,
+           bandeCoeur: Math.round(st.tauxCoeur * 10), ventesCle: q7 * 2 + q30,
+           stockTotal: st.stockTotal };
 }
 
 // --- compatibilité de deux produits pour former un duo ---
@@ -131,18 +140,10 @@ function raisonDuo(a, b, types) {
 // --- classement complet : scores, rotation, duos ---
 function classementAutomatique(produits, ventes) {
   let notes = produits.map(p => scorerProduit(p, ventes)).filter(Boolean);
-  notes.sort((x, y) => y.score - x.score);
-
-  // rotation : dans le premier quart, alterner best-sellers (~moitié) et nouveautés/hausses prometteuses
-  const premierQuart = Math.max(4, Math.floor(notes.length / 4));
-  const tete = notes.slice(0, premierQuart);
-  const promus = notes.slice(premierQuart).filter(n =>
-    ["NOUVEAUTE_FORT_POTENTIEL", "PRODUIT_EN_HAUSSE"].includes(n.statut) && n.score >= 30);
-  for (let i = 1, j = 0; i < tete.length && j < promus.length; i += 2, j++) {
-    const idx = notes.indexOf(promus[j]);
-    notes.splice(idx, 1);
-    notes.splice(i, 0, promus[j]);
-  }
+  // hiérarchie stricte : 1) taux de tailles cœur (tranches de 10 %), 2) ventes, 3) stock total
+  notes.sort((x, y) => (y.bandeCoeur - x.bandeCoeur)
+    || (y.ventesCle - x.ventesCle)
+    || (y.stockTotal - x.stockTotal));
 
   // duos
   const duos = [];
