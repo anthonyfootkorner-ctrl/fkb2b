@@ -24,6 +24,12 @@ const MODELES_IMPORT = {
     sep: ";", encodage: "windows-1252",
     signature: ["CompteClient", "TarifVente", "Client", "AdrLivraison"],
   },
+  stock_shopify: {
+    libelle: "Stock Shopify — emplacement Duhamel (stock B2B)",
+    sep: ",", encodage: "utf-8",
+    signature: ["ID", "Handle", "Variant ID", "Option1 Value", "Inventory Available: Duhamel"],
+    remplacement_complet: true,
+  },
   ventes: {
     libelle: "Ventes quotidiennes (journal VENTE)",
     sep: ",", encodage: "utf-8",
@@ -125,6 +131,25 @@ function mapperVersTables(analyse) {
         famille_tarifaire: l.Tarif, prix: parseFloat(l.Prix),
         prix_achat: l.PrixAchat ? parseFloat(l.PrixAchat) : null }))
         .filter(r => r.famille_tarifaire && !isNaN(r.prix)) }];
+    case "stock_shopify": {
+      const REF = "Metafield: fmsync.reference [single_line_text_field]";
+      const refParId = {};
+      for (const l of L) if (l.ID && l[REF]) refParId[l.ID] ??= l[REF].trim();
+      const parCle = new Map();
+      for (const l of L) {
+        const ref = refParId[l.ID];
+        if (!ref || !l["Variant ID"] || !l["Option1 Value"]) continue;
+        const q = parseInt(parseFloat(l["Inventory Available: Duhamel"] || 0), 10) || 0;
+        if (q <= 0) continue;
+        const cle = ref + "|" + l["Option1 Value"];
+        parCle.set(cle, (parCle.get(cle) || 0) + q);
+      }
+      return [{ table: "stocks", vider: true, activer: true,
+        rows: [...parCle.entries()].map(([cle, q]) => {
+          const [reference, taille] = cle.split("|");
+          return { magasin: "DUHAMEL", reference, taille, quantite: q };
+        }) }];
+    }
     case "ventes": {
       // agrégation par magasin+référence+taille+jour (le journal contient des doublons)
       const parCle = new Map();

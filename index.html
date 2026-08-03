@@ -556,10 +556,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1785794878"></script>
-<script src="imports.js?v=1785794878"></script>
-<script src="merch-shopify.js?v=1785794878"></script>
-<script src="moteur-merch.js?v=1785794878"></script>
+<script src="config.js?v=1785795154"></script>
+<script src="imports.js?v=1785795154"></script>
+<script src="merch-shopify.js?v=1785795154"></script>
+<script src="moteur-merch.js?v=1785795154"></script>
 <script>
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
 let MES_SOCIETES = [], estAdmin = false;
@@ -1373,7 +1373,7 @@ async function chargerStocksRefs(references) {
 function resumeShopify(reference) {
   const s = STOCKS_REFS[reference];
   if (!s || s.total === 0) {
-    return `<div class="ligne-info" style="color:#c0504d"><b>Épuisé en stock Fastmag</b></div>`
+    return `<div class="ligne-info" style="color:#c0504d"><b>Épuisé (stock B2B Duhamel)</b></div>`
       + lignesInfo(0, s?.detail || [], VENTES?.[reference]);
   }
   return lignesInfo(s.total, s.detail, VENTES?.[reference]);
