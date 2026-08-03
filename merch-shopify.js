@@ -6,7 +6,15 @@
 let shopifyDonnees = null; // { entete, lignes, colonnes:{handle, prodHandle, prodTitre, position}, collections }
 
 function detecterColonnesShopify(entete) {
-  const trouver = (...tests) => entete.find(c => tests.some(t => t.test(c)));
+  // les motifs sont essayés PAR PRIORITÉ (le premier qui matche une colonne gagne),
+  // sinon « ID » serait retenu avant « Handle » — format réel validé le 03/08/2026 :
+  // ID, Handle, Product: ID, Product: Handle, Product: Position, Product: Command
+  const trouver = (...tests) => {
+    for (const t of tests) {
+      const c = entete.find(col => t.test(col));
+      if (c) return c;
+    }
+  };
   return {
     handle: trouver(/^Handle$/i, /^ID$/i),
     prodHandle: trouver(/^Product:? ?Handle$/i, /Product.*Handle/i),
