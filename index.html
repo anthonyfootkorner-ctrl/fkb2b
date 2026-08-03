@@ -399,6 +399,8 @@
         <button class="puce-claire" id="btn-tri-recent">Tri : du plus récent au plus ancien</button>
         <button class="btn-noir" id="btn-merch-sauver">ENREGISTRER L'ORDRE</button>
         <button class="puce-claire" id="btn-merch-reinit">Effacer l'ordre de ce périmètre</button>
+        <button class="puce-claire" id="btn-auto-b2b" style="border-color:#111; font-weight:600">⚡ Classement auto (duos)</button>
+        <button class="puce-claire" id="btn-rapport-b2b" style="display:none">Rapport JSON</button>
         <button class="puce-claire" onclick="location.hash='#/merch-shopify'" style="border-color:#95bf47; color:#5e8e3e">Merch Shopify (collections) →</button>
         <span class="compte-produits" id="merch-etat" style="margin:0"></span>
       </div>
@@ -436,6 +438,8 @@
         <button class="puce-claire" id="btn-shopify-bas">⭳ Tout en bas</button>
         <input class="qte-claire" id="shopify-position" type="number" min="1" placeholder="n°" style="width:70px">
         <button class="puce-claire" id="btn-shopify-pos">→ À cette position</button>
+        <button class="puce-claire" id="btn-auto-shopify" style="border-color:#111; font-weight:600">⚡ Classement auto (duos)</button>
+        <button class="puce-claire" id="btn-rapport-shopify" style="display:none">Rapport JSON</button>
         <button class="btn-noir" id="btn-shopify-export">TÉLÉCHARGER LE CSV POUR MATRIXIFY</button>
         <span class="compte-produits" id="etat-shopify"></span>
       </div>
@@ -543,6 +547,7 @@
 <script src="config.js"></script>
 <script src="imports.js"></script>
 <script src="merch-shopify.js"></script>
+<script src="moteur-merch.js"></script>
 <script>
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
 let MES_SOCIETES = [], estAdmin = false;
@@ -1108,6 +1113,8 @@ async function rendreMerch() {
   if (!merchInitialise) {
     merchInitialise = true;
     sel.onchange = rendreMerch;
+    document.getElementById("btn-auto-b2b").onclick = classementAutoB2B;
+    document.getElementById("btn-rapport-b2b").onclick = telechargerRapport;
     document.getElementById("btn-tri-stock").onclick = () =>
       retrier((a, b) => b.stock_total - a.stock_total, "trié par stock");
     document.getElementById("btn-tri-recent").onclick = () =>
@@ -1283,6 +1290,8 @@ async function rendreMerchShopify() {
     const n = parseInt(document.getElementById("shopify-position").value || "0", 10);
     if (n >= 1) deplacerShopify(n - 1);
   };
+  document.getElementById("btn-auto-shopify").onclick = classementAutoShopify;
+  document.getElementById("btn-rapport-shopify").onclick = telechargerRapport;
   document.getElementById("btn-shopify-export").onclick = exporterShopify;
 }
 
@@ -1324,7 +1333,8 @@ async function chargerStocksRefs(references) {
     const rows = await api(`/rest/v1/stock_disponible?reference=in.(${encodeURIComponent(lot)})&select=reference,taille,disponible`)
       .catch(() => []);
     for (const r of rows) {
-      const e = STOCKS_REFS[r.reference] ??= { total: 0, tailles: [] };
+      const e = STOCKS_REFS[r.reference] ??= { total: 0, tailles: [], detail: [] };
+      e.detail.push({ taille: r.taille, stock: r.disponible });
       if (r.disponible > 0) { e.total += r.disponible; e.tailles.push(r.taille); }
     }
   }
@@ -1462,6 +1472,78 @@ async function rendreSuiviShopify() {
             <span style="font-size:12px; color:var(--encre2)">${lib} (${jours} j)</span></div></div>`;
       }).join("")
     : `<div class="compte-produits">Aucune collection merchandisée pour le moment.</div>`;
+}
+
+/* ---------------- classement automatique (moteur de merchandising) ---------------- */
+let DERNIER_RAPPORT = null;
+
+function telechargerRapport() {
+  if (!DERNIER_RAPPORT) return;
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(new Blob([JSON.stringify(DERNIER_RAPPORT, null, 2)],
+    { type: "application/json" }));
+  lien.download = "classement_merch.json";
+  lien.click();
+  URL.revokeObjectURL(lien.href);
+}
+
+function annoterCarte(carte, note) {
+  carte.querySelector(".chip-score")?.remove();
+  if (!note) return;
+  const chip = document.createElement("div");
+  chip.className = "sousnom chip-score";
+  chip.style.cssText = "color:#111; font-weight:700";
+  chip.textContent = `score ${note.score} · ${note.statut.replaceAll("_", " ").toLowerCase()}`;
+  carte.querySelector(".infos").appendChild(chip);
+}
+
+async function classementAutoB2B() {
+  await chargerVentes();
+  const etat = document.getElementById("merch-etat");
+  const prods = produitsDuContexte(contexteMerch());
+  const res = classementAutomatique(prods, VENTES);
+  const grille = document.getElementById("grille-merch");
+  const cartes = new Map([...grille.querySelectorAll(".carte")].map(x => [x.dataset.ref, x]));
+  for (const ref of res.ordre) { const x = cartes.get(ref); if (x) { grille.appendChild(x); annoterCarte(x, res.scores[ref]); } }
+  for (const [ref, x] of cartes) if (!res.ordre.includes(ref)) { grille.appendChild(x); annoterCarte(x, null); }
+  grille.querySelectorAll(".carte").forEach((x, i) => x.querySelector(".rang-merch").textContent = i + 1);
+  travailNonEnregistre = true;
+  DERNIER_RAPPORT = res.rapport;
+  document.getElementById("btn-rapport-b2b").style.display = "";
+  etat.textContent = `classement auto : ${res.rapport.length} duos${res.exclus ? `, ${res.exclus} exclu(s) en rupture` : ""} — ajustez puis enregistrez`;
+}
+
+async function classementAutoShopify() {
+  await chargerVentes();
+  const etat = document.getElementById("etat-shopify");
+  const grille = document.getElementById("grille-shopify");
+  const cartes = [...grille.querySelectorAll(".carte")];
+  // reconstruit les produits : fiche B2B si connue, sinon grille de stock réelle
+  const refParHandle = {}, prods = [], handleParRef = {};
+  for (const carte of cartes) {
+    const h = carte.dataset.handle;
+    const ref = carte.querySelectorAll(".sousnom")[0]?.textContent;
+    const p = DATA.produits.find(x => x.reference === ref);
+    const s = STOCKS_REFS[ref];
+    const produit = p || (s ? { reference: ref, famille: "", marque: "", saison: "",
+      couleur: "", designation: carte.querySelector(".nom")?.textContent || ref,
+      stock_total: s.total, tailles: s.detail } : null);
+    if (produit) { prods.push(produit); refParHandle[h] = ref; handleParRef[ref] ??= h; }
+  }
+  if (!prods.length) { etat.textContent = "aucune donnée produit exploitable pour classer"; return; }
+  const res = classementAutomatique(prods, VENTES);
+  const parHandle = new Map(cartes.map(x => [x.dataset.handle, x]));
+  for (const ref of res.ordre) {
+    const x = parHandle.get(handleParRef[ref]);
+    if (x) { grille.appendChild(x); annoterCarte(x, res.scores[ref]); }
+  }
+  for (const x of cartes) if (![...res.ordre].some(r => handleParRef[r] === x.dataset.handle)) {
+    grille.appendChild(x); annoterCarte(x, null);
+  }
+  renumShopify();
+  DERNIER_RAPPORT = res.rapport;
+  document.getElementById("btn-rapport-shopify").style.display = "";
+  etat.textContent = `classement auto : ${res.rapport.length} duos${res.exclus ? `, ${res.exclus} exclu(s) en rupture` : ""} — ajustez puis téléchargez le CSV`;
 }
 
 /* ---------------- gestion des utilisateurs (admin) ---------------- */
