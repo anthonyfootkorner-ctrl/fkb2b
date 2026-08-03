@@ -24,6 +24,11 @@ const MODELES_IMPORT = {
     sep: ";", encodage: "windows-1252",
     signature: ["CompteClient", "TarifVente", "Client", "AdrLivraison"],
   },
+  ventes: {
+    libelle: "Ventes quotidiennes (journal VENTE)",
+    sep: ",", encodage: "utf-8",
+    signature: ["Code_Origine", "BarCode V2", "Jours dans Date", "Total QteVenteRetail"],
+  },
 };
 const RE_PREFIXE_FOURNISSEUR = /^[A-Z]{2,4}-/;
 const RE_REF_VALIDE = /^[A-Za-z0-9][A-Za-z0-9 ._/-]*$/;
@@ -120,6 +125,23 @@ function mapperVersTables(analyse) {
         famille_tarifaire: l.Tarif, prix: parseFloat(l.Prix),
         prix_achat: l.PrixAchat ? parseFloat(l.PrixAchat) : null }))
         .filter(r => r.famille_tarifaire && !isNaN(r.prix)) }];
+    case "ventes": {
+      // agrégation par magasin+référence+taille+jour (le journal contient des doublons)
+      const parCle = new Map();
+      for (const l of L) {
+        const ref = (l["BarCode V2"] || "").trim();
+        const j = (l["Jours dans Date"] || "").trim();
+        if (!ref || j.length !== 10) continue;
+        const jour = `${j.slice(6, 10)}-${j.slice(3, 5)}-${j.slice(0, 2)}`;
+        const cle = `${l.Code_Origine}|${ref}|${l.Taille}|${jour}`;
+        const e = parCle.get(cle) || { magasin: l.Code_Origine, reference: ref,
+          taille: l.Taille || "", jour, quantite: 0, montant_ttc: 0 };
+        e.quantite += parseInt(parseFloat(l["Total QteVenteRetail"] || 0), 10) || 0;
+        e.montant_ttc += parseFloat(l.MtVenteRetailTTC || 0) || 0;
+        parCle.set(cle, e);
+      }
+      return [{ table: "ventes", rows: [...parCle.values()].filter(r => r.quantite !== 0) }];
+    }
     case "clients": {
       const parCompte = new Map();
       for (const l of L) {

@@ -946,6 +946,26 @@ function majTotalFiche(ref) {
 /* ---------------- merchandising (admin) : ordre par périmètre, drag & drop ---------------- */
 let merchInitialise = false;
 let MERCH = {};   // contexte -> { reference: position }
+let VENTES = null; // reference -> { qte_7j, qte_30j } (admin uniquement)
+
+async function chargerVentes() {
+  if (VENTES) return VENTES;
+  try {
+    const rows = await api("/rest/v1/ventes_recentes?select=reference,qte_7j,qte_30j");
+    VENTES = Object.fromEntries(rows.map(r => [r.reference, r]));
+  } catch (e) { VENTES = {}; }
+  return VENTES;
+}
+
+// Résumé d'un produit pour les cartes de merch : stock, tailles disponibles, ventes récentes.
+function resumeProduit(p) {
+  if (!p) return "";
+  const dispo = p.tailles.filter(t => t.stock > 0);
+  const tailles = dispo.length <= 6 ? dispo.map(t => t.taille).join(" ") : `${dispo.length} tailles`;
+  const v = VENTES?.[p.reference];
+  const ventes = v ? ` · ventes 7j ${v.qte_7j ?? 0} / 30j ${v.qte_30j ?? 0}` : "";
+  return `stock ${p.stock_total} · ${tailles}${ventes}`;
+}
 
 async function chargerMerch() {
   try {
@@ -979,7 +999,8 @@ function produitsDuContexte(ctx) {
   return DATA.produits.filter(p => type === "MARQUE" ? p.marque === val : p.famille === val);
 }
 
-function rendreMerch() {
+async function rendreMerch() {
+  await chargerVentes();
   const sel = document.getElementById("merch-contexte");
   if (!sel.options.length) {
     const marques = [...new Set(DATA.produits.map(p => p.marque).filter(Boolean))].sort();
@@ -1000,7 +1021,8 @@ function rendreMerch() {
       <div class="visuel"><img loading="lazy" src="${p.photo}" alt="" draggable="false"></div>
       <div class="infos">
         <div class="nom">${p.designation || p.reference}</div>
-        <div class="sousnom">${p.marque || ""} · ${p.reference} · ${p.saison || ""} · stock ${p.stock_total}</div>
+        <div class="sousnom">${p.marque || ""} · ${p.reference} · ${p.saison || ""}</div>
+        <div class="sousnom" style="color:#a68a3d">${resumeProduit(p)}</div>
       </div>
     </div>`).join("");
 
@@ -1287,7 +1309,15 @@ async function traiterFichierShopify(fichier) {
   rendreCollectionShopify();
 }
 
+function resumeShopify(reference) {
+  const p = DATA?.produits.find(x => x.reference === reference);
+  if (p) return resumeProduit(p);
+  const v = VENTES?.[reference];
+  return v ? `ventes 7j ${v.qte_7j ?? 0} / 30j ${v.qte_30j ?? 0}` : "";
+}
+
 async function rendreCollectionShopify() {
+  await chargerVentes();
   const d = shopifyDonnees;
   const collection = document.getElementById("sel-collection").value;
   const { entete, lignes, cols } = d;
@@ -1316,7 +1346,8 @@ async function rendreCollectionShopify() {
       <div class="visuel">${v ? `<img loading="lazy" src="${v.url}" alt="" draggable="false">`
         : `<span style="font-size:11px; color:#999; padding:20px; text-align:center">${x.titre}</span>`}</div>
       <div class="infos"><div class="nom">${x.titre}</div>
-        <div class="sousnom">${v?.reference || x.handle}</div></div>
+        <div class="sousnom">${v?.reference || x.handle}</div>
+        ${v?.reference ? `<div class="sousnom" style="color:#a68a3d">${resumeShopify(v.reference)}</div>` : ""}</div>
     </div>`;
   }).join("");
   document.getElementById("etat-shopify").textContent =
