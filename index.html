@@ -182,6 +182,14 @@
   tr.epuise td { opacity: .45; }
   tr.epuise .rupture { font-size: 10px; color: var(--encre2); letter-spacing: .1em; text-transform: uppercase; }
 
+  /* grilles de merch : 8 produits par rangée */
+  #grille-merch, #grille-shopify { grid-template-columns: repeat(8, 1fr); }
+  @media (max-width: 1500px) { #grille-merch, #grille-shopify { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
+  #grille-merch .carte .nom, #grille-shopify .carte .nom { font-size: 11px; height: auto; }
+  #grille-merch .carte .infos, #grille-shopify .carte .infos { padding: 0 10px 12px; }
+  .ligne-info { font-size: 10.5px; color: #a68a3d; letter-spacing: .04em; margin-top: 2px; }
+  .ligne-info b { color: #8a7020; font-weight: 700; }
+
   /* gestion des utilisateurs (admin) */
   .bloc-clair { background: #fafaf8; border: 1px solid var(--hairline); border-radius: 14px; padding: 20px; }
   .titre-bloc { font-size: 11px; letter-spacing: .2em; color: var(--encre2); font-weight: 600;
@@ -966,14 +974,20 @@ async function chargerVentes() {
   return VENTES;
 }
 
-// Résumé d'un produit pour les cartes de merch : stock, tailles disponibles, ventes récentes.
+// Résumé d'un produit pour les cartes de merch : une information par ligne.
+function lignesInfo(stockTotal, taillesDispo, ventes) {
+  const tailles = [...taillesDispo].sort((a, b) => cleTaille(a) - cleTaille(b));
+  const txtTailles = tailles.length === 0 ? "aucune"
+    : tailles.length <= 8 ? tailles.join(" ") : `${tailles.length} tailles`;
+  return `<div class="ligne-info">Stock <b>${stockTotal}</b></div>
+    <div class="ligne-info">Tailles <b>${txtTailles}</b></div>
+    <div class="ligne-info">Ventes <b>${ventes ? `7j ${ventes.qte_7j ?? 0} · 30j ${ventes.qte_30j ?? 0}` : "—"}</b></div>`;
+}
+
 function resumeProduit(p) {
   if (!p) return "";
-  const dispo = p.tailles.filter(t => t.stock > 0);
-  const tailles = dispo.length <= 6 ? dispo.map(t => t.taille).join(" ") : `${dispo.length} tailles`;
-  const v = VENTES?.[p.reference];
-  const ventes = v ? ` · ventes 7j ${v.qte_7j ?? 0} / 30j ${v.qte_30j ?? 0}` : "";
-  return `stock ${p.stock_total} · ${tailles}${ventes}`;
+  return lignesInfo(p.stock_total, p.tailles.filter(t => t.stock > 0).map(t => t.taille),
+                    VENTES?.[p.reference]);
 }
 
 async function chargerMerch() {
@@ -1031,7 +1045,7 @@ async function rendreMerch() {
       <div class="infos">
         <div class="nom">${p.designation || p.reference}</div>
         <div class="sousnom">${p.marque || ""} · ${p.reference} · ${p.saison || ""}</div>
-        <div class="sousnom" style="color:#a68a3d">${resumeProduit(p)}</div>
+        ${resumeProduit(p)}
       </div>
     </div>`).join("");
 
@@ -1341,12 +1355,12 @@ async function chargerStocksRefs(references) {
 }
 
 function resumeShopify(reference) {
-  const v = VENTES?.[reference];
-  const ventes = v ? ` · ventes 7j ${v.qte_7j ?? 0} / 30j ${v.qte_30j ?? 0}` : "";
   const s = STOCKS_REFS[reference];
-  if (!s || s.total === 0) return `épuisé en stock Fastmag${ventes}`;
-  const tailles = s.tailles.length <= 6 ? s.tailles.join(" ") : `${s.tailles.length} tailles`;
-  return `stock ${s.total} · ${tailles}${ventes}`;
+  if (!s || s.total === 0) {
+    return `<div class="ligne-info" style="color:#c0504d"><b>Épuisé en stock Fastmag</b></div>`
+      + lignesInfo(0, [], VENTES?.[reference]);
+  }
+  return lignesInfo(s.total, s.tailles, VENTES?.[reference]);
 }
 
 async function rendreCollectionShopify() {
@@ -1381,7 +1395,7 @@ async function rendreCollectionShopify() {
         : `<span style="font-size:11px; color:#999; padding:20px; text-align:center">${x.titre}</span>`}</div>
       <div class="infos"><div class="nom">${x.titre}</div>
         <div class="sousnom">${v?.reference || x.handle}</div>
-        ${v?.reference ? `<div class="sousnom" style="color:#a68a3d">${resumeShopify(v.reference)}</div>` : ""}</div>
+        ${v?.reference ? resumeShopify(v.reference) : ""}</div>
     </div>`;
   }).join("");
   document.getElementById("etat-shopify").textContent =
