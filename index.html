@@ -1309,11 +1309,28 @@ async function traiterFichierShopify(fichier) {
   rendreCollectionShopify();
 }
 
+let STOCKS_REFS = {}; // reference -> { total, tailles[] } (vue Merch Shopify)
+
+async function chargerStocksRefs(references) {
+  STOCKS_REFS = {};
+  for (let i = 0; i < references.length; i += 80) {
+    const lot = references.slice(i, i + 80).map(r => '"' + r.replaceAll('"', "") + '"').join(",");
+    const rows = await api(`/rest/v1/stock_disponible?reference=in.(${encodeURIComponent(lot)})&select=reference,taille,disponible`)
+      .catch(() => []);
+    for (const r of rows) {
+      const e = STOCKS_REFS[r.reference] ??= { total: 0, tailles: [] };
+      if (r.disponible > 0) { e.total += r.disponible; e.tailles.push(r.taille); }
+    }
+  }
+}
+
 function resumeShopify(reference) {
-  const p = DATA?.produits.find(x => x.reference === reference);
-  if (p) return resumeProduit(p);
   const v = VENTES?.[reference];
-  return v ? `ventes 7j ${v.qte_7j ?? 0} / 30j ${v.qte_30j ?? 0}` : "";
+  const ventes = v ? ` · ventes 7j ${v.qte_7j ?? 0} / 30j ${v.qte_30j ?? 0}` : "";
+  const s = STOCKS_REFS[reference];
+  if (!s || s.total === 0) return `épuisé en stock Fastmag${ventes}`;
+  const tailles = s.tailles.length <= 6 ? s.tailles.join(" ") : `${s.tailles.length} tailles`;
+  return `stock ${s.total} · ${tailles}${ventes}`;
 }
 
 async function rendreCollectionShopify() {
@@ -1337,6 +1354,7 @@ async function rendreCollectionShopify() {
   const grille = document.getElementById("grille-shopify");
   grille.innerHTML = `<div class="vide" style="grid-column:1/-1">Chargement des visuels…</div>`;
   const vignettes = await chargerVignettesShopify(ordreShopify);
+  await chargerStocksRefs([...new Set(Object.values(vignettes).map(v => v.reference))]);
 
   grille.innerHTML = items.map((x, i) => {
     const v = vignettes[x.handle];
