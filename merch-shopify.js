@@ -54,12 +54,12 @@ function genererCSVShopify(donnees, collection, ordreHandles) {
   const iPH = entete.indexOf(cols.prodHandle >= "" ? cols.prodHandle : cols.prodTitre);
   const iPos = entete.indexOf(cols.position);
   const position = new Map(ordreHandles.map((h, i) => [h, i + 1]));
+  // seule la collection travaillée est exportée : l'import Matrixify ne touche qu'elle
   const sortie = [entete.map(champCSV).join(",")];
   for (const champs of lignes) {
+    if (champs[iH] !== collection) continue;
     const copie = [...champs];
-    if (copie[iH] === collection && position.has(copie[iPH])) {
-      copie[iPos] = String(position.get(copie[iPH]));
-    }
+    if (position.has(copie[iPH])) copie[iPos] = String(position.get(copie[iPH]));
     sortie.push(copie.map(champCSV).join(","));
   }
   return sortie.join("\r\n") + "\r\n";

@@ -1484,7 +1484,7 @@ async function exporterShopify() {
   const csv = genererCSVShopify(shopifyDonnees, collection, ordreShopify);
   const lien = document.createElement("a");
   lien.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  lien.download = shopifyDonnees.fichier.replace(/\.csv$/i, "") + "_merch.csv";
+  lien.download = "Merch " + collection + " - Smart Collections.csv";
   lien.click();
   URL.revokeObjectURL(lien.href);
   travailNonEnregistre = false;
