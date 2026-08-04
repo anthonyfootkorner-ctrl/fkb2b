@@ -410,6 +410,7 @@
         <button class="puce-claire" id="btn-tri-recent">Tri : du plus récent au plus ancien</button>
         <button class="btn-noir" id="btn-merch-sauver">ENREGISTRER L'ORDRE</button>
         <button class="puce-claire" id="btn-merch-reinit">Effacer l'ordre de ce périmètre</button>
+        <select class="qte-claire" id="merch-profil" style="width:190px; text-align:left"><option value="equilibre">Profil : équilibré</option><option value="nouveautes">Profil : nouveautés d'abord</option><option value="ventes">Profil : meilleures ventes</option><option value="promotions">Profil : promotions</option></select>
         <button class="puce-claire" id="btn-auto-b2b" style="border-color:#111; font-weight:600">⚡ Classement auto (duos)</button>
         <button class="puce-claire" id="btn-rapport-b2b" style="display:none">Rapport JSON</button>
         <button class="puce-claire" onclick="location.hash='#/merch-shopify'" style="border-color:#95bf47; color:#5e8e3e">Merch Shopify (collections) →</button>
@@ -450,6 +451,7 @@
         <button class="puce-claire" id="btn-shopify-bas">⭳ Tout en bas</button>
         <input class="qte-claire" id="shopify-position" type="number" min="1" placeholder="n°" style="width:70px">
         <button class="puce-claire" id="btn-shopify-pos">→ À cette position</button>
+        <select class="qte-claire" id="shopify-profil" style="width:190px; text-align:left"><option value="equilibre">Profil : équilibré</option><option value="nouveautes">Profil : nouveautés d'abord</option><option value="ventes">Profil : meilleures ventes</option><option value="promotions">Profil : promotions</option></select>
         <button class="puce-claire" id="btn-auto-shopify" style="border-color:#111; font-weight:600">⚡ Classement auto (duos)</button>
         <button class="puce-claire" id="btn-rapport-shopify" style="display:none">Rapport JSON</button>
         <button class="btn-noir" id="btn-shopify-export">TÉLÉCHARGER LE CSV POUR MATRIXIFY</button>
@@ -556,10 +558,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1785795729"></script>
-<script src="imports.js?v=1785795729"></script>
-<script src="merch-shopify.js?v=1785795729"></script>
-<script src="moteur-merch.js?v=1785795729"></script>
+<script src="config.js?v=1785826611"></script>
+<script src="imports.js?v=1785826611"></script>
+<script src="merch-shopify.js?v=1785826611"></script>
+<script src="moteur-merch.js?v=1785826611"></script>
 <script>
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
 let MES_SOCIETES = [], estAdmin = false;
@@ -1558,7 +1560,7 @@ async function classementAutoB2B() {
   await chargerVentes();
   const etat = document.getElementById("merch-etat");
   const prods = produitsDuContexte(contexteMerch());
-  const res = classementAutomatique(prods, VENTES);
+  const res = classementAutomatique(prods, VENTES, document.getElementById("merch-profil")?.value);
   const grille = document.getElementById("grille-merch");
   const cartes = new Map([...grille.querySelectorAll(".carte")].map(x => [x.dataset.ref, x]));
   const actuel = [...cartes.keys()];
@@ -1591,7 +1593,7 @@ async function classementAutoShopify() {
     if (produit) { prods.push(produit); refParHandle[h] = ref; handleParRef[ref] ??= h; }
   }
   if (!prods.length) { etat.textContent = "aucune donnée produit exploitable pour classer"; return; }
-  const res = classementAutomatique(prods, VENTES);
+  const res = classementAutomatique(prods, VENTES, document.getElementById("shopify-profil")?.value);
   const parHandle = new Map(cartes.map(x => [x.dataset.handle, x]));
   const actuel = cartes.map(x => x.dataset.handle);
   const ordreHandles = res.ordre.map(r => handleParRef[r]).filter(Boolean);

@@ -114,6 +114,9 @@ function scorerProduit(p, ventes) {
            statut, q7, q30, alertes, degrade,
            bandeCoeur: Math.round(st.tauxCoeur * 10),
            ventesCle: (q7 * 2 + q30) * facteurSaison + (rangSaison >= 0 && rangSaison <= 1 ? 5 : 0),
+           ventesBrutes: q7 * 2 + q30,
+           rangSaison: rangSaison < 0 ? 9 : Math.min(rangSaison, 9),
+           promo: p.promo_pct || 0,
            facteurSaison, stockTotal: st.stockTotal };
 }
 
@@ -152,14 +155,18 @@ function raisonDuo(a, b, types) {
 }
 
 // --- classement complet : scores, rotation, duos ---
-function classementAutomatique(produits, ventes) {
+// Profils de tri : même moteur, priorités différentes. Les dégradés restent toujours en queue.
+const PROFILS_TRI = {
+  equilibre: (x, y) => (y.bandeCoeur - x.bandeCoeur) || (y.ventesCle - x.ventesCle) || (y.stockTotal - x.stockTotal),
+  nouveautes: (x, y) => (x.rangSaison - y.rangSaison) || (y.bandeCoeur - x.bandeCoeur) || (y.ventesCle - x.ventesCle),
+  ventes: (x, y) => (y.ventesBrutes - x.ventesBrutes) || (y.bandeCoeur - x.bandeCoeur) || (y.stockTotal - x.stockTotal),
+  promotions: (x, y) => (Math.floor(y.promo / 10) - Math.floor(x.promo / 10)) || (y.ventesCle - x.ventesCle) || (y.bandeCoeur - x.bandeCoeur),
+};
+
+function classementAutomatique(produits, ventes, profil = "equilibre") {
   let notes = produits.map(p => scorerProduit(p, ventes)).filter(Boolean);
-  // hiérarchie : 0) produits sains avant produits dégradés (mono-taille, presque épuisés…),
-  // 1) taux de tailles cœur (tranches de 10 %), 2) ventes pondérées, 3) stock total
-  notes.sort((x, y) => ((x.degrade ? 1 : 0) - (y.degrade ? 1 : 0))
-    || (y.bandeCoeur - x.bandeCoeur)
-    || (y.ventesCle - x.ventesCle)
-    || (y.stockTotal - x.stockTotal));
+  const cmp = PROFILS_TRI[profil] || PROFILS_TRI.equilibre;
+  notes.sort((x, y) => ((x.degrade ? 1 : 0) - (y.degrade ? 1 : 0)) || cmp(x, y));
 
   // duos
   const duos = [];
