@@ -199,7 +199,17 @@ async function executerImport(analyse, surProgres) {
       total += lot.length;
       surProgres(`${plan.table} : ${total}/${plan.rows.length} lignes…`);
     }
-    if (plan.activer) { surProgres("recalcul des produits actifs…"); await apiFonction("activer", {}); }
+    if (plan.activer) {
+      surProgres("recalcul des produits actifs…");
+      try { await apiFonction("activer", {}); }
+      catch (e) {
+        // le recalcul peut dépasser le délai de l'API sur un gros volume : on retente une fois
+        surProgres("recalcul long, nouvel essai…");
+        await new Promise(r => setTimeout(r, 4000));
+        try { await apiFonction("activer", {}); }
+        catch (e2) { surProgres("⚠ stock importé, mais recalcul des actifs à relancer (réessayez dans 2 min via un nouvel import ou signalez-le)"); }
+      }
+    }
   }
   await apiFonction("journal", { entree: {
     fichier: analyse.fichier, modele: analyse.modele, empreinte: analyse.empreinte,
