@@ -148,11 +148,46 @@ function mapperVersTables(analyse) {
         const cle = ref + "|" + l["Option1 Value"];
         parCle.set(cle, (parCle.get(cle) || 0) + q);
       }
-      return [{ table: "stocks", vider: true, activer: true,
-        rows: [...parCle.entries()].map(([cle, q]) => {
-          const [reference, taille] = cle.split("|");
-          return { magasin: "DUHAMEL", reference, taille, quantite: q };
-        }) }];
+      // le même fichier alimente aussi photos/galeries/promos : un dépôt = tout à jour
+      const galeries = {}, prix = {};
+      const handleParId = {};
+      for (const l of L) {
+        if (!l.ID) continue;
+        if (l.Handle) handleParId[l.ID] ??= l.Handle.trim();
+        if (l["Image Src"]) {
+          const g = galeries[l.ID] ??= [];
+          if (!g.includes(l["Image Src"])) g.push(l["Image Src"]);
+        }
+        const p = parseFloat(l["Variant Price"]);
+        const cp = parseFloat(l["Variant Compare At Price"]);
+        if (!isNaN(p)) {
+          const e = prix[l.ID] ??= { prix: p, compare: isNaN(cp) ? null : cp };
+          if (!isNaN(cp) && (!e.compare || cp > e.compare)) { e.prix = p; e.compare = cp; }
+        }
+      }
+      const photosParRef = {};
+      for (const [pid, g] of Object.entries(galeries)) {
+        const ref = refParId[pid];
+        if (!ref || !g.length) continue;
+        const e = prix[pid] || {};
+        const promo = e.compare && e.compare > e.prix
+          ? Math.round(100 * (1 - e.prix / e.compare)) : 0;
+        const candidat = { reference: ref, url: g[0], urls: g, handle: handleParId[pid] || null,
+          prix_shopify: e.prix ?? null, prix_barre: e.compare ?? null, promo_pct: promo };
+        const ex = photosParRef[ref];
+        if (!ex || g.length > ex.urls.length) {
+          if (ex && ex.promo_pct > promo) candidat.promo_pct = ex.promo_pct;
+          photosParRef[ref] = candidat;
+        } else if (promo > ex.promo_pct) ex.promo_pct = promo;
+      }
+      return [
+        { table: "stocks", vider: true, activer: true,
+          rows: [...parCle.entries()].map(([cle, q]) => {
+            const [reference, taille] = cle.split("|");
+            return { magasin: "DUHAMEL", reference, taille, quantite: q };
+          }) },
+        { table: "photos", rows: Object.values(photosParRef) },
+      ];
     }
     case "ventes": {
       // agrégation par magasin+référence+taille+jour (le journal contient des doublons)
