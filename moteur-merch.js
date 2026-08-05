@@ -167,6 +167,11 @@ function classementAutomatique(produits, ventes, profil = "equilibre") {
   let notes = produits.map(p => scorerProduit(p, ventes)).filter(Boolean);
   const cmp = PROFILS_TRI[profil] || PROFILS_TRI.equilibre;
   notes.sort((x, y) => ((x.degrade ? 1 : 0) - (y.degrade ? 1 : 0)) || cmp(x, y));
+  // le score affiché reflète exactement le rang du tri (n° 1 = 100) : plus jamais de
+  // contradiction score/position. Seuls les partenaires de duo peuvent l'entrecouper.
+  notes.forEach((n, i) => {
+    n.score = Math.max(1, 100 - Math.round((95 * i) / Math.max(notes.length - 1, 1)));
+  });
 
   // duos
   const duos = [];
