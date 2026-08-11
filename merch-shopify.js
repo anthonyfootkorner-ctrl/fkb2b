@@ -24,24 +24,66 @@ function detecterColonnesShopify(entete) {
   };
 }
 
-async function analyserFichierShopify(fichier) {
-  const texte = new TextDecoder("utf-8").decode(await fichier.arrayBuffer()).replace(/^﻿/, "");
-  const lignesBrutes = texte.split(/\r?\n/).filter(l => l.length);
-  const entete = decouperLigne(lignesBrutes[0], ",").map(c => c.trim());
+// Analyse un CSV de collections (texte déjà décodé) → segment {entete, cols, lignes}
+function analyserSegmentShopify(texte, nom) {
+  const enregs = decouperTexte(texte.replace(/^\uFEFF/, ""), ",");
+  if (!enregs.length) return { erreur: "fichier vide" };
+  const entete = enregs[0].map(col => col.trim());
   const cols = detecterColonnesShopify(entete);
   if (!cols.handle || !cols.position || !(cols.prodHandle || cols.prodTitre)) {
-    return { erreur: `colonnes non reconnues — trouvé : ${entete.slice(0, 8).join(", ")}…
-      Il faut un export Matrixify « Custom Collections » en CSV avec les colonnes produit (Handle/Title/Position).` };
+    return { erreur: `colonnes non reconnues — trouvé : ${entete.slice(0, 8).join(", ")}…` };
   }
-  const iH = entete.indexOf(cols.handle);
-  const lignes = lignesBrutes.slice(1).map(l => decouperLigne(l, ","));
-  const collections = {};
-  lignes.forEach((champs, i) => {
-    const h = champs[iH];
-    if (!h) return;
-    (collections[h] ??= []).push(i);
+  return { nom, entete, cols, lignes: enregs.slice(1) };
+}
+
+async function analyserFichierShopify(fichier) {
+  const tampon = await fichier.arrayBuffer();
+  const sources = [];
+  if (estZip(tampon)) {
+    let entrees;
+    try { entrees = await dezipper(tampon); }
+    catch (e) { return { erreur: "lecture du ZIP impossible : " + e.message }; }
+    for (const e of entrees) {
+      if (!/\.csv$/i.test(e.nom) || /summary/i.test(e.nom)) continue;
+      sources.push({ nom: e.nom, texte: new TextDecoder("utf-8").decode(e.tampon) });
+    }
+    if (!sources.length) return { erreur: "aucun CSV de collections dans ce ZIP" };
+  } else {
+    sources.push({ nom: fichier.name, texte: new TextDecoder("utf-8").decode(tampon) });
+  }
+
+  // chaque CSV (Smart + Custom Collections) devient un segment ; l'export ressortira
+  // chaque collection dans le format EXACT de son fichier d'origine
+  const segments = sources.map(s => analyserSegmentShopify(s.texte, s.nom)).filter(s => !s.erreur);
+  if (!segments.length) {
+    return { erreur: `colonnes non reconnues.
+      Il faut un export Matrixify « Collections » (CSV ou ZIP) avec les colonnes produit (Handle/Title/Position).` };
+  }
+
+  // en-tête canonique = union des colonnes (fichier le plus fourni en premier)
+  segments.sort((a, b) => b.lignes.length - a.lignes.length);
+  const entete = [];
+  for (const seg of segments) for (const col of seg.entete) if (!entete.includes(col)) entete.push(col);
+  const cols = detecterColonnesShopify(entete);
+
+  const lignes = [], collections = {}, sourcesParCollection = {};
+  segments.forEach((seg, si) => {
+    const projection = seg.entete.map(col => entete.indexOf(col));
+    const iH = seg.entete.indexOf(seg.cols.handle);
+    for (const champs of seg.lignes) {
+      const ligne = entete.map(() => "");
+      champs.forEach((v, j) => { if (projection[j] >= 0) ligne[projection[j]] = v; });
+      const rang = lignes.length;
+      lignes.push(ligne);
+      const h = champs[iH];
+      if (!h) continue;
+      (collections[h] ??= []).push(rang);
+      sourcesParCollection[h] ??= si;
+    }
   });
-  return { fichier: fichier.name, entete, lignes, cols, collections };
+  return { fichier: fichier.name, entete, lignes, cols, collections,
+           segments: segments.map(s => ({ nom: s.nom, entete: s.entete })),
+           sources: sourcesParCollection };
 }
 
 function champCSV(v) {
@@ -50,17 +92,22 @@ function champCSV(v) {
 
 function genererCSVShopify(donnees, collection, ordreHandles) {
   const { entete, lignes, cols } = donnees;
+  // format de sortie = celui du fichier d'où vient la collection (Smart ou Custom) ;
+  // les anciens fichiers mémorisés (sans segments) gardent leur en-tête d'origine
+  const seg = donnees.segments?.[donnees.sources?.[collection]];
+  const enteteSortie = seg ? seg.entete : entete;
+  const projection = enteteSortie.map(col => entete.indexOf(col));
   const iH = entete.indexOf(cols.handle);
-  const iPH = entete.indexOf(cols.prodHandle >= "" ? cols.prodHandle : cols.prodTitre);
+  const iPH = entete.indexOf(cols.prodHandle || cols.prodTitre);
   const iPos = entete.indexOf(cols.position);
   const position = new Map(ordreHandles.map((h, i) => [h, i + 1]));
   // seule la collection travaillée est exportée : l'import Matrixify ne touche qu'elle
-  const sortie = [entete.map(champCSV).join(",")];
+  const sortie = [enteteSortie.map(champCSV).join(",")];
   for (const champs of lignes) {
     if (champs[iH] !== collection) continue;
     const copie = [...champs];
     if (position.has(copie[iPH])) copie[iPos] = String(position.get(copie[iPH]));
-    sortie.push(copie.map(champCSV).join(","));
+    sortie.push(projection.map(j => champCSV(copie[j] ?? "")).join(","));
   }
   return sortie.join("\r\n") + "\r\n";
 }

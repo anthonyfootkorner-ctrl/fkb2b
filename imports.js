@@ -80,22 +80,40 @@ function decouperTexte(texte, sep) {
   return enregistrements;
 }
 
+function detecterModeleImport(tampon) {
+  for (const [nom, s] of Object.entries(MODELES_IMPORT)) {
+    const essai = new TextDecoder(s.encodage).decode(tampon);
+    const premiere = essai.slice(0, 8000).split(/\r?\n/)[0].replace(/^\uFEFF/, "");
+    const colonnes = decouperLigne(premiere, s.sep).map(col => col.trim());
+    if (s.signature.every(sig => colonnes.includes(sig))) {
+      return { modele: nom, spec: s, texte: essai, entete: colonnes };
+    }
+  }
+  return null;
+}
+
 async function analyserFichierFastmag(fichier) {
   const tampon = await fichier.arrayBuffer();
   const empreinte = [...new Uint8Array(await crypto.subtle.digest("SHA-256", tampon))]
     .map(b => b.toString(16).padStart(2, "0")).join("");
 
-  // détection du modèle par la signature de l'en-tête, dans l'encodage du modèle
-  let modele = null, spec = null, entete = null, texte = null;
-  for (const [nom, s] of Object.entries(MODELES_IMPORT)) {
-    const essai = new TextDecoder(s.encodage).decode(tampon);
-    const premiere = essai.slice(0, 8000).split(/\r?\n/)[0].replace(/^﻿/, "");
-    const colonnes = decouperLigne(premiere, s.sep).map(c => c.trim());
-    if (s.signature.every(sig => colonnes.includes(sig))) {
-      modele = nom; spec = s; texte = essai; entete = colonnes; break;
+  // .zip accepté tel quel : on cherche dedans le premier CSV au format connu
+  let nomAffiche = fichier.name, d = null;
+  if (estZip(tampon)) {
+    let entrees;
+    try { entrees = await dezipper(tampon); }
+    catch (e) { return { erreur: "lecture du ZIP impossible : " + e.message, empreinte }; }
+    for (const e of entrees) {
+      if (!/\.(csv|txt|tsv)$/i.test(e.nom) || /summary/i.test(e.nom)) continue;
+      d = detecterModeleImport(e.tampon);
+      if (d) { nomAffiche = fichier.name + " \u2192 " + e.nom; break; }
     }
+    if (!d) return { erreur: "aucun fichier au format connu dans ce ZIP", empreinte };
+  } else {
+    d = detecterModeleImport(tampon);
   }
-  if (!modele) return { erreur: "format non reconnu : l'en-tête ne correspond à aucun modèle connu", empreinte };
+  if (!d) return { erreur: "format non reconnu : l'en-t\u00eate ne correspond \u00e0 aucun mod\u00e8le connu", empreinte };
+  const { modele, spec, texte, entete } = d;
 
   const enregistrements = decouperTexte(texte.replace(/^\uFEFF/, ""), spec.sep);
   const stats = { trim: 0, prefixe: 0, decimales: 0 };
@@ -129,7 +147,7 @@ async function analyserFichierFastmag(fichier) {
     lignes.push(obj);
   }
 
-  return { modele, libelle: spec.libelle, spec, empreinte, fichier: fichier.name,
+  return { modele, libelle: spec.libelle, spec, empreinte, fichier: nomAffiche,
            lignes, lues: enregistrements.length - 1, quarantaine, stats };
 }
 
