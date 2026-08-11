@@ -196,10 +196,12 @@ function mapperVersTables(analyse) {
         "Metafield: product.products_bundle [list.product_reference]",
       ];
       const galeries = {}, prix = {}, associesParId = {};
-      const handleParId = {};
+      const handleParId = {}, creeParId = {}, descriptionParId = {};
       for (const l of L) {
         if (!l.ID) continue;
         if (l.Handle) handleParId[l.ID] ??= l.Handle.trim();
+        if (l["Created At"]) creeParId[l.ID] ??= l["Created At"].trim().slice(0, 10);
+        if (l["Body HTML"]) descriptionParId[l.ID] ??= l["Body HTML"];
         if (l["Image Src"]) {
           const g = galeries[l.ID] ??= [];
           if (!g.includes(l["Image Src"])) g.push(l["Image Src"]);
@@ -226,15 +228,19 @@ function mapperVersTables(analyse) {
           ? Math.round(100 * (1 - e.prix / e.compare)) : 0;
         const candidat = { reference: ref, url: g[0], urls: g, handle: handleParId[pid] || null,
           prix_shopify: e.prix ?? null, prix_barre: e.compare ?? null, promo_pct: promo,
-          associes: associesParId[pid] || [] };
+          associes: associesParId[pid] || [],
+          cree_shopify: creeParId[pid] || null, description: descriptionParId[pid] || null };
         const ex = photosParRef[ref];
         if (!ex || g.length > ex.urls.length) {
           if (ex && ex.promo_pct > promo) candidat.promo_pct = ex.promo_pct;
           if (ex && !candidat.associes.length) candidat.associes = ex.associes;
+          if (ex) { candidat.cree_shopify ??= ex.cree_shopify; candidat.description ??= ex.description; }
           photosParRef[ref] = candidat;
         } else {
           if (promo > ex.promo_pct) ex.promo_pct = promo;
           if (!ex.associes.length && associesParId[pid]?.length) ex.associes = associesParId[pid];
+          ex.cree_shopify ??= creeParId[pid] || null;
+          ex.description ??= descriptionParId[pid] || null;
         }
       }
       return [

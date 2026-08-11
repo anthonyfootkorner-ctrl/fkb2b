@@ -117,6 +117,7 @@ function scorerProduit(p, ventes) {
            ventesBrutes: q7 * 2 + q30,
            rangSaison: rangSaison < 0 ? 9 : Math.min(rangSaison, 9),
            promo: p.promo_pct || 0,
+           creation: ASSOCIES?.creation?.[p.reference] || "",
            facteurSaison, stockTotal: st.stockTotal };
 }
 
@@ -124,15 +125,16 @@ function scorerProduit(p, ventes) {
 let ASSOCIES = null; // { parRef: {ref: [handles]}, refParHandle: {handle: ref} }
 async function chargerAssocies() {
   if (ASSOCIES) return ASSOCIES;
-  const parRef = {}, refParHandle = {};
+  const parRef = {}, refParHandle = {}, creation = {};
   try {
-    const rows = await apiTout("/rest/v1/photos?select=reference,handle,associes");
+    const rows = await apiTout("/rest/v1/photos?select=reference,handle,associes,cree_shopify");
     for (const r of rows) {
       if (r.handle) refParHandle[r.handle] ??= r.reference;
       if (r.associes?.length) parRef[r.reference] ??= r.associes;
+      if (r.cree_shopify) creation[r.reference] ??= r.cree_shopify;
     }
   } catch (e) { /* associations indisponibles : les duos retombent sur les règles internes */ }
-  return (ASSOCIES = { parRef, refParHandle });
+  return (ASSOCIES = { parRef, refParHandle, creation });
 }
 
 function sontAssocies(ra, rb) {
@@ -189,7 +191,8 @@ const PROFILS_TRI = {
   promotions: (x, y) => (Math.floor(y.promo / 10) - Math.floor(x.promo / 10)) || (y.ventesCle - x.ventesCle) || (y.bandeCoeur - x.bandeCoeur),
   // Tri antho : tailles cœur → date de création (approchée par la saison tant que
   // Created At manque à l'export) → ventes brutes → stock total
-  antho: (x, y) => (y.bandeCoeur - x.bandeCoeur) || (x.rangSaison - y.rangSaison)
+  antho: (x, y) => (y.bandeCoeur - x.bandeCoeur)
+    || (x.creation !== y.creation ? (y.creation > x.creation ? 1 : -1) : (x.rangSaison - y.rangSaison))
     || (y.ventesBrutes - x.ventesBrutes) || (y.stockTotal - x.stockTotal),
 };
 
