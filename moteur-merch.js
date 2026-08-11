@@ -215,9 +215,11 @@ function classementAutomatique(produits, ventes, profil = "equilibre") {
   // duos
   const duos = [];
   const restants = [...notes];
+  const refsRestantes = new Set(restants.map(n => n.reference));
   let marquesConsecutives = [];
   while (restants.length) {
     const a = restants.shift();
+    refsRestantes.delete(a.reference);
     if (!restants.length) {
       duos.push({ seul: a });
       break;
@@ -244,6 +246,10 @@ function classementAutomatique(produits, ventes, profil = "equilibre") {
       // spec : jamais un produit presque épuisé/dégradé en partenaire d'un produit sain
       if (!a.degrade && b.degrade) continue;
       if (memeMarqueBloquee && b.produit.marque === a.produit.marque && c.types.length <= 1) continue;
+      // ne pas séparer un binôme officiel : si l'associé Shopify de b est encore dans la
+      // collection, b lui est réservé (il fera son duo quand son tour viendra)
+      const bOfficiels = ASSOCIES?.partenaires?.[b.reference];
+      if (bOfficiels && [...bOfficiels].some(r => refsRestantes.has(r))) continue;
       // jamais remonter un mauvais produit juste pour compléter : compatibilité pondérée par le score
       const poids = c.poids * 10 + b.score;
       if (poids > meilleurPoids) { meilleurPoids = poids; meilleur = { b, c }; }
@@ -253,6 +259,7 @@ function classementAutomatique(produits, ventes, profil = "equilibre") {
       meilleur = { b: secours, c: { types: [], doublon: false } };
     }
     restants.splice(restants.indexOf(meilleur.b), 1);
+    refsRestantes.delete(meilleur.b.reference);
     const types = meilleur.c.types.length ? meilleur.c.types : ["DUO_PAR_DEFAUT"];
     duos.push({ a, b: meilleur.b, types });
     marquesConsecutives.push(a.produit.marque);
