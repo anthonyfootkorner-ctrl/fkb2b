@@ -140,3 +140,17 @@ async function dezipper(tampon) {
 function estZip(tampon) {
   return tampon.byteLength > 4 && new DataView(tampon).getUint32(0, true) === 0x04034b50;
 }
+
+// Compression gzip native (mémorisation du fichier collections côté serveur)
+async function gzipVersBase64(texte) {
+  const flux = new Blob([texte]).stream().pipeThrough(new CompressionStream("gzip"));
+  const octets = new Uint8Array(await new Response(flux).arrayBuffer());
+  let s = "";
+  for (let i = 0; i < octets.length; i += 0x8000) s += String.fromCharCode(...octets.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+async function base64VersTexte(b64) {
+  const octets = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+  const flux = new Blob([octets]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return await new Response(flux).text();
+}

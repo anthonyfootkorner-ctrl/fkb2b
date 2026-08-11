@@ -559,10 +559,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1786437991"></script>
-<script src="imports.js?v=1786437991"></script>
-<script src="merch-shopify.js?v=1786437991"></script>
-<script src="moteur-merch.js?v=1786437991"></script>
+<script src="config.js?v=1786438867"></script>
+<script src="imports.js?v=1786438867"></script>
+<script src="merch-shopify.js?v=1786438867"></script>
+<script src="moteur-merch.js?v=1786438867"></script>
 <script>
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
 let MES_SOCIETES = [], estAdmin = false;
@@ -1288,9 +1288,10 @@ async function rendreMerchShopify() {
   // recharge le dernier export déposé (mémorisé en base) si aucun fichier en cours
   if (!shopifyDonnees) {
     try {
-      const rows = await api("/rest/v1/merch_shopify_fichier?cle=eq.dernier&select=nom_fichier,depose_le,donnees");
+      const rows = await api("/rest/v1/merch_shopify_fichier?cle=eq.dernier&select=nom_fichier,depose_le,donnees,donnees_gz");
       if (rows[0]) {
-        shopifyDonnees = rows[0].donnees;
+        shopifyDonnees = rows[0].donnees_gz
+          ? JSON.parse(await base64VersTexte(rows[0].donnees_gz)) : rows[0].donnees;
         const noms = Object.keys(shopifyDonnees.collections);
         document.getElementById("liste-collections").innerHTML =
           noms.map(h => `<option value="${h}">${shopifyDonnees.collections[h].length} produits</option>`).join("");
@@ -1350,18 +1351,18 @@ async function traiterFichierShopify(fichier) {
       `<div class="vide" style="grid-column:1/-1; color:#a33">${shopifyDonnees.erreur}</div>`;
     return;
   }
-  // mémorise le fichier : les collections restent disponibles aux prochaines sessions
-  // (plafonné — l'export Smart complet fait >100 000 lignes, trop lourd à conserver)
-  if (shopifyDonnees.lignes.length <= 20000) {
-    try {
-      await api("/rest/v1/merch_shopify_fichier?cle=eq.dernier", { methode: "DELETE" });
-      await api("/rest/v1/merch_shopify_fichier", { corps: {
-        cle: "dernier", nom_fichier: fichier.name,
-        donnees: { fichier: shopifyDonnees.fichier, entete: shopifyDonnees.entete,
-                   lignes: shopifyDonnees.lignes, cols: shopifyDonnees.cols,
-                   collections: shopifyDonnees.collections } } });
-    } catch (e) { /* mémorisation non bloquante */ }
-  }
+  // mémorise le fichier COMPRESSÉ : toutes les collections (Smart + Custom) restent
+  // disponibles à TOUS les comptes merch/admin aux prochaines sessions
+  try {
+    const gz = await gzipVersBase64(JSON.stringify({
+      fichier: shopifyDonnees.fichier, entete: shopifyDonnees.entete,
+      lignes: shopifyDonnees.lignes, cols: shopifyDonnees.cols,
+      collections: shopifyDonnees.collections,
+      segments: shopifyDonnees.segments, sources: shopifyDonnees.sources }));
+    await api("/rest/v1/merch_shopify_fichier?cle=eq.dernier", { methode: "DELETE" });
+    await api("/rest/v1/merch_shopify_fichier", { corps: {
+      cle: "dernier", nom_fichier: fichier.name, donnees: null, donnees_gz: gz } });
+  } catch (e) { /* mémorisation non bloquante */ }
   const noms = Object.keys(shopifyDonnees.collections);
   document.getElementById("liste-collections").innerHTML =
     noms.map(h => `<option value="${h}">${shopifyDonnees.collections[h].length} produits</option>`).join("");
