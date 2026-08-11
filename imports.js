@@ -57,6 +57,29 @@ function decouperLigne(ligne, sep) {
   return champs;
 }
 
+// Découpe le texte entier en enregistrements : gère les champs entre guillemets
+// contenant des retours à la ligne (descriptions Shopify multi-lignes).
+function decouperTexte(texte, sep) {
+  const enregistrements = [];
+  let champs = [], courant = "", entreGuillemets = false, vide = true;
+  for (let i = 0; i < texte.length; i++) {
+    const c = texte[i];
+    if (entreGuillemets) {
+      if (c === '"' && texte[i + 1] === '"') { courant += '"'; i++; }
+      else if (c === '"') entreGuillemets = false;
+      else courant += c;
+    } else if (c === '"') { entreGuillemets = true; vide = false; }
+    else if (c === sep) { champs.push(courant); courant = ""; vide = false; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && texte[i + 1] === "\n") i++;
+      if (!vide || courant.length) { champs.push(courant); enregistrements.push(champs); }
+      champs = []; courant = ""; vide = true;
+    } else { courant += c; vide = false; }
+  }
+  if (!vide || courant.length) { champs.push(courant); enregistrements.push(champs); }
+  return enregistrements;
+}
+
 async function analyserFichierFastmag(fichier) {
   const tampon = await fichier.arrayBuffer();
   const empreinte = [...new Uint8Array(await crypto.subtle.digest("SHA-256", tampon))]
@@ -74,14 +97,14 @@ async function analyserFichierFastmag(fichier) {
   }
   if (!modele) return { erreur: "format non reconnu : l'en-tête ne correspond à aucun modèle connu", empreinte };
 
-  const lignesBrutes = texte.replace(/^﻿/, "").split(/\r?\n/).filter(l => l.length);
+  const enregistrements = decouperTexte(texte.replace(/^\uFEFF/, ""), spec.sep);
   const stats = { trim: 0, prefixe: 0, decimales: 0 };
   const quarantaine = [];
   const lignes = [];
   const colRef = ["BarCode", "BarCode V2", "Reference_Article"].find(c => entete.includes(c));
 
-  for (let n = 1; n < lignesBrutes.length; n++) {
-    const champs = decouperLigne(lignesBrutes[n], spec.sep);
+  for (let n = 1; n < enregistrements.length; n++) {
+    const champs = enregistrements[n];
     const obj = {};
     entete.forEach((c, i) => {
       let v = champs[i] ?? "";
@@ -107,7 +130,7 @@ async function analyserFichierFastmag(fichier) {
   }
 
   return { modele, libelle: spec.libelle, spec, empreinte, fichier: fichier.name,
-           lignes, lues: lignesBrutes.length - 1, quarantaine, stats };
+           lignes, lues: enregistrements.length - 1, quarantaine, stats };
 }
 
 // Transforme les lignes analysées en enregistrements pour la base.
