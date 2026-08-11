@@ -187,6 +187,10 @@ const PROFILS_TRI = {
   nouveautes: (x, y) => (x.rangSaison - y.rangSaison) || (y.bandeCoeur - x.bandeCoeur) || (y.ventesCle - x.ventesCle),
   ventes: (x, y) => (y.ventesBrutes - x.ventesBrutes) || (y.bandeCoeur - x.bandeCoeur) || (y.stockTotal - x.stockTotal),
   promotions: (x, y) => (Math.floor(y.promo / 10) - Math.floor(x.promo / 10)) || (y.ventesCle - x.ventesCle) || (y.bandeCoeur - x.bandeCoeur),
+  // Tri antho : tailles cœur → date de création (approchée par la saison tant que
+  // Created At manque à l'export) → ventes brutes → stock total
+  antho: (x, y) => (y.bandeCoeur - x.bandeCoeur) || (x.rangSaison - y.rangSaison)
+    || (y.ventesBrutes - x.ventesBrutes) || (y.stockTotal - x.stockTotal),
 };
 
 function classementAutomatique(produits, ventes, profil = "equilibre") {
