@@ -125,7 +125,7 @@ function scorerProduit(p, ventes) {
 let ASSOCIES = null; // { parRef: {ref: [handles]}, refParHandle: {handle: ref} }
 async function chargerAssocies() {
   if (ASSOCIES) return ASSOCIES;
-  const parRef = {}, refParHandle = {}, creation = {};
+  const parRef = {}, refParHandle = {}, creation = {}, partenaires = {};
   try {
     const rows = await apiTout("/rest/v1/photos?select=reference,handle,associes,cree_shopify");
     for (const r of rows) {
@@ -133,15 +133,21 @@ async function chargerAssocies() {
       if (r.associes?.length) parRef[r.reference] ??= r.associes;
       if (r.cree_shopify) creation[r.reference] ??= r.cree_shopify;
     }
+    // index bidirectionnel référence ↔ référence : handles résolus une fois pour toutes
+    for (const [ref, handles] of Object.entries(parRef)) {
+      for (const h of handles) {
+        const rb = refParHandle[h];
+        if (!rb || rb === ref) continue;
+        (partenaires[ref] ??= new Set()).add(rb);
+        (partenaires[rb] ??= new Set()).add(ref);
+      }
+    }
   } catch (e) { /* associations indisponibles : les duos retombent sur les règles internes */ }
-  return (ASSOCIES = { parRef, refParHandle, creation });
+  return (ASSOCIES = { parRef, refParHandle, creation, partenaires });
 }
 
 function sontAssocies(ra, rb) {
-  if (!ASSOCIES) return false;
-  const versRef = h => ASSOCIES.refParHandle[h];
-  return (ASSOCIES.parRef[ra] || []).some(h => versRef(h) === rb) ||
-         (ASSOCIES.parRef[rb] || []).some(h => versRef(h) === ra);
+  return !!ASSOCIES?.partenaires?.[ra]?.has(rb);
 }
 
 // --- compatibilité de deux produits pour former un duo ---
@@ -217,9 +223,22 @@ function classementAutomatique(produits, ventes, profil = "equilibre") {
       break;
     }
     let meilleur = null, meilleurPoids = -1;
+    // partenaire officiel Shopify : cherché dans TOUTE la collection, pas seulement la
+    // fenêtre des 40 suivants — premier trouvé = le mieux classé (restants est trié)
+    const officiels = ASSOCIES?.partenaires?.[a.reference];
+    if (officiels) {
+      for (const b of restants) {
+        if (!officiels.has(b.reference)) continue;
+        if (!a.degrade && b.degrade) continue;
+        const c = compatibilite(a, b);
+        if (c.doublon) continue;
+        meilleur = { b, c };
+        break;
+      }
+    }
     const memeMarqueBloquee = marquesConsecutives.length >= 2 &&
       marquesConsecutives.every(m => m === a.produit.marque);
-    for (const b of restants.slice(0, 40)) {
+    if (!meilleur) for (const b of restants.slice(0, 40)) {
       const c = compatibilite(a, b);
       if (c.doublon) continue;
       // spec : jamais un produit presque épuisé/dégradé en partenaire d'un produit sain
