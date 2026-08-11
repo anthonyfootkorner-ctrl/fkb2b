@@ -559,10 +559,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1786439396"></script>
-<script src="imports.js?v=1786439396"></script>
-<script src="merch-shopify.js?v=1786439396"></script>
-<script src="moteur-merch.js?v=1786439396"></script>
+<script src="config.js?v=1786439764"></script>
+<script src="imports.js?v=1786439764"></script>
+<script src="merch-shopify.js?v=1786439764"></script>
+<script src="moteur-merch.js?v=1786439764"></script>
 <script>
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
 let MES_SOCIETES = [], estAdmin = false;
@@ -1106,7 +1106,10 @@ async function rendreMerch() {
     const cartes = [...grille.querySelectorAll(".carte")];
     const selection = selectionMerch.map(ref => cartes.find(c => c.dataset.ref === ref)).filter(Boolean);
     const restantes = cartes.filter(c => !selectionMerch.includes(c.dataset.ref));
-    const pos = Math.max(0, Math.min(cible, restantes.length));
+    // zone figée : aucun déplacement ne peut s'insérer avant les N premiers produits
+    const nFiges = Math.max(0, parseInt(document.getElementById("merch-figer")?.value || "0", 10) || 0);
+    const posFige = cartes.slice(0, nFiges).filter(c => !selectionMerch.includes(c.dataset.ref)).length;
+    const pos = Math.max(posFige, Math.min(cible, restantes.length));
     const nouvelOrdre = [...restantes.slice(0, pos), ...selection, ...restantes.slice(pos)];
     nouvelOrdre.forEach(c => grille.appendChild(c));
     selectionMerch.length = 0;
@@ -1483,7 +1486,10 @@ function deplacerShopify(cible) {
   const cartes = [...grille.querySelectorAll(".carte")];
   const choisis = selectionShopify.map(h => cartes.find(c => c.dataset.handle === h)).filter(Boolean);
   const restants = cartes.filter(c => !selectionShopify.includes(c.dataset.handle));
-  const pos = Math.max(0, Math.min(cible, restants.length));
+  // zone figée : aucun déplacement ne peut s'insérer avant les N premiers produits
+  const nFiges = Math.max(0, parseInt(document.getElementById("shopify-figer")?.value || "0", 10) || 0);
+  const posFige = cartes.slice(0, nFiges).filter(c => !selectionShopify.includes(c.dataset.handle)).length;
+  const pos = Math.max(posFige, Math.min(cible, restants.length));
   [...restants.slice(0, pos), ...choisis, ...restants.slice(pos)].forEach(c => grille.appendChild(c));
   selectionShopify = [];
   grille.querySelectorAll(".carte").forEach(c => {
