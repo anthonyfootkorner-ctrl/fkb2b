@@ -120,9 +120,33 @@ function scorerProduit(p, ventes) {
            facteurSaison, stockTotal: st.stockTotal };
 }
 
+// --- produits associés officiels (métachamps Shopify : complémentaires, cross-sell) ---
+let ASSOCIES = null; // { parRef: {ref: [handles]}, refParHandle: {handle: ref} }
+async function chargerAssocies() {
+  if (ASSOCIES) return ASSOCIES;
+  const parRef = {}, refParHandle = {};
+  try {
+    const rows = await apiTout("/rest/v1/photos?select=reference,handle,associes");
+    for (const r of rows) {
+      if (r.handle) refParHandle[r.handle] ??= r.reference;
+      if (r.associes?.length) parRef[r.reference] ??= r.associes;
+    }
+  } catch (e) { /* associations indisponibles : les duos retombent sur les règles internes */ }
+  return (ASSOCIES = { parRef, refParHandle });
+}
+
+function sontAssocies(ra, rb) {
+  if (!ASSOCIES) return false;
+  const versRef = h => ASSOCIES.refParHandle[h];
+  return (ASSOCIES.parRef[ra] || []).some(h => versRef(h) === rb) ||
+         (ASSOCIES.parRef[rb] || []).some(h => versRef(h) === ra);
+}
+
 // --- compatibilité de deux produits pour former un duo ---
 function compatibilite(a, b) {
   const pa = a.produit, pb = b.produit, types = [];
+  // association déclarée dans Shopify (produit complémentaire / cross-sell) : prioritaire
+  if (sontAssocies(pa.reference, pb.reference)) types.push("ASSOCIES_SHOPIFY");
   if (pa.famille && pa.famille === pb.famille) types.push("MEME_CATEGORIE");
   const univers = p => (p.sous_famille || p.coloris || "") + " " + (p.designation || "");
   const clubs = /PSG|BARCA|REAL|JUVE|MARSEILLE|OM |LIVERPOOL|ARSENAL|FFF|FOOT/i;
@@ -137,7 +161,8 @@ function compatibilite(a, b) {
   if (pa.couleur && pa.couleur === pb.couleur) types.push("COHERENCE_VISUELLE");
   // quasi-doublon visuel : même modèle ET même couleur = à éviter côte à côte
   const doublon = types.includes("MEME_MODELE_COLORIS") && pa.couleur === pb.couleur;
-  return { types, poids: types.length ? 8 - Math.min(types.length, 4) * 0 + (types.includes("MEME_CATEGORIE") ? 4 : 0)
+  return { types, poids: types.length ? 8 - Math.min(types.length, 4) * 0
+    + (types.includes("ASSOCIES_SHOPIFY") ? 15 : 0) + (types.includes("MEME_CATEGORIE") ? 4 : 0)
     + (types.includes("MEME_UNIVERS") ? 3 : 0) + (types.includes("MEME_MARQUE") ? 2 : 0)
     + (types.includes("MEME_MODELE_COLORIS") ? 2 : 0) + (types.includes("PRODUITS_COMPLEMENTAIRES") ? 2 : 0)
     + (types.includes("COHERENCE_VISUELLE") ? 1 : 0) - 8 : 0, doublon };
@@ -145,6 +170,7 @@ function compatibilite(a, b) {
 
 function raisonDuo(a, b, types) {
   const morceaux = [];
+  if (types.includes("ASSOCIES_SHOPIFY")) morceaux.push("associés sur le site (complémentaire/cross-sell)");
   if (types.includes("MEME_MODELE_COLORIS")) morceaux.push("deux coloris du même modèle");
   else if (types.includes("MEME_CATEGORIE")) morceaux.push(`deux ${(a.produit.famille || "produits").toLowerCase()}`);
   if (types.includes("MEME_MARQUE")) morceaux.push(a.produit.marque);

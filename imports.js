@@ -190,7 +190,12 @@ function mapperVersTables(analyse) {
         parCle.set(cle, (parCle.get(cle) || 0) + q);
       }
       // le même fichier alimente aussi photos/galeries/promos : un dépôt = tout à jour
-      const galeries = {}, prix = {};
+      const COLONNES_ASSOCIES = [
+        "Metafield: shopify--discovery--product_recommendation.complementary_products [list.product_reference]",
+        "Metafield: product.cross_sell [product_reference]",
+        "Metafield: product.products_bundle [list.product_reference]",
+      ];
+      const galeries = {}, prix = {}, associesParId = {};
       const handleParId = {};
       for (const l of L) {
         if (!l.ID) continue;
@@ -198,6 +203,12 @@ function mapperVersTables(analyse) {
         if (l["Image Src"]) {
           const g = galeries[l.ID] ??= [];
           if (!g.includes(l["Image Src"])) g.push(l["Image Src"]);
+        }
+        for (const col of COLONNES_ASSOCIES) {
+          const v = (l[col] || "").trim();
+          if (!v) continue;
+          const a = associesParId[l.ID] ??= [];
+          for (const h of v.split(",").map(x => x.trim()).filter(Boolean)) if (!a.includes(h)) a.push(h);
         }
         const p = parseFloat(l["Variant Price"]);
         const cp = parseFloat(l["Variant Compare At Price"]);
@@ -214,12 +225,17 @@ function mapperVersTables(analyse) {
         const promo = e.compare && e.compare > e.prix
           ? Math.round(100 * (1 - e.prix / e.compare)) : 0;
         const candidat = { reference: ref, url: g[0], urls: g, handle: handleParId[pid] || null,
-          prix_shopify: e.prix ?? null, prix_barre: e.compare ?? null, promo_pct: promo };
+          prix_shopify: e.prix ?? null, prix_barre: e.compare ?? null, promo_pct: promo,
+          associes: associesParId[pid] || [] };
         const ex = photosParRef[ref];
         if (!ex || g.length > ex.urls.length) {
           if (ex && ex.promo_pct > promo) candidat.promo_pct = ex.promo_pct;
+          if (ex && !candidat.associes.length) candidat.associes = ex.associes;
           photosParRef[ref] = candidat;
-        } else if (promo > ex.promo_pct) ex.promo_pct = promo;
+        } else {
+          if (promo > ex.promo_pct) ex.promo_pct = promo;
+          if (!ex.associes.length && associesParId[pid]?.length) ex.associes = associesParId[pid];
+        }
       }
       return [
         { table: "stocks", vider: true, activer: true,
