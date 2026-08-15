@@ -458,9 +458,8 @@
         <span class="compte-produits" id="etat-shopify"></span>
       </div>
     </div>
-    <div class="bloc-clair" style="margin: 0 22px 26px">
-      <h3 class="titre-bloc">Suivi des collections merchandisées</h3>
-      <div class="compte-produits" style="margin-bottom:10px">Une collection en tri manuel n'évolue plus seule : repassez dessus régulièrement (les nouveautés arrivent sans position).</div>
+    <div class="bloc-clair" style="margin: 0 22px 26px; padding: 10px 16px"
+      title="Une collection en tri manuel n'évolue plus seule : repassez dessus régulièrement (les nouveautés arrivent sans position).">
       <div id="suivi-shopify"></div>
     </div>
     <div class="grille-col" id="grille-shopify"></div>
@@ -559,10 +558,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1786446422"></script>
-<script src="imports.js?v=1786446422"></script>
-<script src="merch-shopify.js?v=1786446422"></script>
-<script src="moteur-merch.js?v=1786446422"></script>
+<script src="config.js?v=1786779730"></script>
+<script src="imports.js?v=1786779730"></script>
+<script src="merch-shopify.js?v=1786779730"></script>
+<script src="moteur-merch.js?v=1786779730"></script>
 <script>
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
 let MES_SOCIETES = [], estAdmin = false;
@@ -1522,18 +1521,37 @@ async function exporterShopify() {
 }
 
 async function rendreSuiviShopify() {
+  // une seule ligne compacte : pastilles cliquables pour les collections à revoir,
+  // les collections à jour résumées en un compteur — la grille garde toute la place
   const rows = await api("/rest/v1/merch_shopify_suivi?select=*&order=fait_le.asc").catch(() => []);
-  document.getElementById("suivi-shopify").innerHTML = rows.length
-    ? rows.map(s => {
-        const jours = Math.floor((Date.now() - new Date(s.fait_le)) / 86400000);
-        const [cls, lib] = jours >= 30 ? ["rouge", "à repasser"] : jours >= 14 ? ["orange", "bientôt à revoir"] : ["vert", "à jour"];
-        return `<div class="rang-util"><div class="qui"><b>${s.collection}</b>
-          <span>${s.nb_produits ?? "?"} produits · fait le ${new Date(s.fait_le).toLocaleDateString("fr-FR")}</span></div>
-          <div style="margin-left:auto; display:flex; align-items:center; gap:8px">
-            <span class="pastille ${cls}"></span>
-            <span style="font-size:12px; color:var(--encre2)">${lib} (${jours} j)</span></div></div>`;
-      }).join("")
-    : `<div class="compte-produits">Aucune collection merchandisée pour le moment.</div>`;
+  const etats = rows.map(s => {
+    const jours = Math.floor((Date.now() - new Date(s.fait_le)) / 86400000);
+    return { ...s, jours, cls: jours >= 30 ? "rouge" : jours >= 14 ? "orange" : "vert" };
+  });
+  const attention = etats.filter(x => x.cls !== "vert").sort((a, b) => b.jours - a.jours);
+  const aJour = etats.length - attention.length;
+  const puce = x => `<span onclick="ouvrirCollectionSuivi('${x.collection.replaceAll("'", "")}')"
+      title="${x.nb_produits ?? "?"} produits · fait le ${new Date(x.fait_le).toLocaleDateString("fr-FR")} — cliquer pour ouvrir"
+      style="display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border:1px solid #ddd;
+      border-radius:999px; font-size:12px; cursor:pointer; background:#fff; white-space:nowrap">
+      <span class="pastille ${x.cls}"></span>${x.collection} · ${x.jours} j</span>`;
+  const resume = !etats.length ? "aucune collection merchandisée pour le moment"
+    : attention.length ? `+ ${aJour} à jour` : `${aJour} collection${aJour > 1 ? "s" : ""} à jour ✓`;
+  document.getElementById("suivi-shopify").innerHTML =
+    `<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
+      <span style="font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--encre2); margin-right:4px">Suivi</span>
+      ${attention.map(puce).join("")}
+      <span class="compte-produits">${resume}</span>
+    </div>`;
+}
+
+function ouvrirCollectionSuivi(handle) {
+  const sel = document.getElementById("sel-collection");
+  if (shopifyDonnees?.collections?.[handle]) {
+    sel.value = handle;
+    sel.dataset.precedent = handle;
+    rendreCollectionShopify();
+  }
 }
 
 /* ---------------- épinglage : les produits cochés gardent leur position lors des tris ---------------- */
