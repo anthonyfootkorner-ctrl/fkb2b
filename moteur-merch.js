@@ -202,7 +202,7 @@ const PROFILS_TRI = {
     || (y.ventesBrutes - x.ventesBrutes) || (y.stockTotal - x.stockTotal),
 };
 
-function classementAutomatique(produits, ventes, profil = "equilibre") {
+function classementAutomatique(produits, ventes, profil = "equilibre", decalage = 0) {
   let notes = produits.map(p => scorerProduit(p, ventes)).filter(Boolean);
   const cmp = PROFILS_TRI[profil] || PROFILS_TRI.equilibre;
   notes.sort((x, y) => ((x.degrade ? 1 : 0) - (y.degrade ? 1 : 0)) || cmp(x, y));
@@ -217,6 +217,21 @@ function classementAutomatique(produits, ventes, profil = "equilibre") {
   const restants = [...notes];
   const refsRestantes = new Set(restants.map(n => n.reference));
   let marquesConsecutives = [];
+  // grille du site en 2 ou 4 colonnes : un duo doit occuper (impair, pair) — 63-64, pas
+  // 62-63. Si la zone figée est impaire, le n° 1 du tri complète seul sa ligne, puis
+  // les duos repartent alignés.
+  if (decalage % 2 === 1 && restants.length) {
+    // de préférence un produit dont l'associé officiel n'est pas présent : on ne casse
+    // jamais un binôme pour caler la grille
+    let iCale = restants.findIndex(n => {
+      const off = ASSOCIES?.partenaires?.[n.reference];
+      return !off || ![...off].some(r => refsRestantes.has(r));
+    });
+    if (iCale < 0) iCale = 0;
+    const cale = restants.splice(iCale, 1)[0];
+    refsRestantes.delete(cale.reference);
+    duos.push({ seul: cale, cale: true });
+  }
   while (restants.length) {
     const a = restants.shift();
     refsRestantes.delete(a.reference);
@@ -276,7 +291,9 @@ function classementAutomatique(produits, ventes, profil = "equilibre") {
         score_produit_1: d.seul.score, statut_produit_1: d.seul.statut,
         position_produit_2: null, identifiant_produit_2: null, score_produit_2: null, statut_produit_2: null,
         score_duo: d.seul.score, types_rapprochement: ["DUO_PAR_DEFAUT"],
-        raison_duo: "produit restant (nombre impair)", alerte: d.seul.alertes.join(" ; ") || null });
+        raison_duo: d.cale ? "produit seul : complète la ligne de la zone figée pour caler les duos"
+                           : "produit restant (nombre impair)",
+        alerte: d.seul.alertes.join(" ; ") || null });
       pos += 1;
       continue;
     }
