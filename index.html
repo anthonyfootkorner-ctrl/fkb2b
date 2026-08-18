@@ -35,6 +35,21 @@
   .sous-menu a:first-child { border-radius: 10px 10px 0 0; }
   .sous-menu a:last-child { border-radius: 0 0 10px 10px; border-top: 0; }
   .sous-menu a:hover { background: var(--noir3); color: var(--blanc); }
+  .panneau-catalogue { display: none; left: -18px; padding-top: 10px; }
+  .menu-deroulant:hover .panneau-catalogue, .panneau-catalogue:hover { display: flex; }
+  .panneau-catalogue > .col-menu { background: var(--noir2); border: 1px solid var(--bord); padding: 16px 20px 18px;
+    min-width: 260px; max-height: min(70vh, 520px); overflow: auto; }
+  .panneau-catalogue > .col-menu:first-child { border-radius: 12px 0 0 12px; border-right: 0; }
+  .panneau-catalogue > .col-menu:last-child { border-radius: 0 12px 12px 0; }
+  .entete-menu { font-size: 9.5px; letter-spacing: .22em; color: var(--gris); text-transform: uppercase;
+    padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid var(--bord); }
+  .liens-menu { display: grid; grid-template-columns: repeat(2, minmax(110px, 1fr)); gap: 1px 18px; }
+  .liens-menu a { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; font-size: 12px;
+    letter-spacing: .04em; color: var(--gris); padding: 5px 0; transition: color 130ms ease; }
+  .liens-menu a:hover { color: var(--blanc); }
+  .liens-menu a small { font-size: 9.5px; opacity: .55; }
+  .liens-menu a.tout-voir { grid-column: 1 / -1; color: var(--blanc); margin-top: 8px;
+    border-top: 1px solid var(--bord); padding-top: 10px; }
   .logo { font-size: 19px; font-weight: 700; letter-spacing: .42em; cursor: pointer; text-align: center; padding-left: .42em; }
   .h-droite { display: flex; align-items: center; gap: 12px; justify-content: flex-end; }
   select { background: var(--noir3); color: var(--blanc); border: 1px solid var(--bord); border-radius: 8px;
@@ -392,7 +407,19 @@
 <header>
   <div class="h-gauche">
     <a href="#/" data-lien="accueil">ACCUEIL</a>
-    <a href="#/collection/TOUT">CATALOGUE</a>
+    <div class="menu-deroulant" id="menu-catalogue">
+      <a href="#/collection/TOUT">CATALOGUE ▾</a>
+      <div class="sous-menu panneau-catalogue">
+        <div class="col-menu">
+          <div class="entete-menu">Marques</div>
+          <div class="liens-menu" id="menu-marques"></div>
+        </div>
+        <div class="col-menu">
+          <div class="entete-menu">Familles</div>
+          <div class="liens-menu" id="menu-familles"></div>
+        </div>
+      </div>
+    </div>
     <a href="#/compte">MON COMPTE</a>
     <div class="menu-deroulant" id="lien-merch" style="display:none">
       <a style="color:#d9a441">MERCH ▾</a>
@@ -463,6 +490,7 @@
     </div>
     <div class="col-filtres" id="col-filtres"></div>
     <div class="grille-col" id="grille-col"></div>
+    <div id="col-suite" style="text-align:center; padding: 10px 22px 60px"></div>
   </section>
 
   <!-- PRODUIT -->
@@ -721,14 +749,28 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787088286"></script>
-<script src="imports.js?v=1787088286"></script>
-<script src="merch-shopify.js?v=1787088286"></script>
-<script src="moteur-merch.js?v=1787088286"></script>
+<script src="config.js?v=1787089148"></script>
+<script src="imports.js?v=1787089148"></script>
+<script src="merch-shopify.js?v=1787089148"></script>
+<script src="moteur-merch.js?v=1787089148"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
+// affinage dans la page : la marque quand on navigue par famille, et inversement
+let filtreSecondaire = null;
+// Le catalogue complet dépasse largement une tranche affichable : chaque vue charge
+// la sienne, et tout produit déjà vu reste retrouvable (fiche produit, panier).
+let NAVIGATION = { total: 0, marques: [], familles: [] };
+const CONNUS = new Map();
+const PAS_COLLECTION = 300;
+let collectionChargee = [];
+
+function memoriser(produits) {
+  for (const p of produits) CONNUS.set(p.reference, p);
+  return produits;
+}
+const produitConnu = ref => CONNUS.get(ref) || DATA.produits.find(x => x.reference === ref);
 let MES_SOCIETES = [], estAdmin = false;
 let travailNonEnregistre = false;
 window.addEventListener("beforeunload", e => {
@@ -793,9 +835,15 @@ async function init() {
       || { nom: sessionCourante().email, famille_tarifaire: "", id_fastmag: null };
     rendreSelecteurSociete();
   }
-  DATA = { produits: await api("/rest/v1/rpc/catalogue",
-    { corps: { limite: 300, p_societe: clientActif.id ?? null } }) };
+  const [produits, navigation] = await Promise.all([
+    api("/rest/v1/rpc/catalogue", { corps: { limite: 300, p_societe: clientActif.id ?? null } }),
+    api("/rest/v1/rpc/navigation_catalogue", { corps: { p_societe: clientActif.id ?? null } })
+      .catch(() => ({ total: 0, marques: [], familles: [] })),
+  ]);
+  DATA = { produits };
   DATA.produits.forEach(trierTailles);
+  memoriser(DATA.produits);
+  NAVIGATION = navigation;
 
   document.getElementById("recherche").oninput = e => { texteRecherche = e.target.value.trim().toLowerCase(); rendreCollection(); };
   document.getElementById("btn-panier").onclick = () => basculer("panier", true);
@@ -816,6 +864,7 @@ async function init() {
     el.addEventListener("change", () => localStorage.setItem(cle, el.value));
   }
   await chargerMerch();
+  rendreMenuCatalogue();
   rendreAccueil();
   window.addEventListener("hashchange", router);
   router();
@@ -932,12 +981,26 @@ async function changerSociete(id) {
   localStorage.setItem("fkb2b-societe", id);
   majEtiquetteMagasin();
   // recharge le catalogue aux tarifs de la société choisie
-  DATA.produits = await api("/rest/v1/rpc/catalogue", { corps: { limite: 300, p_societe: id } });
+  CONNUS.clear();
+  const refsPanier = [...new Set([...panier.values()].map(l => l.produit.reference))];
+  const [produits, navigation, duPanier] = await Promise.all([
+    api("/rest/v1/rpc/catalogue", { corps: { limite: 300, p_societe: id } }),
+    api("/rest/v1/rpc/navigation_catalogue", { corps: { p_societe: id } })
+      .catch(() => NAVIGATION),
+    // les produits du panier ne sont pas forcément dans la tranche chargée :
+    // on va chercher les leurs pour les re-tarifer au bon tarif
+    refsPanier.length ? api("/rest/v1/rpc/catalogue",
+      { corps: { limite: refsPanier.length, p_societe: id, p_references: refsPanier } }) : [],
+  ]);
+  DATA.produits = produits;
   DATA.produits.forEach(trierTailles);
+  NAVIGATION = navigation;
+  duPanier.forEach(trierTailles);
+  memoriser(DATA.produits); memoriser(duPanier);
   // le panier suit : on raccroche les lignes aux nouveaux objets produits (prix recalculés)
   let retirees = 0, ajustees = 0;
   for (const [cle, l] of [...panier]) {
-    const p = DATA.produits.find(x => x.reference === l.produit.reference);
+    const p = produitConnu(l.produit.reference);
     const t = p && p.tailles.find(t => t.taille === l.taille);
     if (t && t.stock > 0) {
       const qte = Math.min(l.qte, t.stock);
@@ -946,6 +1009,7 @@ async function changerSociete(id) {
     } else { panier.delete(cle); retirees++; }
   }
   rendrePanier();
+  rendreMenuCatalogue();
   rendreAccueil();
   router();
   const alertes = [retirees && `${retirees} ligne${retirees > 1 ? "s" : ""} retirée${retirees > 1 ? "s" : ""} (indisponible)`,
@@ -981,9 +1045,20 @@ function router() {
   document.querySelectorAll("main .vue").forEach(v => v.classList.remove("active"));
   document.getElementById("prod-barre").classList.remove("visible");
   if (route === "collection") {
-    collectionCourante = decodeURIComponent(args.join("/") || "TOUT");
+    // #/collection/TOUT · #/collection/marque/NIKE · #/collection/famille/PANTALON
+    // (l'ancienne forme #/collection/<valeur> continue de fonctionner)
+    const parties = args.map(decodeURIComponent);
+    if (parties[0] === "marque" || parties[0] === "famille") {
+      collectionCourante = { axe: parties[0], valeur: parties.slice(1).join("/") };
+    } else {
+      const v = parties.join("/") || "TOUT";
+      collectionCourante = v === "TOUT" ? { axe: "TOUT", valeur: "TOUT" }
+        : { axe: DATA.produits.some(p => p.marque === v) ? "marque" : "famille", valeur: v };
+    }
+    filtreSecondaire = null;
     document.getElementById("vue-collection").classList.add("active");
-    rendreCollection();
+    collectionChargee = [];
+    chargerCollection();
   } else if (route === "produit") {
     document.getElementById("vue-produit").classList.add("active");
     rendreProduit(decodeURIComponent(args.join("/")));
@@ -1024,7 +1099,7 @@ function rendreAccueil() {
   // Logo si web/logos/<MARQUE>.png ou .svg existe, sinon wordmark typographique.
   document.getElementById("tuiles-marques").innerHTML = marques.map(m => {
     const n = DATA.produits.filter(x => x.marque === m).length;
-    return `<div class="tuile-logo" onclick="location.hash='#/collection/${encodeURIComponent(m)}'">
+    return `<div class="tuile-logo" onclick="location.hash='#/collection/marque/${encodeURIComponent(m)}'">
       <img loading="lazy" src="logos/${encodeURIComponent(m)}.png" alt="${m}" data-marque="${m}" data-essai="png"
            onerror="logoSuivant(this)">
       <div class="sous-marque">${n} référence${n > 1 ? "s" : ""}</div>
@@ -1059,7 +1134,7 @@ function rendreAccueil() {
   document.getElementById("tuiles-rayons").innerHTML = rayons.map(r => {
     const p = DATA.produits.find(x => x.famille === r);
     const n = DATA.produits.filter(x => x.famille === r).length;
-    return `<div class="tuile" onclick="location.hash='#/collection/${encodeURIComponent(r)}'">
+    return `<div class="tuile" onclick="location.hash='#/collection/famille/${encodeURIComponent(r)}'">
       <img loading="lazy" src="${p.photo}" alt="">
       <div class="nom">${r}<span>${n} référence${n > 1 ? "s" : ""}</span></div>
     </div>`;
@@ -1081,34 +1156,110 @@ function carteHTML(p) {
 }
 
 /* ---------------- collection ---------------- */
+// Charge la tranche de la collection courante (le catalogue entier ne tient pas en une fois).
+async function chargerCollection(suite = false) {
+  const { axe, valeur } = collectionCourante;
+  const corps = { limite: PAS_COLLECTION, p_societe: clientActif.id ?? null,
+                  p_decalage: suite ? collectionChargee.length : 0 };
+  if (axe === "marque") corps.p_marque = valeur;
+  if (axe === "famille") corps.p_famille = valeur;
+  const grille = document.getElementById("grille-col");
+  if (!suite) grille.innerHTML = `<div class="vide" style="grid-column:1/-1;color:#777">Chargement…</div>`;
+  try {
+    const lot = await api("/rest/v1/rpc/catalogue", { corps });
+    lot.forEach(trierTailles);
+    memoriser(lot);
+    collectionChargee = suite ? [...collectionChargee, ...lot] : lot;
+  } catch (e) {
+    grille.innerHTML = `<div class="vide" style="grid-column:1/-1;color:#c0504d">Catalogue indisponible : ${
+      echapperHTML(e.donnees?.message || e.message)}</div>`;
+    return;
+  }
+  rendreCollection();
+}
+
+// Nombre total de références du périmètre, d'après les compteurs de navigation
+// (et non d'après la tranche chargée, qui n'en montre qu'une partie).
+function totalDuPerimetre() {
+  const { axe, valeur } = collectionCourante;
+  if (axe === "TOUT") return NAVIGATION.total || collectionChargee.length;
+  const liste = axe === "marque" ? NAVIGATION.marques : NAVIGATION.familles;
+  return (liste || []).find(x => x.valeur === valeur)?.refs ?? collectionChargee.length;
+}
+
 function rendreCollection() {
-  const c = collectionCourante;
-  const estMarque = DATA.produits.some(p => p.marque === c);
+  const { axe, valeur } = collectionCourante;
   // ordre merchandising du périmètre affiché (repli : ordre catalogue)
-  const contexte = c === "TOUT" ? "TOUT" : (estMarque ? "MARQUE:" + c : "FAMILLE:" + c);
-  const base = ordonner(c === "TOUT" ? DATA.produits
-    : DATA.produits.filter(p => estMarque ? p.marque === c : p.famille === c), contexte);
-  const produits = base.filter(p =>
+  const contexte = axe === "TOUT" ? "TOUT"
+    : (axe === "marque" ? "MARQUE:" : "FAMILLE:") + valeur;
+
+  // l'axe secondaire est celui qu'on n'a pas pris pour naviguer
+  const axeFiltre = axe === "marque" ? "famille" : "marque";
+  const affines = filtreSecondaire
+    ? collectionChargee.filter(p => p[axeFiltre] === filtreSecondaire) : collectionChargee;
+  const produits = ordonner(affines, contexte).filter(p =>
     !texteRecherche || [p.designation, p.reference, p.marque, p.famille]
       .some(x => x && x.toLowerCase().includes(texteRecherche)));
 
   document.getElementById("col-titre").innerHTML =
-    c === "TOUT" ? "TOUT LE <b>CATALOGUE</b>" : `<b>${c}</b>`;
-  document.getElementById("col-compte").textContent =
-    `${produits.length} référence${produits.length > 1 ? "s" : ""} en stock · tarif ${famille()}`;
+    axe === "TOUT" ? "TOUT LE <b>CATALOGUE</b>" : `<b>${echapperHTML(valeur)}</b>`;
 
-  const marques = ["TOUT", ...new Set(DATA.produits.map(p => p.marque).filter(Boolean))];
-  document.getElementById("col-filtres").innerHTML = marques.map(m =>
-    `<button class="puce-claire ${m === c ? "actif" : ""}"
-       onclick="location.hash='#/collection/${encodeURIComponent(m)}'">${m}</button>`).join("");
+  const total = totalDuPerimetre();
+  const reste = Math.max(total - collectionChargee.length, 0);
+  document.getElementById("col-compte").textContent =
+    `${produits.length} référence${produits.length > 1 ? "s" : ""} affichée${produits.length > 1 ? "s" : ""}`
+    + (reste || filtreSecondaire || texteRecherche ? ` sur ${total} en stock` : " en stock")
+    + ` · tarif ${famille()}`;
+
+  // Pastilles d'affinage : les valeurs de l'autre axe présentes dans ce qui est chargé,
+  // la plus fournie d'abord (une pastille qui ne ramène qu'un produit n'aide personne).
+  const compte = new Map();
+  for (const p of collectionChargee) {
+    const v = p[axeFiltre];
+    if (v) compte.set(v, (compte.get(v) || 0) + 1);
+  }
+  const valeurs = [...compte.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const libelle = axeFiltre === "marque" ? "Toutes les marques" : "Toutes les familles";
+  document.getElementById("col-filtres").innerHTML =
+    `<button class="puce-claire ${filtreSecondaire ? "" : "actif"}"
+       onclick="affiner(null)">${axe === "TOUT" ? "Tout" : libelle}</button>`
+    + valeurs.map(([v, n]) =>
+      `<button class="puce-claire ${v === filtreSecondaire ? "actif" : ""}"
+         onclick="affiner('${echapperHTML(v).replace(/'/g, "\\'")}')">${echapperHTML(v)} <small style="opacity:.5">${n}</small></button>`).join("");
 
   document.getElementById("grille-col").innerHTML = produits.map(carteHTML).join("") ||
     `<div class="vide" style="grid-column:1/-1;color:#777">Aucun produit ne correspond${texteRecherche ? ` à « ${texteRecherche} »` : ""}</div>`;
+
+  // Le reste du périmètre se charge à la demande plutôt qu'en un seul bloc.
+  document.getElementById("col-suite").innerHTML = reste
+    ? `<button class="puce-claire" id="btn-suite">Voir les ${Math.min(reste, PAS_COLLECTION)} suivantes
+         <small style="opacity:.55">(${reste} restantes)</small></button>` : "";
+  const btn = document.getElementById("btn-suite");
+  if (btn) btn.onclick = async () => {
+    btn.disabled = true; btn.textContent = "Chargement…";
+    await chargerCollection(true);
+  };
+}
+
+function affiner(valeur) {
+  filtreSecondaire = valeur;
+  rendreCollection();
+}
+
+// Menu du header : les deux axes, avec le nombre de références de chacun.
+function rendreMenuCatalogue() {
+  const remplir = (id, liste, prefixe) => {
+    document.getElementById(id).innerHTML = (liste || []).map(({ valeur, refs }) =>
+      `<a href="#/collection/${prefixe}/${encodeURIComponent(valeur)}">${echapperHTML(valeur)} <small>${refs}</small></a>`).join("")
+      + `<a class="tout-voir" href="#/collection/TOUT">Tout le catalogue (${NAVIGATION.total || "—"}) →</a>`;
+  };
+  remplir("menu-marques", NAVIGATION.marques, "marque");
+  remplir("menu-familles", NAVIGATION.familles, "famille");
 }
 
 /* ---------------- fiche produit ---------------- */
 function rendreProduit(ref) {
-  const p = DATA.produits.find(x => x.reference === ref);
+  const p = produitConnu(ref);
   if (!p) { location.hash = "#/collection/TOUT"; return; }
   const vue = document.getElementById("vue-produit");
   vue.dataset.ref = ref;
@@ -1189,7 +1340,7 @@ function rendreProduit(ref) {
 
 // Valide la sélection dans le panier : remplace les lignes de ce produit par la saisie.
 function ajouterAuPanier(ref) {
-  const p = DATA.produits.find(x => x.reference === ref);
+  const p = produitConnu(ref);
   for (const t of p.tailles) {
     const cle = ref + "|" + t.taille, qte = selection.get(t.taille) || 0;
     if (qte > 0) panier.set(cle, {produit: p, taille: t.taille, qte, prix: prixDe(t)});
@@ -1208,7 +1359,7 @@ function pctGrille(p, t) {
 }
 
 function repartir(ref) {
-  const p = DATA.produits.find(x => x.reference === ref);
+  const p = produitConnu(ref);
   const globale = parseInt(document.getElementById("qte-globale").value || "0", 10);
   if (!globale) return;
   const dispo = p.tailles.filter(t => t.stock > 0);
@@ -1249,7 +1400,7 @@ function majLigne(input, ref, taille, stock) {
 }
 
 function majTotalFiche(ref) {
-  const p = DATA.produits.find(x => x.reference === ref);
+  const p = produitConnu(ref);
   let pieces = 0, ht = 0;
   for (const [taille, qte] of selection) {
     const t = p.tailles.find(x => x.taille === taille);
@@ -2251,8 +2402,16 @@ async function restaurerPanier() {
     const auto = JSON.parse(localStorage.getItem("fkb2b-panier-auto") || "[]");
     const rows = auto.length ? [{ lignes: auto }]
       : await api("/rest/v1/paniers?select=lignes&order=modifie_le.desc&limit=1");
-    for (const l of (rows[0]?.lignes || [])) {
-      const p = DATA.produits.find(x => x.reference === l.ref);
+    const lignes = rows[0]?.lignes || [];
+    const manquantes = [...new Set(lignes.map(l => l.ref))].filter(r => !CONNUS.has(r));
+    if (manquantes.length) {
+      const complement = await api("/rest/v1/rpc/catalogue", { corps: {
+        limite: manquantes.length, p_societe: clientActif.id ?? null, p_references: manquantes } });
+      complement.forEach(trierTailles);
+      memoriser(complement);
+    }
+    for (const l of lignes) {
+      const p = produitConnu(l.ref);
       const t = p && p.tailles.find(t => t.taille === l.taille);
       if (t && t.stock > 0) panier.set(l.ref + "|" + l.taille, {produit: p, taille: l.taille,
         qte: Math.min(l.qte, t.stock), prix: prixDe(t)});
