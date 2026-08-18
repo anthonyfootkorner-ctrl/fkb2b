@@ -219,6 +219,8 @@
   .pastille.vert { background: #2e9e4f; }
   .pastille.orange { background: #d9a441; }
   .pastille.rouge { background: #c0504d; }
+  .pastille.bleu { background: #3d6fb4; }
+  .preco-mot { color: #3d6fb4; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
   tr.epuise td { opacity: .45; }
   tr.epuise .rupture { font-size: 10px; color: var(--encre2); letter-spacing: .1em; text-transform: uppercase; }
 
@@ -578,6 +580,19 @@
       <div class="compte-produits" id="nu-etat" style="margin-top:10px"></div>
     </div>
 
+    <div class="bloc-clair" style="margin: 0 22px 26px">
+      <h3 class="titre-bloc">Marques interdites par magasin</h3>
+      <div class="compte-produits" style="margin-bottom:12px">Une marque interdite disparaît du catalogue du magasin
+        et sa commande est refusée par le serveur, même en forçant.</div>
+      <div class="formu">
+        <input class="qte-claire" style="width:280px; text-align:left" id="ex-societe" list="liste-societes"
+               placeholder="magasin (compte)…">
+        <button class="puce-claire" id="ex-charger">Voir ses marques</button>
+      </div>
+      <div id="ex-marques" class="chips" style="margin-top:14px"></div>
+      <div class="compte-produits" id="ex-etat" style="margin-top:10px"></div>
+    </div>
+
     <div class="bloc-clair" style="margin: 0 22px 60px">
       <h3 class="titre-bloc">Comptes existants</h3>
       <div id="liste-utilisateurs"></div>
@@ -694,10 +709,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787086226"></script>
-<script src="imports.js?v=1787086226"></script>
-<script src="merch-shopify.js?v=1787086226"></script>
-<script src="moteur-merch.js?v=1787086226"></script>
+<script src="config.js?v=1787087572"></script>
+<script src="imports.js?v=1787087572"></script>
+<script src="merch-shopify.js?v=1787087572"></script>
+<script src="moteur-merch.js?v=1787087572"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1041,7 +1056,7 @@ function rendreAccueil() {
 
 function carteHTML(p) {
   const pastilles = p.tailles.slice(0, 5).map(t =>
-    `<i style="background:${t.stock === 0 ? "#c0504d" : t.stock > 20 ? "#2e9e4f" : "#d9a441"}"></i>`).join("");
+    `<i style="background:${t.precommande ? "#3d6fb4" : t.stock === 0 ? "#c0504d" : t.stock > 20 ? "#2e9e4f" : "#d9a441"}"></i>`).join("");
   return `<div class="carte" onclick="location.hash='#/produit/${encodeURIComponent(p.reference)}'">
     <div class="dispo-mini">${pastilles}</div>
     <div class="visuel"><img loading="lazy" src="${p.photo}" alt=""></div>
@@ -1106,6 +1121,7 @@ function rendreProduit(ref) {
         <div class="prixgros">dès ${eur(prixMini(p))} HT<span>tarif ${famille()}</span></div>
 
         <div class="legende">
+          ${p.precommande ? `<span><i class="pastille bleu"></i><b>Précommande</b> — quantité libre, livraison à réception</span>` : ""}
           <span><i class="pastille vert"></i><b>Disponible</b> — plus de 20 pièces</span>
           <span><i class="pastille orange"></i><b>Stock limité</b> — réassort non garanti, commandez vite</span>
           <span><i class="pastille rouge"></i><b>Épuisé</b> — commande impossible</span>
@@ -1122,6 +1138,15 @@ function rendreProduit(ref) {
         </thead><tbody>
           ${p.tailles.map(t => {
             const deja = selection.get(t.taille);
+            // précommande : pas de plafond de quantité, la taille n'est jamais « épuisée »
+            if (t.precommande) return `<tr>
+              <td><b>${t.taille}</b> <span class="preco-mot">précommande</span></td>
+              <td class="num"><span class="pastille bleu"></span></td>
+              <td class="num">${eur(prixDe(t))}</td>
+              <td class="num"><input class="qte-claire" data-taille="${t.taille}" type="number" min="0" inputmode="numeric"
+                   value="${deja || ""}" placeholder="0"
+                   oninput="majLigne(this, '${ref}', '${t.taille}', Infinity)"></td>
+            </tr>`;
             const niveau = t.stock === 0 ? "rouge" : (t.stock > 20 ? "vert" : "orange");
             if (t.stock === 0) return `<tr class="epuise">
               <td><b>${t.taille}</b></td>
@@ -1898,6 +1923,58 @@ async function classementAutoShopify() {
   etat.textContent = `classement auto : ${res.rapport.length} duos${res.exclus ? `, ${res.exclus} exclu(s) en rupture` : ""} — ajustez puis téléchargez le CSV`;
 }
 
+/* ---------------- marques interdites par magasin (admin) ---------------- */
+let MARQUES_CATALOGUE = null, exclusionsInitialisees = false;
+
+function initialiserExclusions() {
+  if (exclusionsInitialisees) return;
+  exclusionsInitialisees = true;
+  document.getElementById("ex-charger").onclick = chargerExclusions;
+  document.getElementById("ex-societe").addEventListener("keydown",
+    e => { if (e.key === "Enter") chargerExclusions(); });
+}
+
+async function chargerExclusions() {
+  const etat = document.getElementById("ex-etat");
+  const zone = document.getElementById("ex-marques");
+  const compte = document.getElementById("ex-societe").value.trim();
+  const societe = MES_SOCIETES.find(s => s.compte === compte);
+  if (!societe) { etat.textContent = "compte de magasin inconnu"; zone.innerHTML = ""; return; }
+
+  etat.textContent = "chargement…";
+  try {
+    MARQUES_CATALOGUE ??= await api("/rest/v1/rpc/marques_catalogue", { corps: {} });
+    const exclues = new Set((await api(
+      `/rest/v1/exclusions_marques?select=marque&societe_id=eq.${societe.id}`)).map(x => x.marque));
+    zone.innerHTML = MARQUES_CATALOGUE.map(m => `
+      <button class="chip ${exclues.has(m.marque) ? "" : "grise"}"
+              title="${exclues.has(m.marque) ? "interdite — cliquer pour autoriser" : "autorisée — cliquer pour interdire"}"
+              onclick="basculerExclusion('${societe.id}', '${echapperHTML(m.marque).replace(/'/g, "\\'")}', ${exclues.has(m.marque)})">
+        ${echapperHTML(m.marque)} <small>${m.references_actives}</small>
+      </button>`).join("");
+    const nb = exclues.size;
+    etat.textContent = `${societe.nom} — ${nb === 0 ? "aucune marque interdite" :
+      nb + " marque" + (nb > 1 ? "s" : "") + " interdite" + (nb > 1 ? "s" : "")}. Les marques en noir sont interdites.`;
+  } catch (e) {
+    etat.textContent = "erreur : " + (e.donnees?.message || e.message);
+  }
+}
+
+async function basculerExclusion(societeId, marque, estExclue) {
+  const etat = document.getElementById("ex-etat");
+  try {
+    if (estExclue) {
+      await api(`/rest/v1/exclusions_marques?societe_id=eq.${societeId}&marque=eq.${encodeURIComponent(marque)}`,
+        { methode: "DELETE" });
+    } else {
+      await api("/rest/v1/exclusions_marques", { corps: { societe_id: societeId, marque } });
+    }
+    await chargerExclusions();
+  } catch (e) {
+    etat.textContent = "erreur : " + (e.donnees?.message || e.message);
+  }
+}
+
 /* ---------------- gestion des utilisateurs (admin) ---------------- */
 async function apiFonction(action, corps) {
   const rep = await fetch(FKB2B.url + "/functions/v1/import-donnees", {
@@ -1931,6 +2008,7 @@ async function rendreUtilisateurs() {
   // référentiel sociétés pour la saisie (l'admin les voit toutes)
   document.getElementById("liste-societes").innerHTML =
     MES_SOCIETES.map(s => `<option value="${s.compte}">${s.nom} — ${s.famille_tarifaire || "?"}</option>`).join("");
+  initialiserExclusions();
 
   const liste = await api("/rest/v1/rpc/admin_utilisateurs", { corps: {} });
   document.getElementById("liste-utilisateurs").innerHTML = (liste || []).map(u => `
