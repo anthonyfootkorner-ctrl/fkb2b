@@ -39,6 +39,52 @@ const MODELES_IMPORT = {
 const RE_PREFIXE_FOURNISSEUR = /^[A-Z]{2,4}-/;
 const RE_REF_VALIDE = /^[A-Za-z0-9][A-Za-z0-9 ._/-]*$/;
 
+/* ---- fichier de stock B2B (préparé par Footkorner) ----
+   Pas de signature figée : on reconnaît les colonnes par leur intitulé, quelle que
+   soit leur orthographe et leur ordre, pour s'adapter au fichier réel. */
+const COLONNES_B2B = {
+  reference: ["reference", "ref", "references", "reference article", "reference_article",
+              "barcode", "barcode v2", "code", "code article", "article", "modele", "sku"],
+  taille: ["taille", "tailles", "size", "pointure", "option1 value"],
+  quantite: ["quantite", "qte", "qty", "quantity", "stock", "stock b2b", "disponible",
+             "dispo", "total stock", "nombre", "nb"],
+  precommande: ["precommande", "preco", "precommand", "pre-commande", "illimite", "illimité",
+                "infini", "stock infini", "sur commande"],
+};
+const sansAccent = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  .toLowerCase().replace(/\s+/g, " ").trim();
+const estVrai = v => ["oui", "o", "yes", "y", "x", "1", "true", "vrai"].includes(sansAccent(v));
+
+// Cherche, dans l'en-tête, la colonne qui correspond à l'un des intitulés attendus.
+function trouverColonne(entete, candidats) {
+  const norm = entete.map(sansAccent);
+  for (const c of candidats) {
+    const i = norm.indexOf(c);
+    if (i >= 0) return entete[i];
+  }
+  return null;
+}
+
+function detecterStockB2B(tampon) {
+  for (const encodage of ["utf-8", "windows-1252"]) {
+    let texte;
+    try { texte = new TextDecoder(encodage).decode(tampon); } catch (e) { continue; }
+    const premiere = texte.slice(0, 8000).split(/\r?\n/)[0].replace(/^\uFEFF/, "");
+    for (const sep of [";", ",", "\t"]) {
+      const entete = decouperLigne(premiere, sep).map(c => c.trim());
+      if (entete.length < 2) continue;
+      const ref = trouverColonne(entete, COLONNES_B2B.reference);
+      const qte = trouverColonne(entete, COLONNES_B2B.quantite);
+      const preco = trouverColonne(entete, COLONNES_B2B.precommande);
+      if (!ref || !(qte || preco)) continue;
+      return { modele: "stock_b2b", texte, entete,
+        spec: { libelle: "Stock B2B (fichier Footkorner)", sep, encodage, remplacement_complet: true,
+                colonnes: { ref, taille: trouverColonne(entete, COLONNES_B2B.taille), qte, preco } } };
+    }
+  }
+  return null;
+}
+
 // Analyse CSV/TSV avec guillemets (état simple, suffisant pour les exports Fastmag).
 function decouperLigne(ligne, sep) {
   const champs = [];
@@ -105,12 +151,13 @@ async function analyserFichierFastmag(fichier) {
     catch (e) { return { erreur: "lecture du ZIP impossible : " + e.message, empreinte }; }
     for (const e of entrees) {
       if (!/\.(csv|txt|tsv)$/i.test(e.nom) || /summary/i.test(e.nom)) continue;
-      d = detecterModeleImport(e.tampon);
+      d = detecterModeleImport(e.tampon) || detecterStockB2B(e.tampon);
       if (d) { nomAffiche = fichier.name + " \u2192 " + e.nom; break; }
     }
     if (!d) return { erreur: "aucun fichier au format connu dans ce ZIP", empreinte };
   } else {
-    d = detecterModeleImport(tampon);
+    // les mod\u00e8les Fastmag/Shopify d'abord (signature stricte), le stock B2B en dernier recours
+    d = detecterModeleImport(tampon) || detecterStockB2B(tampon);
   }
   if (!d) return { erreur: "format non reconnu : l'en-t\u00eate ne correspond \u00e0 aucun mod\u00e8le connu", empreinte };
   const { modele, spec, texte, entete } = d;
@@ -152,6 +199,29 @@ async function analyserFichierFastmag(fichier) {
 }
 
 // Transforme les lignes analysées en enregistrements pour la base.
+// Fichier de stock B2B → lignes prêtes pour la base, avec le détail de ce qui a été lu
+// (les colonnes ayant été reconnues à l'intitulé, autant les montrer avant d'exécuter).
+function preparerStockB2B(analyse) {
+  const { ref, taille, qte, preco } = analyse.spec.colonnes;
+  const parCle = new Map();
+  let precommandes = 0, ignorees = 0;
+  for (const l of analyse.lignes) {
+    const reference = (l[ref] || "").trim();
+    if (!reference) { ignorees++; continue; }
+    const t = ((taille ? l[taille] : "") || "").trim();
+    const illimite = preco ? estVrai(l[preco]) : false;
+    const q = qte ? (parseInt(parseFloat((l[qte] || "0").replace(",", ".")), 10) || 0) : 0;
+    if (!illimite && q <= 0) { ignorees++; continue; }
+    const cle = reference + "|" + t;
+    const e = parCle.get(cle) || { reference, taille: t, quantite: 0, illimite: false };
+    e.quantite += q;
+    e.illimite = e.illimite || illimite;
+    parCle.set(cle, e);
+  }
+  for (const e of parCle.values()) if (e.illimite) precommandes++;
+  return { rows: [...parCle.values()], precommandes, ignorees };
+}
+
 function mapperVersTables(analyse) {
   const L = analyse.lignes;
   switch (analyse.modele) {
@@ -287,6 +357,10 @@ function mapperVersTables(analyse) {
 }
 
 async function executerImport(analyse, surProgres) {
+  // Le stock B2B passe par ses propres fonctions : il ne doit toucher que ses lignes
+  // (le stock Duhamel reste en base pour le merch) et il solde les commandes en attente.
+  if (analyse.modele === "stock_b2b") return executerStockB2B(analyse, surProgres);
+
   const plans = mapperVersTables(analyse);
   let total = 0;
   for (const plan of plans) {
@@ -314,4 +388,43 @@ async function executerImport(analyse, surProgres) {
     lignes_lues: analyse.lues, crees: total, maj: 0, inchanges: 0,
     quarantaine: analyse.quarantaine.length, statut: "OK" } });
   return total;
+}
+
+// Dépôt du stock B2B : préparation, envoi par lots, puis bascule côté serveur
+// (remplacement du stock, solde des commandes en attente, recalcul des actifs).
+async function executerStockB2B(analyse, surProgres) {
+  const { rows, precommandes, ignorees } = preparerStockB2B(analyse);
+  if (!rows.length) throw new Error("aucune ligne de stock exploitable dans ce fichier");
+
+  surProgres("préparation du dépôt…");
+  await api("/rest/v1/rpc/stock_b2b_debut", { corps: {} });
+
+  let envoyees = 0;
+  for (let i = 0; i < rows.length; i += 2000) {
+    const lot = rows.slice(i, i + 2000);
+    await api("/rest/v1/rpc/stock_b2b_lot", { corps: { p_rows: lot } });
+    envoyees += lot.length;
+    surProgres(`stock B2B : ${envoyees}/${rows.length} lignes…`);
+  }
+
+  surProgres("remplacement du stock et recalcul des produits actifs…");
+  const bilan = await api("/rest/v1/rpc/stock_b2b_fin", { corps: {} });
+
+  const mots = [`${bilan.lignes} lignes de stock`];
+  if (precommandes) mots.push(`${precommandes} en précommande`);
+  if (bilan.commandes_soldees) mots.push(`${bilan.commandes_soldees} commande(s) en attente soldée(s)`);
+  if (ignorees) mots.push(`${ignorees} ligne(s) ignorée(s) (sans référence ou quantité nulle)`);
+  surProgres("✓ " + mots.join(" · "));
+  // une référence+taille absente des fiches produits n'apparaîtra jamais au catalogue :
+  // on le dit franchement plutôt que de laisser du stock invisible
+  if (bilan.inconnues) {
+    surProgres(`⚠ ${bilan.inconnues} ligne(s) sans fiche produit correspondante — invisibles au catalogue`
+      + (bilan.exemples_inconnues ? ` (ex. ${bilan.exemples_inconnues})` : ""));
+  }
+
+  await apiFonction("journal", { entree: {
+    fichier: analyse.fichier, modele: analyse.modele, empreinte: analyse.empreinte,
+    lignes_lues: analyse.lues, crees: bilan.lignes, maj: 0, inchanges: 0,
+    quarantaine: analyse.quarantaine.length, statut: "OK" } });
+  return bilan.lignes;
 }

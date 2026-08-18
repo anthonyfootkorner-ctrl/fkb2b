@@ -328,6 +328,14 @@
   .cgv { display: flex; gap: 9px; align-items: flex-start; font-size: 11.5px; color: var(--gris);
     line-height: 1.5; margin: 2px 0 14px; }
   .cgv label { cursor: pointer; }
+  .nom-commande { display: block; font-size: 11px; color: var(--gris); letter-spacing: .06em;
+    text-transform: uppercase; margin: 0 0 14px; }
+  .nom-commande input { display: block; width: 100%; margin-top: 7px; background: var(--noir3);
+    border: 1px solid var(--bord); border-radius: 8px; color: var(--blanc); font-size: 13px;
+    padding: 10px 12px; font-family: inherit; letter-spacing: normal; text-transform: none; }
+  .nom-commande input:focus { outline: 0; border-color: #3d3d3d; }
+  .nom-commande span { display: block; margin-top: 6px; font-size: 10.5px; text-transform: none;
+    letter-spacing: normal; }
   .cgv input { accent-color: #d9a441; width: 15px; height: 15px; margin-top: 1px; flex: none; cursor: pointer; }
   .cgv a { color: var(--blanc); text-decoration: underline; text-underline-offset: 2px; }
   .cgv-texte { max-width: 760px; margin: 0 auto; padding: 0 22px 80px; }
@@ -693,6 +701,10 @@
   <div class="panier-pied">
     <div class="totaux"><span id="t-pieces">0 pièce</span><span id="t-refs">0 référence</span></div>
     <div class="totaux grand"><span>TOTAL HT</span><span id="t-ht">0,00 €</span></div>
+    <label class="nom-commande" for="nom-commande">Nom de la commande
+      <input id="nom-commande" maxlength="40" placeholder="ex. Réassort rentrée" autocomplete="off">
+      <span>Repris comme critère dans Fastmag — 40 caractères maximum.</span>
+    </label>
     <div class="cgv">
       <input type="checkbox" id="cgv-ok">
       <span><label for="cgv-ok">Je déclare avoir pris connaissance et accepter les </label><a href="#/cgv"
@@ -709,10 +721,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787087572"></script>
-<script src="imports.js?v=1787087572"></script>
-<script src="merch-shopify.js?v=1787087572"></script>
-<script src="moteur-merch.js?v=1787087572"></script>
+<script src="config.js?v=1787088286"></script>
+<script src="imports.js?v=1787088286"></script>
+<script src="merch-shopify.js?v=1787088286"></script>
+<script src="moteur-merch.js?v=1787088286"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2259,7 +2271,8 @@ async function validerCommande() {
   try {
     // Validation atomique côté serveur : société de l'utilisateur, stock disponible, prix officiels.
     const r = await api("/rest/v1/rpc/valider_commande",
-      { corps: { p_lignes: lignes, p_societe: clientActif.id ?? null, p_cgv_version: CGV_VERSION } });
+      { corps: { p_lignes: lignes, p_societe: clientActif.id ?? null, p_cgv_version: CGV_VERSION,
+                 p_nom: document.getElementById("nom-commande").value.trim() || null } });
 
     // Envoi de la commande à Footkorner (fichier Fastmag reconstruit côté serveur).
     // Un échec d'envoi ne perd pas la commande : elle est déjà enregistrée et le stock réservé.
@@ -2276,11 +2289,13 @@ async function validerCommande() {
     await api("/rest/v1/paniers?user_id=eq." + monUserId(), { methode: "DELETE" }).catch(() => {});
     panier.clear();
     document.getElementById("cgv-ok").checked = false; // à recocher pour la commande suivante
+    document.getElementById("nom-commande").value = "";
     rendrePanier();
     const motEnvoi = erreurEnvoi
       ? `<span style="color:#e0a24d">Envoi de l'e-mail à confirmer — nos équipes ont bien la commande en base.</span><br>`
       : (envoi?.copie_client ? "Un récapitulatif vient de vous être envoyé par e-mail.<br>" : "");
-    document.getElementById("panier-corps").innerHTML = `<div class="vide">Commande <b>${r.numero}</b> transmise ✓<br><br>
+    document.getElementById("panier-corps").innerHTML = `<div class="vide">Commande <b>${r.numero}</b> transmise ✓<br>
+      ${r.nom ? `<span style="font-size:12px">« ${echapperHTML(r.nom)} »</span>` : ""}<br>
       <span style="font-size:12px">${r.nb_pieces} pièces — ${eur(Number(r.total_ht))} HT<br>
       Enregistrée côté serveur : le stock est réservé.<br>
       ${motEnvoi}</span></div>`;
