@@ -39,6 +39,46 @@
   .h-droite { display: flex; align-items: center; gap: 12px; justify-content: flex-end; }
   select { background: var(--noir3); color: var(--blanc); border: 1px solid var(--bord); border-radius: 8px;
     padding: 8px 10px; font-size: 12.5px; max-width: 30vw; }
+
+  /* ---------- sélecteur de magasin (clients multi-magasins) ---------- */
+  .magasin { position: relative; }
+  .magasin-btn { display: flex; align-items: center; gap: 10px; background: var(--noir3);
+    border: 1px solid var(--bord); border-radius: 999px; padding: 7px 14px 7px 16px; cursor: pointer;
+    color: var(--blanc); text-align: left; max-width: 34vw; transition: border-color 150ms ease; }
+  .magasin-btn:hover { border-color: #3d3d3d; }
+  .magasin-btn[disabled] { cursor: default; opacity: 1; }
+  .magasin-btn .col { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .magasin-btn .sur { font-size: 8.5px; letter-spacing: .22em; color: var(--gris); text-transform: uppercase; }
+  .magasin-btn .nom { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; }
+  .magasin-btn .chevron { font-size: 9px; color: var(--gris); flex: none; transition: transform 200ms var(--ease-out); }
+  .magasin.ouvert .magasin-btn .chevron { transform: rotate(180deg); }
+  .magasin-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 70; width: 320px;
+    max-height: min(60vh, 460px); overflow: auto; background: var(--noir2); border: 1px solid var(--bord);
+    border-radius: 12px; padding: 6px; box-shadow: 0 18px 44px rgba(0,0,0,.6); display: none; }
+  .magasin.ouvert .magasin-menu { display: block; }
+  .magasin-menu .entete { font-size: 9.5px; letter-spacing: .2em; color: var(--gris); text-transform: uppercase;
+    padding: 9px 12px 7px; }
+  .magasin-filtre { width: 100%; background: var(--noir3); border: 1px solid var(--bord); border-radius: 8px;
+    color: var(--blanc); font-size: 12.5px; padding: 8px 11px; margin: 0 0 6px; font-family: inherit; }
+  .magasin-opt { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0;
+    color: var(--blanc); text-align: left; padding: 9px 12px; border-radius: 8px; cursor: pointer; }
+  .magasin-opt:hover { background: var(--noir3); }
+  .magasin-opt .col { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+  .magasin-opt .nom { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .magasin-opt .meta { font-size: 10.5px; color: var(--gris); letter-spacing: .04em; }
+  .magasin-opt .coche { color: #d9a441; font-size: 12px; flex: none; visibility: hidden; }
+  .magasin-opt.actif { background: var(--noir3); }
+  .magasin-opt.actif .nom { font-weight: 600; }
+  .magasin-opt.actif .coche { visibility: visible; }
+  .magasin-menu .aucun { font-size: 12px; color: var(--gris); padding: 10px 12px; }
+  .magasin-menu .note { font-size: 10.5px; color: var(--gris); line-height: 1.5;
+    border-top: 1px solid var(--bord); margin-top: 6px; padding: 9px 12px 6px; }
+  .magasin-fixe { font-size: 11.5px; color: var(--gris); letter-spacing: .08em; text-align: right; }
+  @media (max-width: 720px) {
+    .magasin-btn { max-width: 46vw; }
+    .magasin-menu { width: min(88vw, 320px); }
+  }
   .btn-panier { background: var(--blanc); color: var(--noir); border: 0; border-radius: 999px;
     padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
     transition: transform 160ms var(--ease-out); white-space: nowrap; }
@@ -273,6 +313,26 @@
   .ligne .det .d { font-size: 11px; color: var(--gris); margin-top: 3px; }
   .ligne .m { font-size: 13px; font-weight: 600; white-space: nowrap; }
   .ligne .sup { background: none; border: 0; color: var(--gris); cursor: pointer; font-size: 15px; }
+  /* le panier regroupe les tailles sous leur référence */
+  .groupe { padding: 13px 0; border-bottom: 1px solid #1e1e1e; }
+  .groupe .ligne { padding: 0; border-bottom: 0; }
+  .groupe .tailles { display: flex; flex-wrap: wrap; gap: 6px; margin: 11px 0 0 58px; }
+  .t-puce { display: flex; align-items: center; gap: 8px; background: var(--noir3); border: 1px solid var(--bord);
+    border-radius: 999px; padding: 5px 7px 5px 12px; font-size: 11.5px; color: var(--gris); }
+  .t-puce b { color: var(--blanc); font-weight: 600; }
+  .t-puce .x { background: none; border: 0; color: var(--gris); cursor: pointer; font-size: 13px;
+    line-height: 1; padding: 0 3px; }
+  .t-puce .x:hover { color: var(--blanc); }
+  .cgv { display: flex; gap: 9px; align-items: flex-start; font-size: 11.5px; color: var(--gris);
+    line-height: 1.5; margin: 2px 0 14px; }
+  .cgv label { cursor: pointer; }
+  .cgv input { accent-color: #d9a441; width: 15px; height: 15px; margin-top: 1px; flex: none; cursor: pointer; }
+  .cgv a { color: var(--blanc); text-decoration: underline; text-underline-offset: 2px; }
+  .cgv-texte { max-width: 760px; margin: 0 auto; padding: 0 22px 80px; }
+  .cgv-texte h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; margin: 30px 0 9px; }
+  .cgv-texte p { font-size: 14px; line-height: 1.75; color: #333; }
+  .cgv-projet { border-left: 3px solid #d9a441; background: var(--tuile); padding: 14px 16px;
+    font-size: 13px !important; line-height: 1.65 !important; margin-bottom: 8px; }
   .panier-pied { padding: 18px 22px 24px; border-top: 1px solid var(--bord); }
   .totaux { display: flex; justify-content: space-between; font-size: 13px; color: var(--gris); margin-bottom: 6px; }
   .totaux.grand { color: var(--blanc); font-size: 16px; font-weight: 700; margin: 10px 0 16px; }
@@ -336,7 +396,7 @@
   </div>
   <div class="logo" onclick="location.hash='#/'">FKB2B</div>
   <div class="h-droite">
-    <span id="societe-nom" style="font-size:11.5px; color:var(--gris); letter-spacing:.08em; text-align:right"></span>
+    <div id="societe-nom" class="magasin-fixe"></div>
     <button class="puce" id="btn-deconnexion" title="Se déconnecter">Quitter</button>
     <button class="btn-panier" id="btn-panier">Panier<span class="badge" id="badge">0</span></button>
   </div>
@@ -374,7 +434,8 @@
 
     <footer>
       <div class="logo">FKB2B</div>
-      <span>Portail privé — accès réservé aux clients autorisés · Maquette de démonstration</span>
+      <span>Portail privé — accès réservé aux clients autorisés</span>
+      <a href="#/cgv" style="margin-left:auto; text-decoration:underline; text-underline-offset:3px">Conditions générales de vente</a>
     </footer>
   </section>
 
@@ -534,6 +595,76 @@
       <div class="bloc" id="bloc-societe"></div>
     </div>
   </section>
+
+  <!-- CONDITIONS GÉNÉRALES DE VENTE -->
+  <section class="vue page-claire" id="vue-cgv">
+    <div class="col-tete">
+      <span class="fil" onclick="history.length > 1 ? history.back() : location.hash='#/'">← RETOUR</span>
+      <h1>CONDITIONS <b>GÉNÉRALES</b></h1>
+      <div class="compte-produits">Version <span id="cgv-version"></span> — ventes aux professionnels</div>
+    </div>
+    <div class="cgv-texte" id="cgv-texte">
+      <p class="cgv-projet"><b>Projet — à valider par Footkorner avant l'ouverture aux clients.</b>
+        Ce texte décrit le fonctionnement réel du portail ; il doit être relu et complété
+        (raison sociale, RCS, TVA, délais et conditions de règlement du compte client) avant mise en ligne.</p>
+
+      <h2>1. Objet et champ d'application</h2>
+      <p>Les présentes conditions régissent les commandes passées sur le portail professionnel FKB2B par les
+        clients titulaires d'un compte ouvert par Footkorner. L'accès est strictement réservé aux professionnels ;
+        toute commande passée sur le portail vaut acceptation des présentes conditions dans leur version en vigueur
+        au jour de la commande.</p>
+
+      <h2>2. Compte et accès</h2>
+      <p>L'accès est nominatif. Le titulaire est responsable de la confidentialité de ses identifiants et de toute
+        commande passée depuis son compte. Un même titulaire peut être rattaché à plusieurs magasins : le magasin
+        actif au moment de la commande détermine les tarifs applicables, l'adresse de livraison et la facturation.</p>
+
+      <h2>3. Produits, disponibilité et réassort</h2>
+      <p>Les produits proposés sont ceux effectivement disponibles en entrepôt au moment de la consultation. Les
+        indicateurs de disponibilité sont donnés à titre indicatif et évoluent en continu. <b>Le réassort n'est pas
+        garanti</b> : une référence épuisée peut ne pas revenir. Les visuels et descriptifs sont non contractuels.</p>
+
+      <h2>4. Prix</h2>
+      <p>Les prix sont exprimés en euros, hors taxes, hors frais de port, et correspondent à la grille tarifaire
+        attachée au compte du magasin actif. Ils peuvent être modifiés à tout moment ; le prix applicable est celui
+        retenu par le serveur au moment de la validation de la commande, qui figure sur le récapitulatif envoyé
+        par e-mail.</p>
+
+      <h2>5. Commande</h2>
+      <p>La commande est ferme et définitive à sa validation. Elle donne lieu à une réservation immédiate du stock
+        correspondant et à l'envoi d'un récapitulatif par e-mail. Footkorner se réserve le droit de refuser ou
+        d'ajuster une commande en cas d'indisponibilité constatée, d'erreur manifeste de prix ou d'encours de
+        règlement non apuré.</p>
+
+      <h2>6. Livraison</h2>
+      <p>Les délais de livraison sont indicatifs et courent à compter de la confirmation de la commande. Un retard
+        ne peut donner lieu à annulation, indemnité ou pénalité. Les risques sont transférés au client à la remise
+        au transporteur ; toute avarie ou manquant doit être signalé par écrit sous trois jours ouvrés avec les
+        réserves portées sur le bon de transport.</p>
+
+      <h2>7. Facturation et règlement</h2>
+      <p>La facturation et les conditions de règlement sont celles convenues au compte client. Tout retard de
+        paiement entraîne de plein droit des pénalités au taux légal applicable entre professionnels ainsi que
+        l'indemnité forfaitaire pour frais de recouvrement prévue par la loi, et peut suspendre l'accès au portail.</p>
+
+      <h2>8. Retours</h2>
+      <p>Aucun retour n'est accepté sans accord écrit préalable de Footkorner. Les produits retournés doivent être
+        neufs, complets et dans leur emballage d'origine.</p>
+
+      <h2>9. Réserve de propriété</h2>
+      <p>Les marchandises restent la propriété de Footkorner jusqu'au paiement intégral de leur prix.</p>
+
+      <h2>10. Données personnelles</h2>
+      <p>Les données collectées (identité du contact, magasin, historique de commandes) sont traitées pour la seule
+        gestion de la relation commerciale et conservées pendant la durée légale applicable. Le titulaire dispose
+        d'un droit d'accès, de rectification et d'effacement qu'il peut exercer auprès de son interlocuteur
+        Footkorner.</p>
+
+      <h2>11. Droit applicable</h2>
+      <p>Les présentes conditions sont soumises au droit français. À défaut de résolution amiable, tout litige
+        relève de la compétence exclusive des tribunaux du ressort du siège de Footkorner.</p>
+    </div>
+  </section>
 </main>
 
 <div class="voile" id="voile"></div>
@@ -547,9 +678,14 @@
   <div class="panier-pied">
     <div class="totaux"><span id="t-pieces">0 pièce</span><span id="t-refs">0 référence</span></div>
     <div class="totaux grand"><span>TOTAL HT</span><span id="t-ht">0,00 €</span></div>
+    <div class="cgv">
+      <input type="checkbox" id="cgv-ok">
+      <span><label for="cgv-ok">Je déclare avoir pris connaissance et accepter les </label><a href="#/cgv"
+        onclick="basculer('panier', false)">conditions générales de vente</a>.</span>
+    </div>
     <button class="btn-plein" id="btn-export" style="width:100%" disabled>VALIDER LA COMMANDE</button>
     <button class="puce" id="btn-sauver" style="width:100%; margin-top:10px">Enregistrer le panier pour plus tard</button>
-    <p class="note">À la validation, la commande est transmise avec le fichier Fastmag en pièce jointe — le client ne manipule jamais le fichier. (Dans ce POC, le fichier est téléchargé pour permettre le test de réimport.)</p>
+    <p class="note">À la validation, la commande est transmise à Footkorner et le stock est réservé. Vous recevez un récapitulatif par e-mail.</p>
   </div>
 </aside>
 
@@ -558,11 +694,13 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1786785598"></script>
-<script src="imports.js?v=1786785598"></script>
-<script src="merch-shopify.js?v=1786785598"></script>
-<script src="moteur-merch.js?v=1786785598"></script>
+<script src="config.js?v=1787086226"></script>
+<script src="imports.js?v=1787086226"></script>
+<script src="merch-shopify.js?v=1787086226"></script>
+<script src="moteur-merch.js?v=1787086226"></script>
 <script>
+// Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
+const CGV_VERSION = "2026-08";
 let DATA = null, clientActif = null, filtreActif = "TOUT", texteRecherche = "", collectionCourante = null;
 let MES_SOCIETES = [], estAdmin = false;
 let travailNonEnregistre = false;
@@ -638,6 +776,7 @@ async function init() {
   document.getElementById("voile").onclick = () => basculer("panier", false);
   document.getElementById("btn-export").onclick = validerCommande;
   document.getElementById("btn-sauver").onclick = sauverPanier;
+  document.getElementById("cgv-ok").onchange = majBoutonCommande;
 
   restaurerPanier();
   // paramétrage de base du merch : dernier profil de tri et N figés retenus
@@ -678,34 +817,134 @@ function logoSuivant(img) {
   }
 }
 
-/* ---------------- sélecteur de société (clients multi-magasins) ---------------- */
+/* ---------------- sélecteur de magasin (propriétaires multi-magasins) ---------------- */
+// Le magasin actif détermine les tarifs, l'historique de commandes et l'ID Fastmag
+// du fichier envoyé : il doit rester lisible en permanence, pas caché dans un menu.
 function rendreSelecteurSociete() {
   const zone = document.getElementById("societe-nom");
+  const nomCourt = s => s.nom || s.compte || "Magasin";
+
+  // Un seul magasin : pas de menu, juste le rappel du compte actif.
   if (MES_SOCIETES.length <= 1) {
-    zone.textContent = `${clientActif.nom}${clientActif.famille_tarifaire ? " · tarif " + clientActif.famille_tarifaire : ""}`;
+    zone.className = "magasin-fixe";
+    zone.textContent = `${nomCourt(clientActif)}${clientActif.famille_tarifaire ? " · tarif " + clientActif.famille_tarifaire : ""}`;
     return;
   }
-  zone.innerHTML = `<select id="sel-societe" title="Magasin actif">${MES_SOCIETES.map(s =>
-    `<option value="${s.id}" ${s.id === clientActif.id ? "selected" : ""}>${s.nom} — ${s.famille_tarifaire || "?"}</option>`).join("")}</select>`;
-  document.getElementById("sel-societe").onchange = e => changerSociete(e.target.value);
+
+  zone.className = "magasin";
+  zone.innerHTML = `
+    <button class="magasin-btn" id="magasin-btn" aria-haspopup="listbox" aria-expanded="false"
+            title="Changer de magasin">
+      <span class="col">
+        <span class="sur">Magasin</span>
+        <span class="nom" id="magasin-nom"></span>
+      </span>
+      <span class="chevron">▼</span>
+    </button>
+    <div class="magasin-menu" id="magasin-menu" role="listbox">
+      <div class="entete">Mes magasins (${MES_SOCIETES.length})</div>
+      ${MES_SOCIETES.length > 8 ? `<input class="magasin-filtre" id="magasin-filtre" placeholder="Filtrer…" autocomplete="off">` : ""}
+      <div id="magasin-liste"></div>
+      <div class="note">Les tarifs, l'historique et le fichier de commande suivent le magasin choisi.
+        Le panier en cours est conservé et recalculé aux nouveaux prix.</div>
+    </div>`;
+
+  const btn = document.getElementById("magasin-btn");
+  const menu = document.getElementById("magasin-menu");
+  const filtre = document.getElementById("magasin-filtre");
+
+  const rendreListe = () => {
+    const q = (filtre?.value || "").trim().toLowerCase();
+    const vus = MES_SOCIETES.filter(s => !q ||
+      `${s.nom || ""} ${s.compte || ""} ${s.famille_tarifaire || ""}`.toLowerCase().includes(q));
+    document.getElementById("magasin-liste").innerHTML = vus.length
+      ? vus.map(s => `<button class="magasin-opt ${s.id === clientActif.id ? "actif" : ""}" data-id="${s.id}"
+            role="option" aria-selected="${s.id === clientActif.id}">
+          <span class="col">
+            <span class="nom">${echapperHTML(nomCourt(s))}</span>
+            <span class="meta">tarif ${echapperHTML(s.famille_tarifaire || "?")}${s.id_fastmag ? " · Fastmag " + echapperHTML(s.id_fastmag) : " · sans ID Fastmag"}</span>
+          </span>
+          <span class="coche">✓</span>
+        </button>`).join("")
+      : `<div class="aucun">Aucun magasin ne correspond.</div>`;
+    for (const b of document.querySelectorAll(".magasin-opt")) {
+      b.onclick = () => { ouvrirMenuMagasin(false); changerSociete(b.dataset.id); };
+    }
+  };
+
+  const ouvrirMenuMagasin = (ouvrir) => {
+    zone.classList.toggle("ouvert", ouvrir);
+    btn.setAttribute("aria-expanded", String(ouvrir));
+    if (ouvrir) { rendreListe(); filtre?.focus(); }
+    else if (filtre) filtre.value = "";
+  };
+
+  btn.onclick = e => { e.stopPropagation(); ouvrirMenuMagasin(!zone.classList.contains("ouvert")); };
+  menu.onclick = e => e.stopPropagation();
+  if (filtre) filtre.oninput = rendreListe;
+  document.addEventListener("click", () => ouvrirMenuMagasin(false));
+  document.addEventListener("keydown", e => { if (e.key === "Escape") ouvrirMenuMagasin(false); });
+
+  majEtiquetteMagasin();
+}
+
+function majEtiquetteMagasin() {
+  const el = document.getElementById("magasin-nom");
+  if (!el) return;
+  el.textContent = `${clientActif.nom || clientActif.compte || "Magasin"}`
+    + (clientActif.famille_tarifaire ? ` · ${clientActif.famille_tarifaire}` : "");
+}
+
+function echapperHTML(s) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 async function changerSociete(id) {
+  if (!id || id === clientActif?.id) return;
   clientActif = MES_SOCIETES.find(s => s.id === id);
   localStorage.setItem("fkb2b-societe", id);
+  majEtiquetteMagasin();
   // recharge le catalogue aux tarifs de la société choisie
   DATA.produits = await api("/rest/v1/rpc/catalogue", { corps: { limite: 300, p_societe: id } });
   DATA.produits.forEach(trierTailles);
   // le panier suit : on raccroche les lignes aux nouveaux objets produits (prix recalculés)
+  let retirees = 0, ajustees = 0;
   for (const [cle, l] of [...panier]) {
     const p = DATA.produits.find(x => x.reference === l.produit.reference);
     const t = p && p.tailles.find(t => t.taille === l.taille);
-    if (t && t.stock > 0) panier.set(cle, { produit: p, taille: l.taille, qte: Math.min(l.qte, t.stock), prix: prixDe(t) });
-    else panier.delete(cle);
+    if (t && t.stock > 0) {
+      const qte = Math.min(l.qte, t.stock);
+      if (qte !== l.qte) ajustees++;
+      panier.set(cle, { produit: p, taille: l.taille, qte, prix: prixDe(t) });
+    } else { panier.delete(cle); retirees++; }
   }
   rendrePanier();
   rendreAccueil();
   router();
+  const alertes = [retirees && `${retirees} ligne${retirees > 1 ? "s" : ""} retirée${retirees > 1 ? "s" : ""} (indisponible)`,
+                   ajustees && `${ajustees} quantité${ajustees > 1 ? "s" : ""} ajustée${ajustees > 1 ? "s" : ""}`].filter(Boolean);
+  signalerMagasin(`Magasin actif : ${clientActif.nom || clientActif.compte}`
+    + (alertes.length ? ` — panier : ${alertes.join(", ")}` : ""));
+}
+
+// Message éphémère en bas d'écran après un changement de magasin.
+function signalerMagasin(texte) {
+  let bulle = document.getElementById("bulle-magasin");
+  if (!bulle) {
+    bulle = document.createElement("div");
+    bulle.id = "bulle-magasin";
+    bulle.style.cssText = "position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(10px);"
+      + "background:var(--noir2); border:1px solid var(--bord); border-radius:999px; padding:11px 20px;"
+      + "font-size:12.5px; letter-spacing:.03em; z-index:200; opacity:0; pointer-events:none;"
+      + "transition:opacity 200ms ease, transform 260ms var(--ease-out); box-shadow:0 14px 34px rgba(0,0,0,.55)";
+    document.body.appendChild(bulle);
+  }
+  bulle.textContent = texte;
+  requestAnimationFrame(() => { bulle.style.opacity = "1"; bulle.style.transform = "translateX(-50%) translateY(0)"; });
+  clearTimeout(signalerMagasin.minuteur);
+  signalerMagasin.minuteur = setTimeout(() => {
+    bulle.style.opacity = "0"; bulle.style.transform = "translateX(-50%) translateY(10px)";
+  }, 3600);
 }
 
 /* ---------------- routeur ---------------- */
@@ -733,6 +972,9 @@ function router() {
   } else if (route === "imports") {
     document.getElementById("vue-imports").classList.add("active");
     rendreImports();
+  } else if (route === "cgv") {
+    document.getElementById("vue-cgv").classList.add("active");
+    document.getElementById("cgv-version").textContent = CGV_VERSION;
   } else if (route === "merch-shopify") {
     document.getElementById("vue-merch-shopify").classList.add("active");
     rendreMerchShopify();
@@ -1833,27 +2075,62 @@ function rendrePanier() {
     l.prix = prixDe(l.produit.tailles.find(t => t.taille === l.taille));
     pieces += l.qte; ht += l.qte * l.prix; refs.add(l.produit.reference);
   }
+  // Regroupement par référence : une carte produit, ses tailles en pastilles dessous.
+  const groupes = new Map();
+  for (const [cle, l] of panier.entries()) {
+    const g = groupes.get(l.produit.reference)
+      || { produit: l.produit, lignes: [], pieces: 0, total: 0 };
+    g.lignes.push({ cle, ...l });
+    g.pieces += l.qte; g.total += l.qte * l.prix;
+    groupes.set(l.produit.reference, g);
+  }
+  for (const g of groupes.values()) {
+    const rang = t => g.produit.tailles.findIndex(x => x.taille === t);
+    g.lignes.sort((a, b) => rang(a.taille) - rang(b.taille));
+  }
+
   corps.innerHTML = panier.size === 0 ? `<div class="vide">Votre panier est vide</div>` :
-    [...panier.entries()].map(([cle, l]) => `
-      <div class="ligne">
-        <div class="visuel"><img src="${l.produit.photo}" alt=""></div>
-        <div class="det">
-          <div class="n">${l.produit.designation || l.produit.reference}</div>
-          <div class="d">${l.produit.reference} · T. ${l.taille} · ${l.qte} × ${eur(l.prix)}</div>
+    [...groupes.values()].map(g => `
+      <div class="groupe">
+        <div class="ligne">
+          <div class="visuel"><img src="${g.produit.photo}" alt=""></div>
+          <div class="det">
+            <div class="n">${echapperHTML(g.produit.designation || g.produit.reference)}</div>
+            <div class="d">${echapperHTML(g.produit.reference)}${g.produit.couleur ? " · " + echapperHTML(g.produit.couleur) : ""}
+              · ${g.pieces} pièce${g.pieces > 1 ? "s" : ""}</div>
+          </div>
+          <div class="m">${eur(g.total)}</div>
+          <button class="sup" title="Retirer la référence"
+            onclick="retirerReference('${g.produit.reference.replace(/'/g, "\\'")}')">×</button>
         </div>
-        <div class="m">${eur(l.qte * l.prix)}</div>
-        <button class="sup" onclick="panier.delete('${cle}'); rendrePanier()">×</button>
+        <div class="tailles">
+          ${g.lignes.map(l => `<span class="t-puce"><b>${echapperHTML(l.taille)}</b> × ${l.qte}
+            <span style="opacity:.7">${eur(l.prix)}</span>
+            <button class="x" title="Retirer cette taille"
+              onclick="panier.delete('${l.cle.replace(/'/g, "\\'")}'); rendrePanier()">×</button></span>`).join("")}
+        </div>
       </div>`).join("");
   document.getElementById("badge").textContent = pieces;
   document.getElementById("t-pieces").textContent = `${pieces} pièce${pieces > 1 ? "s" : ""}`;
   document.getElementById("t-refs").textContent = `${refs.size} référence${refs.size > 1 ? "s" : ""}`;
   document.getElementById("t-ht").textContent = eur(ht);
-  document.getElementById("btn-export").disabled = panier.size === 0;
+  majBoutonCommande();
   // filet de sécurité : le panier en cours survit à une actualisation (localStorage)
   try {
     localStorage.setItem("fkb2b-panier-auto", JSON.stringify(
       [...panier.values()].map(l => ({ref: l.produit.reference, taille: l.taille, qte: l.qte}))));
   } catch (e) { /* stockage local indisponible */ }
+}
+
+// La commande n'est ouverte qu'avec un panier non vide ET les CGV cochées.
+function majBoutonCommande() {
+  const cgv = document.getElementById("cgv-ok");
+  document.getElementById("btn-export").disabled = panier.size === 0 || !cgv?.checked;
+}
+
+function retirerReference(reference) {
+  for (const [cle, l] of [...panier]) if (l.produit.reference === reference) panier.delete(cle);
+  rendrePanier();
 }
 
 function basculer(id, ouvert) {
@@ -1904,16 +2181,31 @@ async function validerCommande() {
   try {
     // Validation atomique côté serveur : société de l'utilisateur, stock disponible, prix officiels.
     const r = await api("/rest/v1/rpc/valider_commande",
-      { corps: { p_lignes: lignes, p_societe: clientActif.id ?? null } });
-    genererFichier(r.numero);
+      { corps: { p_lignes: lignes, p_societe: clientActif.id ?? null, p_cgv_version: CGV_VERSION } });
+
+    // Envoi de la commande à Footkorner (fichier Fastmag reconstruit côté serveur).
+    // Un échec d'envoi ne perd pas la commande : elle est déjà enregistrée et le stock réservé.
+    let envoi = null, erreurEnvoi = null;
+    try {
+      envoi = await api("/functions/v1/envoyer-commande", { corps: { commande_id: r.id } });
+    } catch (e) {
+      erreurEnvoi = String(e.donnees?.erreur || e.message);
+    }
+
+    // Le client ne manipule jamais le fichier Fastmag ; l'admin peut le récupérer pour vérifier.
+    if (estAdmin) genererFichier(r.numero);
     localStorage.removeItem("fkb2b-panier-auto");
     await api("/rest/v1/paniers?user_id=eq." + monUserId(), { methode: "DELETE" }).catch(() => {});
     panier.clear();
+    document.getElementById("cgv-ok").checked = false; // à recocher pour la commande suivante
     rendrePanier();
+    const motEnvoi = erreurEnvoi
+      ? `<span style="color:#e0a24d">Envoi de l'e-mail à confirmer — nos équipes ont bien la commande en base.</span><br>`
+      : (envoi?.copie_client ? "Un récapitulatif vient de vous être envoyé par e-mail.<br>" : "");
     document.getElementById("panier-corps").innerHTML = `<div class="vide">Commande <b>${r.numero}</b> transmise ✓<br><br>
       <span style="font-size:12px">${r.nb_pieces} pièces — ${eur(Number(r.total_ht))} HT<br>
       Enregistrée côté serveur : le stock est réservé.<br>
-      (POC : le fichier Fastmag est aussi téléchargé pour vérification.)</span></div>`;
+      ${motEnvoi}</span></div>`;
   } catch (e) {
     document.getElementById("panier-corps").insertAdjacentHTML("afterbegin",
       `<div class="vide" style="color:#e08a87; padding:20px 0">${String(e.donnees?.message || e.message).replace(/</g, "&lt;")}</div>`);
