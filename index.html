@@ -196,6 +196,21 @@
   .carte img { width: 88%; height: 88%; object-fit: contain; mix-blend-mode: multiply; transition: transform 450ms var(--ease-out); }
   @media (hover: hover) and (pointer: fine) { .carte:hover img { transform: scale(1.05); } }
   .carte:active img { transform: scale(0.98); }
+  /* Produit sans visuel Shopify : la marque en filigrane et un bandeau franc,
+     plutôt que de le retirer du catalogue (18 % du stock B2B n'a pas de photo). */
+  .sans-visuel { aspect-ratio: 1; position: relative; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px; background: #efefec; width: 100%; }
+  .sans-visuel .mq { font-size: clamp(14px, 2.2vw, 19px); font-weight: 800; letter-spacing: .12em;
+    color: #cdcdc7; text-align: center; padding: 0 14px; text-transform: uppercase; line-height: 1.25; }
+  .sans-visuel .rf { font-size: 10.5px; letter-spacing: .14em; color: #b0b0aa; }
+  .sans-visuel .bandeau { position: absolute; left: 0; right: 0; bottom: 0; background: var(--encre);
+    color: #fff; font-size: 9px; letter-spacing: .18em; text-transform: uppercase; text-align: center;
+    padding: 6px 0; }
+  /* même gabarit que la photo réelle, pour que le bandeau reste dans le premier écran */
+  .prod-visuel .sans-visuel { width: min(72%, 560px); }
+  .prod-visuel .sans-visuel .mq { font-size: clamp(24px, 4vw, 44px); }
+  .prod-visuel .sans-visuel .rf { font-size: 12.5px; letter-spacing: .18em; }
+  .prod-visuel .sans-visuel .bandeau { font-size: 10.5px; padding: 11px 0; letter-spacing: .22em; }
   .carte .infos { padding: 0 16px 16px; background: var(--tuile); }
   .carte .nom { font-size: 12.5px; color: var(--encre); line-height: 1.4; }
   .carte .sousnom { font-size: 10.5px; color: var(--encre2); letter-spacing: .1em; margin-top: 2px; text-transform: uppercase; }
@@ -749,10 +764,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787089148"></script>
-<script src="imports.js?v=1787089148"></script>
-<script src="merch-shopify.js?v=1787089148"></script>
-<script src="moteur-merch.js?v=1787089148"></script>
+<script src="config.js?v=1787090283"></script>
+<script src="imports.js?v=1787090283"></script>
+<script src="merch-shopify.js?v=1787090283"></script>
+<script src="moteur-merch.js?v=1787090283"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1141,12 +1156,22 @@ function rendreAccueil() {
   }).join("");
 }
 
+// Produit dont le visuel Shopify n'existe pas encore : on l'affiche quand même.
+function blocSansVisuel(p) {
+  return `<div class="sans-visuel">
+    <div class="mq">${echapperHTML(p.marque || p.designation || "")}</div>
+    <div class="rf">${echapperHTML(p.reference)}</div>
+    <div class="bandeau">visuel à venir</div>
+  </div>`;
+}
+
 function carteHTML(p) {
   const pastilles = p.tailles.slice(0, 5).map(t =>
     `<i style="background:${t.precommande ? "#3d6fb4" : t.stock === 0 ? "#c0504d" : t.stock > 20 ? "#2e9e4f" : "#d9a441"}"></i>`).join("");
   return `<div class="carte" onclick="location.hash='#/produit/${encodeURIComponent(p.reference)}'">
     <div class="dispo-mini">${pastilles}</div>
-    <div class="visuel"><img loading="lazy" src="${p.photo}" alt=""></div>
+    ${p.photo ? `<div class="visuel"><img loading="lazy" src="${p.photo}" alt=""></div>`
+              : blocSansVisuel(p)}
     <div class="infos">
       <div class="nom">${p.designation || p.reference}</div>
       <div class="sousnom">${p.marque || ""} · ${p.reference}</div>
@@ -1258,8 +1283,18 @@ function rendreMenuCatalogue() {
 }
 
 /* ---------------- fiche produit ---------------- */
-function rendreProduit(ref) {
-  const p = produitConnu(ref);
+async function rendreProduit(ref) {
+  let p = produitConnu(ref);
+  // lien direct (favori, e-mail) vers un produit hors de la tranche chargée : on va le chercher
+  if (!p) {
+    try {
+      const lot = await api("/rest/v1/rpc/catalogue",
+        { corps: { limite: 1, p_societe: clientActif.id ?? null, p_references: [ref] } });
+      lot.forEach(trierTailles);
+      memoriser(lot);
+      p = lot[0];
+    } catch (e) { /* produit introuvable ou plus commandable */ }
+  }
   if (!p) { location.hash = "#/collection/TOUT"; return; }
   const vue = document.getElementById("vue-produit");
   vue.dataset.ref = ref;
@@ -1267,10 +1302,12 @@ function rendreProduit(ref) {
   selection.clear();
   for (const [cle, l] of panier) if (cle.startsWith(ref + "|")) selection.set(l.taille, l.qte);
   const galerie = Array.isArray(p.photos) && p.photos.length > 1 ? p.photos : null;
+  const visuelPrincipal = p.photo
+    ? `<img id="visuel-principal" src="${p.photo}" alt="">` : blocSansVisuel(p);
   vue.innerHTML = `
     <div class="prod">
       <div>
-        <div class="prod-visuel"><img id="visuel-principal" src="${p.photo}" alt=""></div>
+        <div class="prod-visuel">${visuelPrincipal}</div>
         ${galerie ? `<div class="prod-galerie">${galerie.map((u, i) =>
           `<img src="${u}" class="${i === 0 ? "actif" : ""}"
             onclick="document.getElementById('visuel-principal').src=this.src;
