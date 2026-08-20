@@ -764,10 +764,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787260628"></script>
-<script src="imports.js?v=1787260628"></script>
-<script src="merch-shopify.js?v=1787260628"></script>
-<script src="moteur-merch.js?v=1787260628"></script>
+<script src="config.js?v=1787260949"></script>
+<script src="imports.js?v=1787260949"></script>
+<script src="merch-shopify.js?v=1787260949"></script>
+<script src="moteur-merch.js?v=1787260949"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1707,16 +1707,10 @@ async function traiterFichier(fichier) {
     zone.innerHTML = `<div class="compte-produits" style="color:#a33"><b>${a.erreur}</b></div>`;
     return;
   }
-  // préfixes fournisseur : on tranche avec le référentiel avant de simuler
-  if (a.spec.strip_prefixe) {
+  // on dit combien de lignes visent un produit inconnu, sans rien réécrire
+  if (a.spec.verifie_references) {
     zone.innerHTML = `<div class="compte-produits">Vérification des références contre le référentiel…</div>`;
-    try { await resoudrePrefixes(a); }
-    catch (e) {
-      zone.innerHTML = `<div class="compte-produits" style="color:#a33">
-        <b>Impossible de vérifier les références</b> — ${String(e.message || e).slice(0, 140)}.
-        Import interrompu : sans cette vérification, des préfixes seraient retirés à tort.</div>`;
-      return;
-    }
+    try { await verifierReferences(a); } catch (e) { /* l'information manquera, l'import reste possible */ }
   }
   // anti-rejeu : ce fichier exact a-t-il déjà été importé ?
   const deja = await api(`/rest/v1/journal_imports?empreinte=eq.${a.empreinte}&select=horodatage`).catch(() => []);
@@ -1729,9 +1723,8 @@ async function traiterFichier(fichier) {
       <span class="chip grise">${nbEcrire} à écrire</span>
       <span class="chip grise">${a.quarantaine.length} en quarantaine</span>
       <span class="chip grise">${a.stats.trim} nettoyages</span>
-      ${a.stats.prefixe ? `<span class="chip grise">${a.stats.prefixe} préfixes fournisseur retirés</span>` : ""}
-      ${a.stats.prefixe_conserve ? `<span class="chip grise">${a.stats.prefixe_conserve} références gardées telles quelles</span>` : ""}
-      ${a.stats.reference_inconnue ? `<span class="chip">${a.stats.reference_inconnue} références hors référentiel</span>` : ""}
+      ${a.stats.reference_connue ? `<span class="chip grise">${a.stats.reference_connue} références reconnues</span>` : ""}
+      ${a.stats.reference_inconnue ? `<span class="chip">${a.stats.reference_inconnue} références hors référentiel (ignorées par le catalogue)</span>` : ""}
       ${a.stats.decimales ? `<span class="chip grise">${a.stats.decimales} décimales converties</span>` : ""}
       ${a.spec.remplacement_complet ? `<span class="chip">remplacement complet du stock + recalcul des actifs</span>` : ""}
     </div>
