@@ -308,7 +308,10 @@
   .prod-galerie::-webkit-scrollbar { display: none; }
   /* min-width:0 sinon l'image impose sa largeur naturelle et fait déborder le bandeau */
   .prod-galerie img { flex: 0 0 33.3333%; min-width: 0; aspect-ratio: 1; object-fit: cover;
-    scroll-snap-align: start; cursor: zoom-in; background: var(--tuile); }
+    scroll-snap-align: start; cursor: pointer; background: var(--tuile);
+    opacity: .82; transition: opacity 220ms ease; }
+  .prod-galerie img:hover { opacity: 1; }
+  .prod-galerie img.actif { opacity: 1; outline: 2px solid var(--encre); outline-offset: -2px; }
   @media (max-width: 899px) { .prod-galerie img { flex-basis: 82%; } }
   .prod-galerie-tete { display: flex; align-items: baseline; gap: 12px;
     padding: 26px clamp(22px, 4vw, 56px) 14px; }
@@ -796,10 +799,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787264808"></script>
-<script src="imports.js?v=1787264808"></script>
-<script src="merch-shopify.js?v=1787264808"></script>
-<script src="moteur-merch.js?v=1787264808"></script>
+<script src="config.js?v=1787265132"></script>
+<script src="imports.js?v=1787265132"></script>
+<script src="merch-shopify.js?v=1787265132"></script>
+<script src="moteur-merch.js?v=1787265132"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1435,11 +1438,11 @@ async function rendreProduit(ref) {
     </div>
     ${galerie ? `
       <div class="prod-galerie-tete">
-        <h3>Autres visuels</h3><span>${galerie.length - 1} photo${galerie.length > 2 ? "s" : ""} — faites défiler</span>
+        <h3>Visuels</h3><span>${galerie.length} photos — cliquez pour l'afficher en grand</span>
       </div>
-      <div class="prod-galerie">${galerie.slice(1).map(u =>
-        `<img loading="lazy" src="${u}" alt=""
-           onclick="const v=document.getElementById('visuel-principal'); if(v){const a=v.src; v.src=this.src; this.src=a; scrollTo({top:0,behavior:'smooth'});}">`).join("")}</div>` : ""}`;
+      <div class="prod-galerie">${galerie.map((u, i) =>
+        `<img loading="lazy" src="${u}" alt="" class="${i === 0 ? "actif" : ""}"
+           onclick="choisirVisuel(this)">`).join("")}</div>` : ""}`;
   document.getElementById("prod-barre").classList.add("visible");
   const btn = document.getElementById("btn-ajouter");
   btn.onclick = () => ajouterAuPanier(ref);
@@ -2429,6 +2432,17 @@ async function rendreCompte() {
     ? paniersSauves.map(p => `<div class="rang"><b>Panier du ${new Date(p.modifie_le).toLocaleDateString("fr-FR")}</b>
         <span class="fin">${p.lignes.reduce((s, l) => s + l.qte, 0)} pièces · ${p.lignes.length} lignes</span></div>`).join("")
     : `<div class="rang" style="color:var(--gris)">Aucun panier enregistré</div>`;
+}
+
+// Clic sur une photo du bandeau : elle devient la photo principale. On ne permute
+// rien — le bandeau garde son ordre, sinon il se réorganise sous le doigt et on
+// croit que le clic n'a pas marché.
+function choisirVisuel(img) {
+  const principal = document.getElementById("visuel-principal");
+  if (!principal) return;
+  principal.src = img.src;
+  for (const autre of img.parentNode.children) autre.classList.toggle("actif", autre === img);
+  scrollTo({ top: 0, behavior: "smooth" });
 }
 
 /* ---------------- dupliquer une commande ---------------- */
