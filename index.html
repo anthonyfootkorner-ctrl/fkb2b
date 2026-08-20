@@ -764,10 +764,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787260949"></script>
-<script src="imports.js?v=1787260949"></script>
-<script src="merch-shopify.js?v=1787260949"></script>
-<script src="moteur-merch.js?v=1787260949"></script>
+<script src="config.js?v=1787261403"></script>
+<script src="imports.js?v=1787261403"></script>
+<script src="merch-shopify.js?v=1787261403"></script>
+<script src="moteur-merch.js?v=1787261403"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -777,6 +777,8 @@ let filtreSecondaire = null;
 // Le catalogue complet dépasse largement une tranche affichable : chaque vue charge
 // la sienne, et tout produit déjà vu reste retrouvable (fiche produit, panier).
 let NAVIGATION = { total: 0, marques: [], familles: [] };
+// compteurs du périmètre de la collection ouverte (marque ou famille), pour les pastilles
+let NAV_PERIMETRE = { total: 0, marques: [], familles: [] };
 const CONNUS = new Map();
 const PAS_COLLECTION = 300;
 let collectionChargee = [];
@@ -1188,10 +1190,20 @@ async function chargerCollection(suite = false) {
                   p_decalage: suite ? collectionChargee.length : 0 };
   if (axe === "marque") corps.p_marque = valeur;
   if (axe === "famille") corps.p_famille = valeur;
+  // l'affinage porte sur l'autre axe : les deux se combinent côté serveur
+  if (filtreSecondaire) corps[axe === "marque" ? "p_famille" : "p_marque"] = filtreSecondaire;
   const grille = document.getElementById("grille-col");
   if (!suite) grille.innerHTML = `<div class="vide" style="grid-column:1/-1;color:#777">Chargement…</div>`;
   try {
-    const lot = await api("/rest/v1/rpc/catalogue", { corps });
+    const [lot, perimetre] = await Promise.all([
+      api("/rest/v1/rpc/catalogue", { corps }),
+      // compteurs du périmètre de navigation (sans l'affinage, sinon il s'auto-restreindrait)
+      suite ? Promise.resolve(NAV_PERIMETRE) : api("/rest/v1/rpc/navigation_catalogue", { corps: {
+        p_societe: clientActif.id ?? null,
+        p_marque: axe === "marque" ? valeur : null,
+        p_famille: axe === "famille" ? valeur : null } }).catch(() => NAVIGATION),
+    ]);
+    NAV_PERIMETRE = perimetre;
     lot.forEach(trierTailles);
     memoriser(lot);
     collectionChargee = suite ? [...collectionChargee, ...lot] : lot;
@@ -1206,10 +1218,13 @@ async function chargerCollection(suite = false) {
 // Nombre total de références du périmètre, d'après les compteurs de navigation
 // (et non d'après la tranche chargée, qui n'en montre qu'une partie).
 function totalDuPerimetre() {
-  const { axe, valeur } = collectionCourante;
-  if (axe === "TOUT") return NAVIGATION.total || collectionChargee.length;
-  const liste = axe === "marque" ? NAVIGATION.marques : NAVIGATION.familles;
-  return (liste || []).find(x => x.valeur === valeur)?.refs ?? collectionChargee.length;
+  const { axe } = collectionCourante;
+  if (filtreSecondaire) {
+    const axeFiltre = axe === "marque" ? "famille" : "marque";
+    const liste = (axeFiltre === "marque" ? NAV_PERIMETRE.marques : NAV_PERIMETRE.familles) || [];
+    return liste.find(x => x.valeur === filtreSecondaire)?.refs ?? collectionChargee.length;
+  }
+  return NAV_PERIMETRE.total ?? collectionChargee.length;
 }
 
 function rendreCollection() {
@@ -1234,21 +1249,16 @@ function rendreCollection() {
   document.getElementById("col-compte").textContent =
     `${produits.length} référence${produits.length > 1 ? "s" : ""} affichée${produits.length > 1 ? "s" : ""}`
     + (reste || filtreSecondaire || texteRecherche ? ` sur ${total} en stock` : " en stock")
-    + ` · tarif ${famille()}`;
+    + (famille() ? ` · tarif ${famille()}` : "");
 
-  // Pastilles d'affinage : les valeurs de l'autre axe présentes dans ce qui est chargé,
-  // la plus fournie d'abord (une pastille qui ne ramène qu'un produit n'aide personne).
-  const compte = new Map();
-  for (const p of collectionChargee) {
-    const v = p[axeFiltre];
-    if (v) compte.set(v, (compte.get(v) || 0) + 1);
-  }
-  const valeurs = [...compte.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  // Pastilles d'affinage : comptées sur le périmètre RÉEL, pas sur la tranche chargée
+  // (sinon « NIKE 49 » alors que le catalogue en a 919), et cliquables côté serveur.
+  const valeurs = (axeFiltre === "marque" ? NAV_PERIMETRE.marques : NAV_PERIMETRE.familles) || [];
   const libelle = axeFiltre === "marque" ? "Toutes les marques" : "Toutes les familles";
   document.getElementById("col-filtres").innerHTML =
     `<button class="puce-claire ${filtreSecondaire ? "" : "actif"}"
        onclick="affiner(null)">${axe === "TOUT" ? "Tout" : libelle}</button>`
-    + valeurs.map(([v, n]) =>
+    + valeurs.map(({ valeur: v, refs: n }) =>
       `<button class="puce-claire ${v === filtreSecondaire ? "actif" : ""}"
          onclick="affiner('${echapperHTML(v).replace(/'/g, "\\'")}')">${echapperHTML(v)} <small style="opacity:.5">${n}</small></button>`).join("");
 
@@ -1266,9 +1276,10 @@ function rendreCollection() {
   };
 }
 
-function affiner(valeur) {
+async function affiner(valeur) {
+  if (valeur === filtreSecondaire) return;
   filtreSecondaire = valeur;
-  rendreCollection();
+  await chargerCollection();   // l'affinage porte sur tout le périmètre, pas sur ce qui est affiché
 }
 
 // Menu du header : les deux axes, avec le nombre de références de chacun.
