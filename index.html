@@ -35,21 +35,18 @@
   .sous-menu a:first-child { border-radius: 10px 10px 0 0; }
   .sous-menu a:last-child { border-radius: 0 0 10px 10px; border-top: 0; }
   .sous-menu a:hover { background: var(--noir3); color: var(--blanc); }
-  .panneau-catalogue { display: none; left: -18px; padding-top: 10px; }
-  .menu-deroulant:hover .panneau-catalogue, .panneau-catalogue:hover { display: flex; }
-  .panneau-catalogue > .col-menu { background: var(--noir2); border: 1px solid var(--bord); padding: 16px 20px 18px;
-    min-width: 260px; max-height: min(70vh, 520px); overflow: auto; }
-  .panneau-catalogue > .col-menu:first-child { border-radius: 12px 0 0 12px; border-right: 0; }
-  .panneau-catalogue > .col-menu:last-child { border-radius: 0 12px 12px 0; }
-  .entete-menu { font-size: 9.5px; letter-spacing: .22em; color: var(--gris); text-transform: uppercase;
-    padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid var(--bord); }
-  .liens-menu { display: grid; grid-template-columns: repeat(2, minmax(110px, 1fr)); gap: 1px 18px; }
-  .liens-menu a { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; font-size: 12px;
-    letter-spacing: .04em; color: var(--gris); padding: 5px 0; transition: color 130ms ease; }
-  .liens-menu a:hover { color: var(--blanc); }
-  .liens-menu a small { font-size: 9.5px; opacity: .55; }
-  .liens-menu a.tout-voir { grid-column: 1 / -1; color: var(--blanc); margin-top: 8px;
-    border-top: 1px solid var(--bord); padding-top: 10px; }
+  .sous-menu a small { color: var(--gris); font-size: 10px; letter-spacing: .08em; margin-left: 6px; }
+  /* pages « nos marques » et « nos familles » */
+  .tuile-famille { position: relative; background: var(--tuile); aspect-ratio: 16/10; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+    padding: 16px; text-align: center; }
+  .tuile-famille .nom-f { font-size: clamp(13px, 1.5vw, 17px); font-weight: 700; letter-spacing: .12em;
+    color: var(--encre); text-transform: uppercase; line-height: 1.25;
+    transition: transform 400ms var(--ease-out); }
+  .tuile-famille .nb-f { font-size: 10.5px; letter-spacing: .14em; color: var(--encre2); text-transform: uppercase; }
+  @media (hover: hover) and (pointer: fine) { .tuile-famille:hover .nom-f { transform: scale(1.05); } }
+  .tuile-logo .nb-m { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center;
+    font-size: 10px; letter-spacing: .14em; color: var(--encre2); text-transform: uppercase; }
   .logo { font-size: 19px; font-weight: 700; letter-spacing: .42em; cursor: pointer; text-align: center; padding-left: .42em; }
   .h-droite { display: flex; align-items: center; gap: 12px; justify-content: flex-end; }
   select { background: var(--noir3); color: var(--blanc); border: 1px solid var(--bord); border-radius: 8px;
@@ -436,15 +433,10 @@
     <a href="#/" data-lien="accueil">ACCUEIL</a>
     <div class="menu-deroulant" id="menu-catalogue">
       <a href="#/collection/TOUT">CATALOGUE ▾</a>
-      <div class="sous-menu panneau-catalogue">
-        <div class="col-menu">
-          <div class="entete-menu">Marques</div>
-          <div class="liens-menu" id="menu-marques"></div>
-        </div>
-        <div class="col-menu">
-          <div class="entete-menu">Familles</div>
-          <div class="liens-menu" id="menu-familles"></div>
-        </div>
+      <div class="sous-menu">
+        <a href="#/collection/TOUT">Toute la collection <small id="menu-total"></small></a>
+        <a href="#/marques">Nos marques <small id="menu-nb-marques"></small></a>
+        <a href="#/familles">Nos familles <small id="menu-nb-familles"></small></a>
       </div>
     </div>
     <a href="#/compte">MON COMPTE</a>
@@ -674,6 +666,27 @@
     </div>
   </section>
 
+  <!-- NOS MARQUES / NOS FAMILLES -->
+  <section class="vue page-claire" id="vue-marques">
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='#/'">← ACCUEIL</span>
+      <h1>NOS <b>MARQUES</b></h1>
+      <div class="compte-produits" id="marques-compte"></div>
+    </div>
+    <div class="tuiles" id="tuiles-toutes-marques"></div>
+    <div style="height:60px"></div>
+  </section>
+
+  <section class="vue page-claire" id="vue-familles">
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='#/'">← ACCUEIL</span>
+      <h1>NOS <b>FAMILLES</b></h1>
+      <div class="compte-produits" id="familles-compte"></div>
+    </div>
+    <div class="tuiles" id="tuiles-toutes-familles"></div>
+    <div style="height:60px"></div>
+  </section>
+
   <!-- CONDITIONS GÉNÉRALES DE VENTE -->
   <section class="vue page-claire" id="vue-cgv">
     <div class="col-tete">
@@ -776,10 +789,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787262895"></script>
-<script src="imports.js?v=1787262895"></script>
-<script src="merch-shopify.js?v=1787262895"></script>
-<script src="moteur-merch.js?v=1787262895"></script>
+<script src="config.js?v=1787263183"></script>
+<script src="imports.js?v=1787263183"></script>
+<script src="merch-shopify.js?v=1787263183"></script>
+<script src="moteur-merch.js?v=1787263183"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1103,6 +1116,12 @@ function router() {
   } else if (route === "imports") {
     document.getElementById("vue-imports").classList.add("active");
     rendreImports();
+  } else if (route === "marques") {
+    document.getElementById("vue-marques").classList.add("active");
+    rendrePageMarques();
+  } else if (route === "familles") {
+    document.getElementById("vue-familles").classList.add("active");
+    rendrePageFamilles();
   } else if (route === "cgv") {
     document.getElementById("vue-cgv").classList.add("active");
     document.getElementById("cgv-version").textContent = CGV_VERSION;
@@ -1296,13 +1315,35 @@ async function affiner(valeur) {
 
 // Menu du header : les deux axes, avec le nombre de références de chacun.
 function rendreMenuCatalogue() {
-  const remplir = (id, liste, prefixe) => {
-    document.getElementById(id).innerHTML = (liste || []).map(({ valeur, refs }) =>
-      `<a href="#/collection/${prefixe}/${encodeURIComponent(valeur)}">${echapperHTML(valeur)} <small>${refs}</small></a>`).join("")
-      + `<a class="tout-voir" href="#/collection/TOUT">Tout le catalogue (${NAVIGATION.total || "—"}) →</a>`;
-  };
-  remplir("menu-marques", NAVIGATION.marques, "marque");
-  remplir("menu-familles", NAVIGATION.familles, "famille");
+  const mettre = (id, texte) => { const e = document.getElementById(id); if (e) e.textContent = texte; };
+  mettre("menu-total", NAVIGATION.total ? `(${NAVIGATION.total})` : "");
+  mettre("menu-nb-marques", NAVIGATION.marques?.length ? `(${NAVIGATION.marques.length})` : "");
+  mettre("menu-nb-familles", NAVIGATION.familles?.length ? `(${NAVIGATION.familles.length})` : "");
+}
+
+// Page « nos marques » : une tuile par marque, logo si on en a un, dans l'ordre voulu.
+function rendrePageMarques() {
+  const liste = NAVIGATION.marques || [];
+  document.getElementById("marques-compte").textContent =
+    `${liste.length} marque${liste.length > 1 ? "s" : ""} · ${NAVIGATION.total} références en stock`;
+  document.getElementById("tuiles-toutes-marques").innerHTML = liste.map(({ valeur, refs }) => `
+    <div class="tuile-logo" onclick="location.hash='#/collection/marque/${encodeURIComponent(valeur)}'">
+      <img loading="lazy" src="logos/${encodeURIComponent(valeur)}.png" alt="${echapperHTML(valeur)}"
+           data-marque="${echapperHTML(valeur)}" data-essai="png" onerror="logoSuivant(this)">
+      <div class="nb-m">${refs} référence${refs > 1 ? "s" : ""}</div>
+    </div>`).join("");
+}
+
+// Page « nos familles » : les types de produit, du plus fourni au moins fourni.
+function rendrePageFamilles() {
+  const liste = NAVIGATION.familles || [];
+  document.getElementById("familles-compte").textContent =
+    `${liste.length} famille${liste.length > 1 ? "s" : ""} · ${NAVIGATION.total} références en stock`;
+  document.getElementById("tuiles-toutes-familles").innerHTML = liste.map(({ valeur, refs }) => `
+    <div class="tuile-famille" onclick="location.hash='#/collection/famille/${encodeURIComponent(valeur)}'">
+      <div class="nom-f">${echapperHTML(valeur)}</div>
+      <div class="nb-f">${refs} référence${refs > 1 ? "s" : ""}</div>
+    </div>`).join("");
 }
 
 /* ---------------- fiche produit ---------------- */
