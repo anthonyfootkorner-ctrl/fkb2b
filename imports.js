@@ -246,23 +246,44 @@ function preparerStockB2B(analyse) {
 function mapperVersTables(analyse) {
   const L = analyse.lignes;
   switch (analyse.modele) {
-    case "fiches_produits":
-      return [{ table: "variantes", rows: L.filter(l => l.Produit).map(l => ({
+    case "fiches_produits": {
+      const vus = new Set();
+      const uniques = L.filter(l => l.Produit && !vus.has(l.Produit) && vus.add(l.Produit));
+      analyse.stats.doublons = L.filter(l => l.Produit).length - uniques.length;
+      return [{ table: "variantes", rows: uniques.map(l => ({
         id_fastmag: l.Produit, reference: l.Reference_Article, couleur: l.Couleur,
         taille: l.Taille, ean: l.Gencod || null, designation: l.Designation,
         coloris_fournisseur: l.Designation2, marque: l.Marque, famille: l.Famille,
         sous_famille: l.Sous_Famille, rayon: l.Rayon, saison: l.Saison })) }];
+    }
     case "stock":
       return [{ table: "stocks", vider: true, activer: true,
         rows: L.filter(l => parseInt(l["Total Stock"], 10) > 0).map(l => ({
           magasin: l.Code_Origine, reference: l["BarCode V2"], taille: l.Taille,
           quantite: parseInt(l["Total Stock"], 10) })) }];
-    case "tarifs":
-      return [{ table: "tarifs", rows: L.filter(l => l.BarCode).map(l => ({
-        reference: l.BarCode, couleur: l.Couleur || "", taille: l.Taille || "",
-        famille_tarifaire: l.Tarif, prix: parseFloat(l.Prix),
-        prix_achat: l.PrixAchat ? parseFloat(l.PrixAchat) : null }))
-        .filter(r => r.famille_tarifaire && !isNaN(r.prix)) }];
+    case "tarifs": {
+      // Le fichier contient quelques doublons sur la clé (référence, couleur, taille,
+      // grille) — Postgres refuse d'appliquer deux fois la même clé dans un seul lot.
+      // On garde le prix le plus bas, ce que le catalogue retiendrait de toute façon
+      // s'il trouvait les deux (il lit min(prix)).
+      const parCle = new Map();
+      let doublons = 0;
+      for (const l of L) {
+        if (!l.BarCode) continue;
+        const prix = parseFloat(l.Prix);
+        if (!l.Tarif || isNaN(prix)) continue;
+        const r = { reference: l.BarCode, couleur: l.Couleur || "", taille: l.Taille || "",
+                    famille_tarifaire: l.Tarif, prix,
+                    prix_achat: l.PrixAchat ? parseFloat(l.PrixAchat) : null };
+        const cle = [r.reference, r.couleur, r.taille, r.famille_tarifaire].join("\u0001");
+        const vu = parCle.get(cle);
+        if (!vu) { parCle.set(cle, r); continue; }
+        doublons++;
+        if (r.prix < vu.prix) parCle.set(cle, r);
+      }
+      analyse.stats.doublons = doublons;
+      return [{ table: "tarifs", rows: [...parCle.values()] }];
+    }
     case "stock_shopify": {
       const REF = "Metafield: fmsync.reference [single_line_text_field]";
       const refParId = {}, statutParId = {};
