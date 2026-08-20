@@ -188,6 +188,19 @@
 
   .grille-col { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1px;
     background: var(--hairline); border-top: 1px solid var(--hairline); }
+  /* Sur téléphone, deux produits par ligne : un seul par écran donne un défilement
+     interminable et empêche de comparer deux références d'un coup d'œil. */
+  @media (max-width: 599px) {
+    .grille-col, .tuiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .carte .infos { padding: 0 11px 13px; }
+    .carte .nom { font-size: 11.5px; }
+    .carte .sousnom { font-size: 9.5px; letter-spacing: .08em; }
+    .carte .prix { font-size: 11px; }
+    .carte .dispo-mini { top: 8px; left: 8px; }
+    .carte .dispo-mini i { width: 6px; height: 6px; }
+    .tuile-logo .nb-m, .tuile-famille .nb-f { font-size: 9px; letter-spacing: .1em; }
+    .tuile-famille .nom-f { letter-spacing: .08em; }
+  }
   .carte { position: relative; background: var(--tuile); cursor: pointer; }
   .carte .visuel { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .carte img { width: 88%; height: 88%; object-fit: contain; mix-blend-mode: multiply; transition: transform 450ms var(--ease-out); }
@@ -307,12 +320,14 @@
     background: var(--tuile); scrollbar-width: none; }
   .prod-galerie::-webkit-scrollbar { display: none; }
   /* min-width:0 sinon l'image impose sa largeur naturelle et fait déborder le bandeau */
-  .prod-galerie img { flex: 0 0 33.3333%; min-width: 0; aspect-ratio: 1; object-fit: cover;
+  /* `contain` et non `cover` : sur un visuel produit en portrait, `cover` rognait
+     le bas de la photo — flagrant sur téléphone. */
+  .prod-galerie img { flex: 0 0 33.3333%; min-width: 0; aspect-ratio: 1; object-fit: contain;
     scroll-snap-align: start; cursor: pointer; background: var(--tuile);
     opacity: .82; transition: opacity 220ms ease; }
   .prod-galerie img:hover { opacity: 1; }
   .prod-galerie img.actif { opacity: 1; outline: 2px solid var(--encre); outline-offset: -2px; }
-  @media (max-width: 899px) { .prod-galerie img { flex-basis: 82%; } }
+  @media (max-width: 899px) { .prod-galerie img { flex-basis: 82%; aspect-ratio: 3 / 4; } }
   .prod-galerie-tete { display: flex; align-items: baseline; gap: 12px;
     padding: 26px clamp(22px, 4vw, 56px) 14px; }
   .prod-galerie-tete h3 { font-size: 11px; letter-spacing: .22em; color: var(--encre2);
@@ -320,6 +335,10 @@
   .prod-galerie-tete span { font-size: 11px; color: #aaa; letter-spacing: .06em; }
   .prod-description { margin-top: 34px; padding-top: 22px; border-top: 1px solid var(--hairline);
     font-size: 13.5px; line-height: 1.75; color: #333; }
+  .desc-corps { position: relative; }
+  .desc-corps.replie { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+    overflow: hidden; }
+  .desc-plus { margin-top: 12px; }
   .prod-description h3 { font-size: 11px; letter-spacing: .22em; color: var(--encre2); font-weight: 600;
     text-transform: uppercase; margin-bottom: 12px; }
   .prod-description :is(p, ul) { margin-bottom: 10px; }
@@ -425,11 +444,25 @@
   .recherche-globale input:focus { outline: none; }
 
   @media (max-width: 640px) {
-    header { grid-template-columns: auto 1fr; grid-template-areas: "logo droite" "nav nav"; row-gap: 10px; }
-    .logo { grid-area: logo; text-align: left; padding-left: 0; }
-    .h-droite { grid-area: droite; }
-    .h-gauche { grid-area: nav; }
+    header { grid-template-columns: auto 1fr; grid-template-areas: "logo droite" "nav nav"; row-gap: 10px;
+      padding: 13px 14px; }
+    .logo { grid-area: logo; text-align: left; padding-left: 0; font-size: 16px; letter-spacing: .3em; }
+    .h-droite { grid-area: droite; gap: 8px; }
+    .h-gauche { grid-area: nav; gap: 14px; }
     select { max-width: 34vw; }
+  }
+  /* En dessous, le trio magasin + quitter + panier ne tient plus : on resserre
+     tout et le nom du magasin prend ce qui reste, sans jamais pousser le panier
+     hors de l'écran. */
+  @media (max-width: 520px) {
+    .h-droite { min-width: 0; }
+    .magasin { min-width: 0; flex: 1 1 auto; }
+    .magasin-btn { max-width: 100%; width: 100%; padding: 6px 10px 6px 12px; gap: 6px; }
+    .magasin-btn .sur { font-size: 7.5px; letter-spacing: .16em; }
+    .magasin-btn .nom { font-size: 11.5px; }
+    .btn-panier { padding: 8px 13px; font-size: 12px; }
+    .puce { padding: 6px 11px; font-size: 11px; }
+    .h-gauche a { font-size: 10.5px; letter-spacing: .12em; }
   }
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
@@ -799,10 +832,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787265132"></script>
-<script src="imports.js?v=1787265132"></script>
-<script src="merch-shopify.js?v=1787265132"></script>
-<script src="moteur-merch.js?v=1787265132"></script>
+<script src="config.js?v=1787265349"></script>
+<script src="imports.js?v=1787265349"></script>
+<script src="merch-shopify.js?v=1787265349"></script>
+<script src="moteur-merch.js?v=1787265349"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1433,7 +1466,12 @@ async function rendreProduit(ref) {
           }).join("")}
         </tbody></table>
 
-        ${p.description ? `<div class="prod-description"><h3>Description</h3>${nettoyerHTML(p.description)}</div>` : ""}
+        ${p.description ? `<div class="prod-description">
+          <h3>Description</h3>
+          <div class="desc-corps replie" id="desc-corps">${nettoyerHTML(p.description)}</div>
+          <button class="puce-claire desc-plus" id="desc-plus" style="display:none"
+                  onclick="basculerDescription(this)">Lire la suite</button>
+        </div>` : ""}
       </div>
     </div>
     ${galerie ? `
@@ -1443,6 +1481,7 @@ async function rendreProduit(ref) {
       <div class="prod-galerie">${galerie.map((u, i) =>
         `<img loading="lazy" src="${u}" alt="" class="${i === 0 ? "actif" : ""}"
            onclick="choisirVisuel(this)">`).join("")}</div>` : ""}`;
+  preparerDescription();
   document.getElementById("prod-barre").classList.add("visible");
   const btn = document.getElementById("btn-ajouter");
   btn.onclick = () => ajouterAuPanier(ref);
@@ -2432,6 +2471,21 @@ async function rendreCompte() {
     ? paniersSauves.map(p => `<div class="rang"><b>Panier du ${new Date(p.modifie_le).toLocaleDateString("fr-FR")}</b>
         <span class="fin">${p.lignes.reduce((s, l) => s + l.qte, 0)} pièces · ${p.lignes.length} lignes</span></div>`).join("")
     : `<div class="rang" style="color:var(--gris)">Aucun panier enregistré</div>`;
+}
+
+// La description Shopify peut faire dix lignes : on n'en montre que le début,
+// et le bouton n'apparaît que s'il y a réellement quelque chose de replié.
+function preparerDescription() {
+  const corps = document.getElementById("desc-corps");
+  const bouton = document.getElementById("desc-plus");
+  if (!corps || !bouton) return;
+  bouton.style.display = corps.scrollHeight > corps.clientHeight + 4 ? "" : "none";
+}
+
+function basculerDescription(bouton) {
+  const corps = document.getElementById("desc-corps");
+  const replie = corps.classList.toggle("replie");
+  bouton.textContent = replie ? "Lire la suite" : "Réduire";
 }
 
 // Clic sur une photo du bandeau : elle devient la photo principale. On ne permute
