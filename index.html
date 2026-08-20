@@ -219,13 +219,17 @@
   .carte .dispo-mini i { width: 7px; height: 7px; border-radius: 999px; display: block; }
 
   /* ---------- FICHE PRODUIT pleine page (surface claire) ---------- */
+  /* Le visuel occupe exactement la moitié gauche de l'écran, les informations
+     sont centrées dans l'autre moitié ; les autres photos défilent en dessous. */
   .prod { display: grid; grid-template-columns: 1fr; }
-  @media (min-width: 900px) { .prod { grid-template-columns: 1.15fr 1fr; } }
+  @media (min-width: 900px) { .prod { grid-template-columns: 1fr 1fr; align-items: stretch; } }
   .prod-visuel { background: var(--tuile); display: flex; align-items: center; justify-content: center;
-    min-height: 52svh; position: sticky; top: 57px; align-self: start; }
-  @media (max-width: 899px) { .prod-visuel { position: static; min-height: 44svh; } }
-  .prod-visuel img { width: min(72%, 560px); aspect-ratio: 1; object-fit: contain; mix-blend-mode: multiply; }
-  .prod-infos { padding: 40px 30px 120px; max-width: 560px; }
+    min-height: calc(100svh - 57px); position: sticky; top: 57px; align-self: start; overflow: hidden; }
+  @media (max-width: 899px) { .prod-visuel { position: static; min-height: 68svh; } }
+  .prod-visuel img { width: 100%; height: 100%; max-height: calc(100svh - 57px); object-fit: contain;
+    padding: clamp(20px, 5vw, 64px); mix-blend-mode: multiply; }
+  .prod-infos { padding: clamp(28px, 5vw, 64px) clamp(22px, 4vw, 56px) 110px; max-width: 620px;
+    align-self: center; }
   .prod-infos .fil { font-size: 10.5px; letter-spacing: .18em; color: var(--encre2); text-transform: uppercase; cursor: pointer; }
   .prod-infos .marque { font-size: 11px; letter-spacing: .3em; color: var(--encre2); margin-top: 22px; text-transform: uppercase; }
   .prod-infos h1 { font-size: clamp(22px, 3.4vw, 32px); font-weight: 600; letter-spacing: .02em; line-height: 1.2; margin-top: 8px; }
@@ -302,10 +306,18 @@
     background: #fafaf8; border: 1px solid var(--hairline); border-radius: 10px; }
   .legende span { font-size: 11.5px; color: var(--encre2); display: flex; align-items: center; gap: 7px; }
   .legende b { color: var(--encre); font-weight: 600; }
-  .prod-galerie { display: flex; gap: 8px; justify-content: center; padding: 14px 0 4px; flex-wrap: wrap; }
-  .prod-galerie img { width: 54px; height: 54px; object-fit: contain; background: #fff; border: 1px solid var(--hairline);
-    border-radius: 8px; cursor: pointer; padding: 4px; transition: border-color 150ms ease; }
-  .prod-galerie img.actif { border-color: var(--encre); }
+  .prod-galerie { display: flex; overflow-x: auto; scroll-snap-type: x mandatory;
+    background: var(--tuile); scrollbar-width: none; }
+  .prod-galerie::-webkit-scrollbar { display: none; }
+  /* min-width:0 sinon l'image impose sa largeur naturelle et fait déborder le bandeau */
+  .prod-galerie img { flex: 0 0 33.3333%; min-width: 0; aspect-ratio: 1; object-fit: cover;
+    scroll-snap-align: start; cursor: zoom-in; background: var(--tuile); }
+  @media (max-width: 899px) { .prod-galerie img { flex-basis: 82%; } }
+  .prod-galerie-tete { display: flex; align-items: baseline; gap: 12px;
+    padding: 26px clamp(22px, 4vw, 56px) 14px; }
+  .prod-galerie-tete h3 { font-size: 11px; letter-spacing: .22em; color: var(--encre2);
+    font-weight: 600; text-transform: uppercase; }
+  .prod-galerie-tete span { font-size: 11px; color: #aaa; letter-spacing: .06em; }
   .prod-description { margin-top: 34px; padding-top: 22px; border-top: 1px solid var(--hairline);
     font-size: 13.5px; line-height: 1.75; color: #333; }
   .prod-description h3 { font-size: 11px; letter-spacing: .22em; color: var(--encre2); font-weight: 600;
@@ -764,10 +776,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787262123"></script>
-<script src="imports.js?v=1787262123"></script>
-<script src="merch-shopify.js?v=1787262123"></script>
-<script src="moteur-merch.js?v=1787262123"></script>
+<script src="config.js?v=1787262895"></script>
+<script src="imports.js?v=1787262895"></script>
+<script src="merch-shopify.js?v=1787262895"></script>
+<script src="moteur-merch.js?v=1787262895"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1317,13 +1329,7 @@ async function rendreProduit(ref) {
     ? `<img id="visuel-principal" src="${p.photo}" alt="">` : blocSansVisuel(p);
   vue.innerHTML = `
     <div class="prod">
-      <div>
-        <div class="prod-visuel">${visuelPrincipal}</div>
-        ${galerie ? `<div class="prod-galerie">${galerie.map((u, i) =>
-          `<img src="${u}" class="${i === 0 ? "actif" : ""}"
-            onclick="document.getElementById('visuel-principal').src=this.src;
-                     this.parentNode.querySelectorAll('img').forEach(x=>x.classList.toggle('actif',x===this))">`).join("")}</div>` : ""}
-      </div>
+      <div class="prod-visuel">${visuelPrincipal}</div>
       <div class="prod-infos">
         <span class="fil" onclick="history.length > 1 ? history.back() : location.hash='#/collection/TOUT'">← RETOUR</span>
         <div class="marque">${p.marque || ""}</div>
@@ -1378,7 +1384,14 @@ async function rendreProduit(ref) {
 
         ${p.description ? `<div class="prod-description"><h3>Description</h3>${nettoyerHTML(p.description)}</div>` : ""}
       </div>
-    </div>`;
+    </div>
+    ${galerie ? `
+      <div class="prod-galerie-tete">
+        <h3>Autres visuels</h3><span>${galerie.length - 1} photo${galerie.length > 2 ? "s" : ""} — faites défiler</span>
+      </div>
+      <div class="prod-galerie">${galerie.slice(1).map(u =>
+        `<img loading="lazy" src="${u}" alt=""
+           onclick="const v=document.getElementById('visuel-principal'); if(v){const a=v.src; v.src=this.src; this.src=a; scrollTo({top:0,behavior:'smooth'});}">`).join("")}</div>` : ""}`;
   document.getElementById("prod-barre").classList.add("visible");
   const btn = document.getElementById("btn-ajouter");
   btn.onclick = () => ajouterAuPanier(ref);
