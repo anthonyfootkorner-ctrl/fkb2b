@@ -407,6 +407,13 @@
   .etiquette { font-size: 10px; letter-spacing: .1em; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--bord); color: var(--gris); }
   .etiquette.ok { color: #3fae5a; border-color: #24512f; }
   .etiquette.attente { color: #d9a441; border-color: #57431e; }
+  .nom-cmd { font-size: 12px; color: var(--gris); font-style: italic; }
+  .mag-cmd { font-size: 10.5px; letter-spacing: .1em; color: var(--gris); text-transform: uppercase;
+    border-left: 1px solid var(--bord); padding-left: 12px; }
+  .dupli { flex-basis: 100%; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .dupli:not(:empty) { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--bord); }
+  .dupli-lib { font-size: 11px; letter-spacing: .1em; color: var(--gris); text-transform: uppercase; }
+  .dupli-etat { font-size: 12px; color: var(--gris); }
   .mention-demo { font-size: 11px; color: var(--gris); margin-top: 8px; }
 
   .recherche-globale { display: flex; align-items: center; gap: 10px; margin: 0 22px 18px;
@@ -789,10 +796,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787263183"></script>
-<script src="imports.js?v=1787263183"></script>
-<script src="merch-shopify.js?v=1787263183"></script>
-<script src="moteur-merch.js?v=1787263183"></script>
+<script src="config.js?v=1787264808"></script>
+<script src="imports.js?v=1787264808"></script>
+<script src="merch-shopify.js?v=1787264808"></script>
+<script src="moteur-merch.js?v=1787264808"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2397,7 +2404,7 @@ async function rendreCompte() {
     <div class="rang">Conditions de règlement<span class="fin">Sur facture — définies dans Fastmag</span></div>`;
 
   const [commandes, paniersSauves] = await Promise.all([
-    api("/rest/v1/commandes?select=numero,statut,nb_pieces,total_ht,cree_le&order=cree_le.desc&limit=15").catch(() => []),
+    api("/rest/v1/commandes?select=id,numero,nom,statut,nb_pieces,total_ht,cree_le,societe_id&order=cree_le.desc&limit=15").catch(() => []),
     api("/rest/v1/paniers?select=lignes,modifie_le&order=modifie_le.desc&limit=3").catch(() => []),
   ]);
 
@@ -2405,8 +2412,16 @@ async function rendreCompte() {
     ? commandes.map(cm => {
         const [lib, cls] = LIBELLES_STATUT[cm.statut] || [cm.statut, ""];
         const d = new Date(cm.cree_le).toLocaleDateString("fr-FR");
-        return `<div class="rang"><b>${cm.numero}</b><span class="etiquette ${cls}">${lib}</span>
-          <span class="fin">${d} · ${cm.nb_pieces} pièces · ${eur(Number(cm.total_ht))} HT</span></div>`;
+        const mag = MES_SOCIETES.find(x => x.id === cm.societe_id);
+        return `<div class="rang">
+          <b>${echapperHTML(cm.numero)}</b>
+          ${cm.nom ? `<span class="nom-cmd">« ${echapperHTML(cm.nom)} »</span>` : ""}
+          <span class="etiquette ${cls}">${lib}</span>
+          ${MES_SOCIETES.length > 1 && mag ? `<span class="mag-cmd">${echapperHTML(mag.nom)}</span>` : ""}
+          <span class="fin">${d} · ${cm.nb_pieces} pièces · ${eur(Number(cm.total_ht))} HT</span>
+          <button class="puce" style="margin-left:12px" onclick="ouvrirDuplication('${cm.id}')">Dupliquer</button>
+          <div class="dupli" id="dupli-${cm.id}"></div>
+        </div>`;
       }).join("")
     : `<div class="rang" style="color:var(--gris)">Aucune commande pour le moment</div>`;
 
@@ -2414,6 +2429,68 @@ async function rendreCompte() {
     ? paniersSauves.map(p => `<div class="rang"><b>Panier du ${new Date(p.modifie_le).toLocaleDateString("fr-FR")}</b>
         <span class="fin">${p.lignes.reduce((s, l) => s + l.qte, 0)} pièces · ${p.lignes.length} lignes</span></div>`).join("")
     : `<div class="rang" style="color:var(--gris)">Aucun panier enregistré</div>`;
+}
+
+/* ---------------- dupliquer une commande ---------------- */
+// Recommander à l'identique, éventuellement pour un autre magasin : les quantités
+// sont reprises telles quelles, mais les prix et le stock sont ceux d'aujourd'hui
+// et du magasin de destination — jamais ceux figés dans la commande d'origine.
+function ouvrirDuplication(id) {
+  const zone = document.getElementById("dupli-" + id);
+  if (!zone) return;
+  if (zone.innerHTML) { zone.innerHTML = ""; return; }
+  const choix = MES_SOCIETES.length > 1
+    ? `<select id="dupli-mag-${id}">${MES_SOCIETES.map(x =>
+        `<option value="${x.id}" ${x.id === clientActif.id ? "selected" : ""}>${echapperHTML(x.nom)} — ${echapperHTML(x.famille_tarifaire || "?")}</option>`).join("")}</select>`
+    : "";
+  zone.innerHTML = `
+    <span class="dupli-lib">Dupliquer ${MES_SOCIETES.length > 1 ? "vers" : "dans le panier"}</span>
+    ${choix}
+    <button class="puce" onclick="dupliquerCommande('${id}')">Reprendre au panier</button>
+    <span class="dupli-etat" id="dupli-etat-${id}"></span>`;
+}
+
+async function dupliquerCommande(id) {
+  const etat = document.getElementById("dupli-etat-" + id);
+  const select = document.getElementById("dupli-mag-" + id);
+  const cible = select ? select.value : clientActif.id;
+  etat.textContent = "reprise en cours…";
+  try {
+    const lignes = await api(`/rest/v1/commande_lignes?select=reference,taille,quantite&commande_id=eq.${id}`);
+    if (!lignes.length) { etat.textContent = "cette commande n'a aucune ligne"; return; }
+
+    if (cible && cible !== clientActif.id) await changerSociete(cible);
+
+    // on relit les produits au tarif et au stock du magasin de destination
+    const refs = [...new Set(lignes.map(l => l.reference))];
+    const produits = await api("/rest/v1/rpc/catalogue", { corps: {
+      limite: refs.length, p_societe: clientActif.id ?? null, p_references: refs } });
+    produits.forEach(trierTailles);
+    memoriser(produits);
+
+    let reprises = 0, ajustees = 0, indisponibles = 0;
+    for (const l of lignes) {
+      const p = produitConnu(l.reference);
+      const t = p && p.tailles.find(x => x.taille === l.taille);
+      if (!t || t.stock <= 0) { indisponibles++; continue; }
+      const qte = Math.min(l.quantite, t.stock);
+      if (qte !== l.quantite) ajustees++;
+      panier.set(l.reference + "|" + l.taille, { produit: p, taille: l.taille, qte, prix: prixDe(t) });
+      reprises++;
+    }
+    rendrePanier();
+    // le changement de magasin re-rend la page : le résumé passe par la bulle,
+    // qui vit en dehors de la vue et survit au re-rendu
+    if (!reprises) { signalerMagasin("Aucune ligne de cette commande n'est disponible pour ce magasin"); return; }
+    const mots = [`${reprises} ligne${reprises > 1 ? "s" : ""} reprise${reprises > 1 ? "s" : ""} au panier`];
+    if (ajustees) mots.push(`${ajustees} quantité${ajustees > 1 ? "s" : ""} réduite${ajustees > 1 ? "s" : ""} au stock`);
+    if (indisponibles) mots.push(`${indisponibles} ligne${indisponibles > 1 ? "s" : ""} indisponible${indisponibles > 1 ? "s" : ""}`);
+    signalerMagasin(mots.join(" · "));
+    basculer("panier", true);
+  } catch (e) {
+    const message = "Duplication impossible : " + String(e.donnees?.message || e.message).slice(0, 120);
+    if (etat && etat.isConnected) etat.textContent = message; else signalerMagasin(message);
+  }
 }
 
 /* ---------------- panier ---------------- */
