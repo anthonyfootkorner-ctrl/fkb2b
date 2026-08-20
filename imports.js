@@ -177,10 +177,8 @@ async function analyserFichierFastmag(fichier) {
       if (propre !== v) stats.trim++;
       obj[c] = propre;
     });
-    if (spec.strip_prefixe && obj[colRef]) {
-      const neuf = obj[colRef].replace(RE_PREFIXE_FOURNISSEUR, "");
-      if (neuf !== obj[colRef]) { obj[colRef] = neuf; stats.prefixe++; }
-    }
+    // le retrait du préfixe fournisseur est décidé plus tard, référentiel en main
+    // (cf. resoudrePrefixes) : « ETIQ- » ou « MAT- » ne sont pas des préfixes.
     if (spec.decimale_virgule) {
       for (const c of ["Prix", "PrixAchat"]) {
         if (obj[c]?.includes(",")) { obj[c] = obj[c].replace(",", "."); stats.decimales++; }
@@ -194,8 +192,54 @@ async function analyserFichierFastmag(fichier) {
     lignes.push(obj);
   }
 
-  return { modele, libelle: spec.libelle, spec, empreinte, fichier: nomAffiche,
+  return { modele, libelle: spec.libelle, spec, empreinte, fichier: nomAffiche, entete,
            lignes, lues: enregistrements.length - 1, quarantaine, stats };
+}
+
+// Décide, référence par référence, s'il faut retirer le préfixe fournisseur.
+// La règle purement typographique (2-4 majuscules + tiret) casse les références qui
+// commencent réellement ainsi : ETIQ-SOLDES-SNEAKERS, MAT-BARREZ, ALL-DOMMUSIALA…
+// On tranche avec le référentiel produits : on ne retire le préfixe que si la
+// référence brute est inconnue ET que la version raccourcie, elle, existe.
+async function resoudrePrefixes(analyse) {
+  if (!analyse.spec.strip_prefixe) return analyse;
+  const colRef = ["BarCode", "BarCode V2", "Reference_Article"].find(c => analyse.entete.includes(c));
+  if (!colRef) return analyse;
+
+  const brutes = new Set();
+  for (const l of analyse.lignes) if (l[colRef]) brutes.add(l[colRef]);
+  const candidates = new Map();          // brute → version sans préfixe
+  for (const r of brutes) {
+    const court = r.replace(RE_PREFIXE_FOURNISSEUR, "");
+    if (court !== r && court) candidates.set(r, court);
+  }
+  if (!candidates.size) return analyse;
+
+  const connues = new Set();
+  const demander = async (liste) => {
+    for (let i = 0; i < liste.length; i += 3000) {
+      const lot = await api("/rest/v1/rpc/references_connues", { corps: { p_refs: liste.slice(i, i + 3000) } });
+      for (const r of lot || []) connues.add(r);
+    }
+  };
+  await demander([...candidates.keys()]);
+  await demander([...new Set(candidates.values())]);
+
+  let retires = 0, conserves = 0, inconnues = 0;
+  const table = new Map();
+  for (const [brute, court] of candidates) {
+    if (connues.has(brute)) { conserves++; continue; }        // la brute est la bonne
+    if (connues.has(court)) { table.set(brute, court); retires++; }
+    else inconnues++;                                          // ni l'une ni l'autre : on n'y touche pas
+  }
+  for (const l of analyse.lignes) {
+    const neuf = table.get(l[colRef]);
+    if (neuf) l[colRef] = neuf;
+  }
+  analyse.stats.prefixe = retires;
+  analyse.stats.prefixe_conserve = conserves;
+  analyse.stats.reference_inconnue = inconnues;
+  return analyse;
 }
 
 // Transforme les lignes analysées en enregistrements pour la base.
