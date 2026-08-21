@@ -125,6 +125,44 @@
   .hero .chiffre b { display: block; font-size: 22px; font-weight: 700; }
   .hero .chiffre span { font-size: 10.5px; color: var(--gris); letter-spacing: .14em; text-transform: uppercase; }
 
+  /* back-office — suivi des commandes : une carte par commande, jamais une liste tassée */
+  .cmd-carte { background: var(--papier); border: 1px solid var(--hairline); border-radius: 12px;
+    padding: 16px 18px; margin-bottom: 10px;
+    transition: border-color 160ms ease, box-shadow 160ms ease; }
+  .cmd-carte:hover { border-color: #d5d5d2; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+  .cmd-tete { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .cmd-num { font-size: 15px; font-weight: 700; letter-spacing: .01em; }
+  .cmd-nom { font-size: 12.5px; color: var(--encre2); font-style: italic; }
+  .cmd-montant { margin-left: auto; font-size: 15px; font-weight: 700; white-space: nowrap; }
+  .cmd-meta { margin-top: 7px; font-size: 12.5px; color: var(--encre2); }
+  .cmd-meta b { color: var(--encre); font-weight: 600; }
+  .cmd-badges { display: flex; gap: 6px; margin-top: 11px; flex-wrap: wrap; }
+  .badge-c { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; padding: 4px 10px;
+    border-radius: 999px; border: 1px solid var(--hairline); color: var(--encre2); background: #fbfbfa; }
+  .badge-c.ok { color: #1f7a3a; border-color: #bfe3cb; background: #f3fbf6; }
+  .badge-c.attente { color: #8a6414; border-color: #eddcaf; background: #fdf9ef; }
+  .badge-c.alerte { color: #a33; border-color: #f0cccc; background: #fdf4f4; }
+  .cmd-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--hairline); }
+  .cmd-etat { font-size: 12px; color: var(--encre2); }
+  .cmd-note { margin-top: 11px; font-size: 12.5px; border-radius: 8px; padding: 9px 11px; }
+  .cmd-note.erreur { color: #a33; background: #fdf4f4; border: 1px solid #f0cccc; }
+  .cmd-note.mot { color: var(--encre2); background: #fafaf8; border: 1px solid var(--hairline); }
+  .cmd-lignes { margin-top: 13px; border-top: 1px solid var(--hairline); padding-top: 6px; }
+  .cmd-ligne { display: flex; gap: 14px; align-items: baseline; font-size: 12.5px;
+    padding: 7px 0; border-bottom: 1px dashed #eeeeeb; }
+  .cmd-ligne:last-child { border-bottom: 0; }
+  .cmd-ligne .ref { font-weight: 600; min-width: 140px; }
+  .cmd-ligne .taille { min-width: 56px; color: var(--encre2); }
+  .cmd-ligne .des { flex: 1; color: var(--encre2); }
+  .cmd-ligne .qte { white-space: nowrap; text-align: right; }
+  .puce-claire.forte { color: var(--encre); border-color: #b9b9b4; }
+  @media (max-width: 700px) {
+    .cmd-montant { margin-left: 0; width: 100%; }
+    .cmd-ligne { flex-wrap: wrap; gap: 8px; }
+    .cmd-ligne .des { flex-basis: 100%; }
+  }
+
   .recap-chiffres { display: flex; gap: 34px; flex-wrap: wrap; padding: 2px 0 20px; }
   .recap-chiffre b { display: block; font-size: 22px; font-weight: 700; }
   .recap-chiffre span { font-size: 10.5px; color: var(--encre2); letter-spacing: .14em; text-transform: uppercase; }
@@ -665,7 +703,7 @@
       <div class="compte-produits">Toutes les commandes du portail, tous magasins. Le fichier d'import Fastmag se reconstruit ici à la demande, même si l'e-mail n'est jamais parti.</div>
     </div>
 
-    <div class="bloc-clair" style="margin: 0 22px 60px">
+    <div class="bloc-clair" style="margin: 0 22px 18px">
       <div class="recap-chiffres" id="cmd-chiffres"></div>
       <div class="formu">
         <input class="qte-claire" style="width:300px; text-align:left" id="cmd-recherche"
@@ -680,8 +718,9 @@
         <button class="puce-claire" id="cmd-rafraichir">Rafraîchir</button>
       </div>
       <div class="chips" id="cmd-chips" style="margin-top:12px"></div>
-      <div id="cmd-liste" style="margin-top:6px"></div>
     </div>
+
+    <div id="cmd-liste" style="margin: 0 22px 60px"></div>
   </section>
 
   <section class="vue page-claire" id="vue-utilisateurs">
@@ -866,10 +905,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787327855"></script>
-<script src="imports.js?v=1787327855"></script>
-<script src="merch-shopify.js?v=1787327855"></script>
-<script src="moteur-merch.js?v=1787327855"></script>
+<script src="config.js?v=1787328569"></script>
+<script src="imports.js?v=1787328569"></script>
+<script src="merch-shopify.js?v=1787328569"></script>
+<script src="moteur-merch.js?v=1787328569"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2564,47 +2603,59 @@ function filtrerCommandesAdmin() {
 
   document.getElementById("cmd-liste").innerHTML = vues.length
     ? vues.map(rangCommandeAdmin).join("")
-    : `<div class="rang" style="color:var(--gris)">Aucune commande ne correspond.</div>`;
+    : `<div class="cmd-carte" style="color:var(--encre2)">Aucune commande ne correspond à cette recherche.</div>`;
 }
 
 function rangCommandeAdmin(c) {
   const [lib, cls] = LIBELLES_STATUT[c.statut] || [c.statut, ""];
-  const quand = new Date(c.cree_le).toLocaleString("fr-FR");
+  const d = new Date(c.cree_le);
+  const jour = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+  const heure = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   const envoi = c.envoye_le
-    ? `<span class="etiquette ok">E-MAIL PARTI</span>`
-    : `<span class="etiquette attente">${c.envoi_erreur ? "ENVOI EN ÉCHEC" : "AUCUN E-MAIL"}</span>`;
-  return `<div class="rang" style="flex-wrap:wrap">
-    <b>${echapperHTML(c.numero)}</b>
-    ${c.nom ? `<span class="nom-cmd">« ${echapperHTML(c.nom)} »</span>` : ""}
-    <span class="etiquette ${cls}">${lib}</span>${envoi}
-    <span class="fin">${quand} · ${echapperHTML(c.societe)} · ${c.nb_pieces} pièces · ${eur(Number(c.total_ht))} HT</span>
-    <div style="width:100%; display:flex; gap:8px; margin-top:8px; align-items:center; flex-wrap:wrap">
-      <button class="puce" onclick="basculerDetailCommande('${c.id}')">Détail</button>
-      <button class="puce" onclick="telechargerRecapCommande('${c.id}')">Télécharger (Excel)</button>
-      <button class="puce" onclick="telechargerFichierCommande('${c.id}')">Fichier Fastmag</button>
-      <button class="puce" onclick="renvoyerCommande('${c.id}')">${c.envoye_le ? "Renvoyer l'e-mail" : "Envoyer l'e-mail"}</button>
-      <span class="compte-produits" id="cmd-etat-${c.id}"></span>
+    ? `<span class="badge-c ok">e-mail parti</span>`
+    : c.envoi_erreur
+      ? `<span class="badge-c alerte">envoi en échec</span>`
+      : `<span class="badge-c attente">aucun e-mail</span>`;
+  return `<div class="cmd-carte">
+    <div class="cmd-tete">
+      <span class="cmd-num">${echapperHTML(c.numero)}</span>
+      ${c.nom ? `<span class="cmd-nom">« ${echapperHTML(c.nom)} »</span>` : ""}
+      <span class="cmd-montant">${eur(Number(c.total_ht))} HT</span>
     </div>
-    ${c.envoi_erreur ? `<div class="compte-produits" style="width:100%; color:#a33">Dernière erreur : ${echapperHTML(c.envoi_erreur)}</div>` : ""}
-    ${c.commentaire ? `<div class="compte-produits" style="width:100%">Commentaire du client : ${echapperHTML(c.commentaire)}</div>` : ""}
-    <div style="width:100%" id="cmd-detail-${c.id}"></div>
+    <div class="cmd-meta"><b>${echapperHTML(c.societe)}</b> · ${c.nb_pieces} pièce${c.nb_pieces > 1 ? "s" : ""}
+      · ${jour} à ${heure}</div>
+    <div class="cmd-badges">
+      <span class="badge-c ${cls === "ok" ? "ok" : "attente"}">${lib}</span>${envoi}
+    </div>
+    ${c.envoi_erreur ? `<div class="cmd-note erreur">Dernier échec d'envoi : ${echapperHTML(c.envoi_erreur)}</div>` : ""}
+    ${c.commentaire ? `<div class="cmd-note mot">Mot du client : ${echapperHTML(c.commentaire)}</div>` : ""}
+    <div class="cmd-actions">
+      <button class="puce-claire forte" onclick="telechargerRecapCommande('${c.id}')">Télécharger (Excel)</button>
+      <button class="puce-claire" onclick="telechargerFichierCommande('${c.id}')">Fichier Fastmag</button>
+      <button class="puce-claire" onclick="basculerDetailCommande('${c.id}')" id="cmd-btn-detail-${c.id}">Voir le détail</button>
+      <button class="puce-claire" onclick="renvoyerCommande('${c.id}')">${c.envoye_le ? "Renvoyer l'e-mail" : "Envoyer l'e-mail"}</button>
+      <span class="cmd-etat" id="cmd-etat-${c.id}"></span>
+    </div>
+    <div id="cmd-detail-${c.id}"></div>
   </div>`;
 }
 
 async function basculerDetailCommande(id) {
   const zone = document.getElementById("cmd-detail-" + id);
-  if (zone.innerHTML) { zone.innerHTML = ""; return; }
-  zone.innerHTML = `<div class="compte-produits">Chargement des lignes…</div>`;
+  const bouton = document.getElementById("cmd-btn-detail-" + id);
+  if (zone.innerHTML) { zone.innerHTML = ""; bouton.textContent = "Voir le détail"; return; }
+  zone.innerHTML = `<div class="cmd-lignes"><div class="cmd-etat" style="padding:8px 0">Chargement des lignes…</div></div>`;
   const lignes = await api(`/rest/v1/commande_lignes?commande_id=eq.${id}`
     + `&select=reference,couleur,taille,designation,quantite,prix&order=reference,taille`).catch(() => []);
+  bouton.textContent = "Masquer le détail";
   zone.innerHTML = lignes.length
-    ? `<div style="margin:8px 0 4px">${lignes.map(l => `<div class="rang" style="padding:4px 0">
-        <span style="min-width:150px"><b>${echapperHTML(l.reference)}</b></span>
-        <span style="min-width:90px">${echapperHTML(l.taille || "")}</span>
-        <span>${echapperHTML(l.designation || "")} ${l.couleur ? `· ${echapperHTML(l.couleur)}` : ""}</span>
-        <span class="fin">${l.quantite} × ${eur(Number(l.prix))} = ${eur(l.quantite * Number(l.prix))}</span>
+    ? `<div class="cmd-lignes">${lignes.map(l => `<div class="cmd-ligne">
+        <span class="ref">${echapperHTML(l.reference)}</span>
+        <span class="taille">${echapperHTML(l.taille || "")}</span>
+        <span class="des">${echapperHTML(l.designation || "")}${l.couleur ? ` · ${echapperHTML(l.couleur)}` : ""}</span>
+        <span class="qte">${l.quantite} × ${eur(Number(l.prix))} = <b>${eur(l.quantite * Number(l.prix))}</b></span>
       </div>`).join("")}</div>`
-    : `<div class="compte-produits">Aucune ligne enregistrée.</div>`;
+    : `<div class="cmd-lignes"><div class="cmd-etat" style="padding:8px 0">Aucune ligne enregistrée.</div></div>`;
 }
 
 // Le récap lisible : la commande telle qu'on la lit, pas telle que Fastmag l'avale.
