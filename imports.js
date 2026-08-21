@@ -356,7 +356,8 @@ function mapperVersTables(analyse) {
         }
       }
       return [
-        { table: "stocks", vider: true, activer: true,
+        // vider: seulement les lignes Duhamel — le stock B2B, lui, vient du dépôt Fastmag
+        { table: "stocks", vider: true, magasin: "DUHAMEL", activer: true,
           rows: [...parCle.entries()].map(([cle, q]) => {
             const [reference, taille] = cle.split("|");
             return { magasin: "DUHAMEL", reference, taille, quantite: q };
@@ -406,7 +407,10 @@ async function executerImport(analyse, surProgres) {
   const plans = mapperVersTables(analyse);
   let total = 0;
   for (const plan of plans) {
-    if (plan.vider) { surProgres("vidage de la table stocks…"); await apiFonction("vider", { table: "stocks" }); }
+    if (plan.vider) {
+      surProgres(plan.magasin ? `vidage du stock ${plan.magasin}…` : "vidage de la table stocks…");
+      await apiFonction("vider", { table: "stocks", magasin: plan.magasin || null });
+    }
     for (let i = 0; i < plan.rows.length; i += 3000) {
       const lot = plan.rows.slice(i, i + 3000);
       await apiFonction("upsert", { table: plan.table, rows: lot });
