@@ -157,6 +157,12 @@
   .cmd-ligne .des { flex: 1; color: var(--encre2); }
   .cmd-ligne .qte { white-space: nowrap; text-align: right; }
   .puce-claire.forte { color: var(--encre); border-color: #b9b9b4; }
+  .cmd-lot { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--hairline); font-size: 13px; }
+  .cmd-lot b { font-weight: 700; }
+  .cmd-coche { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .cmd-coche input { width: 16px; height: 16px; accent-color: var(--encre); cursor: pointer; }
+  .cmd-carte.cochee { border-color: var(--encre); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
   @media (max-width: 700px) {
     .cmd-montant { margin-left: 0; width: 100%; }
     .cmd-ligne { flex-wrap: wrap; gap: 8px; }
@@ -525,16 +531,17 @@
       </div>
     </div>
     <a href="#/compte">MON COMPTE</a>
-    <div class="menu-deroulant" id="lien-merch" style="display:none">
-      <a style="color:#d9a441">MERCH ▾</a>
+    <div class="menu-deroulant" id="lien-backoffice" style="display:none">
+      <a style="color:#d9a441">BACK OFFICE ▾</a>
       <div class="sous-menu">
-        <a href="#/merch">Merch B2B</a>
-        <a href="#/merch-shopify">Merch Shopify</a>
+        <a href="#/backoffice" id="bo-tableau">Tableau de bord</a>
+        <a href="#/commandes" id="bo-commandes">Commandes<span id="bo-badge"></span></a>
+        <a href="#/merch" id="bo-merch">Merch B2B</a>
+        <a href="#/merch-shopify" id="bo-merch-shopify">Merch Shopify</a>
+        <a href="#/imports" id="bo-imports">Imports</a>
+        <a href="#/utilisateurs" id="bo-utilisateurs">Utilisateurs</a>
       </div>
     </div>
-    <a href="#/commandes" id="lien-commandes" style="display:none; color:#d9a441">COMMANDES</a>
-    <a href="#/utilisateurs" id="lien-utilisateurs" style="display:none; color:#d9a441">UTILISATEURS</a>
-    <a href="#/imports" id="lien-imports" style="display:none; color:#d9a441">IMPORTS</a>
   </div>
   <div class="logo" onclick="location.hash='#/'">FKB2B</div>
   <div class="h-droite">
@@ -695,7 +702,17 @@
   </section>
 
   <!-- UTILISATEURS (admin) -->
-  <!-- COMMANDES (admin) : la copie de secours quand l'e-mail ne part pas -->
+  <!-- TABLEAU DE BORD (interne) -->
+  <section class="vue page-claire" id="vue-backoffice">
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='#/'">&larr; ACCUEIL</span>
+      <h1>TABLEAU DE BORD</h1>
+      <div class="compte-produits" id="bo-sous-titre">L'état du portail en un écran : les commandes à traiter, le catalogue, les stocks et les derniers dépôts.</div>
+    </div>
+    <div id="bo-contenu" style="margin: 0 22px 60px"></div>
+  </section>
+
+  <!-- COMMANDES (interne) : approbation, intégration, et la copie de secours quand l'e-mail ne part pas -->
   <section class="vue page-claire" id="vue-commandes">
     <div class="col-tete">
       <span class="fil" onclick="location.hash='#/'">&larr; ACCUEIL</span>
@@ -710,14 +727,15 @@
                placeholder="numéro, magasin ou nom de commande…">
         <select class="qte-claire" style="width:210px" id="cmd-statut">
           <option value="">Tous les statuts</option>
-          <option value="validee">Validée (e-mail à envoyer)</option>
-          <option value="transmise">Transmise</option>
+          <option value="validee">À approuver</option>
+          <option value="a_integrer">À intégrer dans Fastmag</option>
           <option value="integree">Intégrée Fastmag</option>
           <option value="annulee">Annulée</option>
         </select>
         <button class="puce-claire" id="cmd-rafraichir">Rafraîchir</button>
       </div>
       <div class="chips" id="cmd-chips" style="margin-top:12px"></div>
+      <div id="cmd-lot" class="cmd-lot" style="display:none"></div>
     </div>
 
     <div id="cmd-liste" style="margin: 0 22px 60px"></div>
@@ -739,7 +757,9 @@
           <option value="responsable">Responsable (client)</option>
           <option value="acheteur">Acheteur (client)</option>
           <option value="merch">Merchandiser (interne)</option>
-          <option value="admin">Administrateur (interne)</option>
+          <option value="admin_commercial">Administrateur commercial (approuve)</option>
+          <option value="admin_adv">Administrateur ADV (intègre dans Fastmag)</option>
+          <option value="admin">Administrateur (tous droits)</option>
         </select>
         <input class="qte-claire" style="width:240px; text-align:left" id="nu-societe" list="liste-societes"
                placeholder="ajouter un magasin (compte)…">
@@ -905,10 +925,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787328569"></script>
-<script src="imports.js?v=1787328569"></script>
-<script src="merch-shopify.js?v=1787328569"></script>
-<script src="moteur-merch.js?v=1787328569"></script>
+<script src="config.js?v=1787328909"></script>
+<script src="imports.js?v=1787328909"></script>
+<script src="merch-shopify.js?v=1787328909"></script>
+<script src="moteur-merch.js?v=1787328909"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -930,6 +950,9 @@ function memoriser(produits) {
 }
 const produitConnu = ref => CONNUS.get(ref) || DATA.produits.find(x => x.reference === ref);
 let MES_SOCIETES = [], estAdmin = false;
+// Trois rôles internes se partagent le back-office : l'admin voit tout, le commercial
+// approuve les commandes, l'ADV les marque intégrées dans Fastmag.
+let MON_ROLE = null, estStaff = false, peutApprouver = false, peutIntegrer = false;
 let travailNonEnregistre = false;
 window.addEventListener("beforeunload", e => {
   if (travailNonEnregistre) { e.preventDefault(); e.returnValue = ""; }
@@ -974,20 +997,35 @@ async function init() {
     if (err.statut === 401) { deconnexion(); return; }
     throw err;
   }
-  estAdmin = profil?.role === "admin";
-  const estMerch = profil?.role === "merch";
-  if (estAdmin || estMerch) document.getElementById("lien-merch").style.display = "";
+  MON_ROLE = profil?.role || null;
+  estAdmin = MON_ROLE === "admin";
+  estStaff = ["admin", "admin_commercial", "admin_adv"].includes(MON_ROLE);
+  peutApprouver = ["admin", "admin_commercial"].includes(MON_ROLE);
+  peutIntegrer = ["admin", "admin_adv"].includes(MON_ROLE);
+  const estMerch = MON_ROLE === "merch";
+  if (estStaff || estMerch) {
+    document.getElementById("lien-backoffice").style.display = "";
+    // chacun n'ouvre que ce qui le concerne
+    const montrer = (id, oui) => document.getElementById(id).style.display = oui ? "" : "none";
+    montrer("bo-tableau", estStaff);
+    montrer("bo-commandes", estStaff);
+    montrer("bo-merch", estAdmin || estMerch);
+    montrer("bo-merch-shopify", estAdmin || estMerch);
+    montrer("bo-imports", estAdmin);
+    montrer("bo-utilisateurs", estAdmin);
+  }
   if (estMerch) {
     clientActif = { nom: "Merchandiser", famille_tarifaire: "", id_fastmag: null, compte: "MERCH" };
     document.getElementById("societe-nom").textContent = "Merchandiser";
   }
-  if (estAdmin) {
-    document.getElementById("lien-commandes").style.display = "";
-    document.getElementById("lien-utilisateurs").style.display = "";
-    document.getElementById("lien-imports").style.display = "";
-    // l'admin n'est rattaché à aucune société : catalogue toutes familles (prix mini)
-    clientActif = { nom: "Administrateur", famille_tarifaire: "", id_fastmag: null, compte: "ADMIN" };
-    document.getElementById("societe-nom").textContent = "Administrateur — toutes sociétés";
+  if (estStaff) {
+    // aucun rattachement à une société : catalogue toutes familles (prix mini)
+    const titre = { admin: "Administrateur — toutes sociétés",
+                    admin_commercial: "Administration commerciale",
+                    admin_adv: "Administration des ventes" }[MON_ROLE];
+    clientActif = { nom: titre, famille_tarifaire: "", id_fastmag: null, compte: "ADMIN" };
+    document.getElementById("societe-nom").textContent = titre;
+    rafraichirFilesCommandes();
   } else {
     const memo = localStorage.getItem("fkb2b-societe");
     clientActif = MES_SOCIETES.find(s => s.id === memo) || MES_SOCIETES[0]
@@ -1227,9 +1265,13 @@ function router() {
   } else if (route === "merch") {
     document.getElementById("vue-merch").classList.add("active");
     rendreMerch();
+  } else if (route === "backoffice") {
+    document.getElementById("vue-backoffice").classList.add("active");
+    rendreBackOffice();
   } else if (route === "commandes") {
     document.getElementById("vue-commandes").classList.add("active");
-    rendreCommandesAdmin();
+    // #/commandes/a-approuver et #/commandes/a-integrer ouvrent directement la file
+    rendreCommandesAdmin(args[0] || null);
   } else if (route === "utilisateurs") {
     document.getElementById("vue-utilisateurs").classList.add("active");
     rendreUtilisateurs();
@@ -2515,7 +2557,7 @@ async function rendreUtilisateurs() {
       if (!email) { etat.textContent = "e-mail requis"; return; }
       const roleChoisi = document.getElementById("nu-role").value;
       // admin et merch sont des rôles internes : aucun magasin à rattacher
-      if (!["merch", "admin"].includes(roleChoisi) && !societesChoisies.length) {
+      if (!["merch", "admin", "admin_commercial", "admin_adv"].includes(roleChoisi) && !societesChoisies.length) {
         etat.textContent = "ajoutez au moins un magasin"; return;
       }
       // un admin voit tous les magasins, tous les prix et tous les imports : on le fait dire
@@ -2543,6 +2585,87 @@ async function rendreUtilisateurs() {
   }
 }
 
+/* ---------------- tableau de bord (interne) ---------------- */
+const dateCourte = (iso) => iso
+  ? new Date(iso).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+  : "jamais";
+
+// Le badge du menu : ce que MON rôle doit traiter, visible depuis n'importe quelle page.
+async function rafraichirFilesCommandes() {
+  const badge = document.getElementById("bo-badge");
+  if (!badge) return;
+  const f = await api("/rest/v1/rpc/files_commandes", { corps: {} }).catch(() => null);
+  if (!f) { badge.textContent = ""; return; }
+  const n = (peutApprouver ? f.a_approuver : 0) + (peutIntegrer ? f.a_integrer : 0);
+  badge.textContent = n ? ` (${n})` : "";
+  FILES_COMMANDES = f;
+}
+let FILES_COMMANDES = null;
+
+async function rendreBackOffice() {
+  const zone = document.getElementById("bo-contenu");
+  zone.innerHTML = `<div class="compte-produits">Chargement…</div>`;
+  const t = await api("/rest/v1/rpc/tableau_bord", { corps: {} }).catch(() => null);
+  if (!t) { zone.innerHTML = `<div class="cmd-carte">Tableau de bord réservé aux comptes internes.</div>`; return; }
+  FILES_COMMANDES = t.files;
+
+  const chiffre = (v, l) => `<div class="recap-chiffre"><b>${v}</b><span>${l}</span></div>`;
+  const carte = (titre, corps, lien) => `<div class="cmd-carte">
+    <div class="cmd-tete"><span class="cmd-num">${titre}</span>
+      ${lien ? `<span class="cmd-montant"><button class="puce-claire" onclick="location.hash='${lien}'">Ouvrir</button></span>` : ""}</div>
+    <div style="margin-top:10px">${corps}</div></div>`;
+  const ligne = (k, v) => `<div class="cmd-ligne"><span class="des">${k}</span><span class="qte"><b>${v}</b></span></div>`;
+
+  // ce que mon rôle doit traiter, en premier et en gros
+  const files = [];
+  if (peutApprouver) files.push(`<button class="puce-claire forte" onclick="location.hash='#/commandes/a-approuver'">
+    ${t.files.a_approuver} commande${t.files.a_approuver > 1 ? "s" : ""} à approuver</button>`);
+  if (peutIntegrer) files.push(`<button class="puce-claire forte" onclick="location.hash='#/commandes/a-integrer'">
+    ${t.files.a_integrer} à intégrer dans Fastmag</button>`);
+
+  const alertes = [];
+  if (!t.stock_b2b.lignes) alertes.push("Aucun stock B2B en base : le catalogue affiche 0 partout.");
+  if (t.commandes.en_erreur) alertes.push(`${t.commandes.en_erreur} commande(s) en erreur d'envoi d'e-mail.`);
+  if (t.catalogue.actives === 0) alertes.push("Aucune variante active : plus rien n'est commandable.");
+
+  zone.innerHTML = `
+    ${files.length ? `<div class="cmd-carte"><div class="cmd-actions" style="margin:0; padding:0; border:0">${files.join("")}</div></div>` : ""}
+    ${alertes.length ? `<div class="cmd-carte"><div class="cmd-note erreur" style="margin:0">${alertes.join("<br>")}</div></div>` : ""}
+    <div class="bloc-clair" style="margin-bottom:10px">
+      <div class="recap-chiffres" style="padding-bottom:0">
+        ${chiffre(t.commandes.nombre, "commandes")}
+        ${chiffre(t.commandes.pieces.toLocaleString("fr-FR"), "pièces")}
+        ${chiffre(eur(Number(t.commandes.total_ht)), "total HT")}
+        ${chiffre(t.files.a_approuver, "à approuver")}
+        ${chiffre(t.files.a_integrer, "à intégrer")}
+      </div>
+    </div>
+    ${carte("Commandes", ligne("Dernière commande", dateCourte(t.commandes.derniere))
+      + ligne("Sans e-mail parti", t.commandes.sans_mail)
+      + ligne("Déjà intégrées", t.files.integrees), "#/commandes")}
+    ${carte("Catalogue B2B", ligne("Références commandables", t.catalogue.references_actives)
+      + ligne("Tailles actives", `${t.catalogue.actives} / ${t.catalogue.variantes}`)
+      + ligne("Stock B2B", `${t.stock_b2b.lignes} lignes · ${Number(t.stock_b2b.pieces).toLocaleString("fr-FR")} pièces`)
+      + ligne("Dernier dépôt stock B2B", dateCourte(t.depots.stock_b2b)))}
+    ${carte("Stock web (Duhamel)", ligne("Références", t.stock_web.references)
+      + ligne("Lignes de stock", t.stock_web.lignes)
+      + ligne("Pièces", Number(t.stock_web.pieces).toLocaleString("fr-FR"))
+      + ligne("Dernier dépôt Shopify", dateCourte(t.depots.stock_shopify)),
+      estAdmin ? "#/imports" : null)}
+    ${t.merch_shopify ? carte("Merch Shopify", ligne("Fichier collections", t.merch_shopify.fichier || "—")
+      + ligne("Déposé le", dateCourte(t.merch_shopify.depose_le))
+      + ligne("Collections suivies", t.merch_shopify.collections_suivies)
+      + ligne("Dernière passe", dateCourte(t.merch_shopify.derniere_passe)),
+      (estAdmin || MON_ROLE === "merch") ? "#/merch-shopify" : null) : ""}
+    ${estAdmin ? carte("Derniers imports", (t.imports || []).map(i =>
+      `<div class="cmd-ligne"><span class="ref">${echapperHTML(i.modele)}</span>
+        <span class="des">${echapperHTML(i.fichier)}</span>
+        <span class="qte">${Number(i.lignes).toLocaleString("fr-FR")} lignes · ${dateCourte(i.horodatage)}</span></div>`).join("")
+      || "<div class='compte-produits'>Aucun import.</div>", "#/imports") : ""}
+    ${estAdmin ? carte("Comptes", Object.entries(t.utilisateurs || {}).map(([r, n]) => ligne(r, n)).join("")
+      + ligne("Magasins référencés", t.societes), "#/utilisateurs") : ""}`;
+}
+
 /* ---------------- commandes (admin) : le filet de sécurité ----------------
    Quand l'e-mail ne part pas — clé Resend absente, domaine non vérifié, panne —
    la commande existe quand même en base. Cet écran la retrouve, reconstruit son
@@ -2551,16 +2674,27 @@ async function rendreUtilisateurs() {
 let COMMANDES_ADMIN = [];
 let commandesAdminInitialise = false;
 
-async function rendreCommandesAdmin() {
+const SELECTION_CMD = new Set();
+const A_INTEGRER = ["approuvee", "transmise"];
+const cmdAApprouver = (c) => c.statut === "validee" && peutApprouver;
+const cmdAIntegrer = (c) => A_INTEGRER.includes(c.statut) && peutIntegrer;
+const cmdCochable = (c) => cmdAApprouver(c) || cmdAIntegrer(c);
+
+async function rendreCommandesAdmin(file) {
   const liste = document.getElementById("cmd-liste");
   if (!COMMANDES_ADMIN.length) liste.innerHTML = `<div class="compte-produits">Chargement…</div>`;
   const [commandes, societes] = await Promise.all([
-    api("/rest/v1/commandes?select=id,numero,nom,statut,nb_pieces,total_ht,cree_le,societe_id,envoye_le,envoi_erreur,commentaire&order=cree_le.desc&limit=500").catch(() => []),
+    api("/rest/v1/commandes?select=id,numero,nom,statut,nb_pieces,total_ht,cree_le,societe_id,envoye_le,envoi_erreur,commentaire,approuvee_le,integree_le&order=cree_le.desc&limit=500").catch(() => []),
     api("/rest/v1/societes?select=id,nom,compte").catch(() => []),
   ]);
   const nomSociete = {};
   societes.forEach(x => nomSociete[x.id] = x.nom || x.compte);
   COMMANDES_ADMIN = commandes.map(c => ({ ...c, societe: nomSociete[c.societe_id] || "—" }));
+  // une commande déjà traitée ne doit pas rester cochée
+  [...SELECTION_CMD].forEach(id => {
+    const c = COMMANDES_ADMIN.find(x => x.id === id);
+    if (!c || !cmdCochable(c)) SELECTION_CMD.delete(id);
+  });
 
   if (!commandesAdminInitialise) {
     commandesAdminInitialise = true;
@@ -2568,14 +2702,20 @@ async function rendreCommandesAdmin() {
     document.getElementById("cmd-statut").onchange = filtrerCommandesAdmin;
     document.getElementById("cmd-rafraichir").onclick = () => rendreCommandesAdmin();
   }
+  // #/commandes/a-approuver et #/commandes/a-integrer ouvrent la file directement
+  if (file === "a-approuver") document.getElementById("cmd-statut").value = "validee";
+  if (file === "a-integrer") document.getElementById("cmd-statut").value = "a_integrer";
+
   filtrerCommandesAdmin();
+  rafraichirFilesCommandes();
 }
 
 function filtrerCommandesAdmin() {
   const q = (document.getElementById("cmd-recherche").value || "").toLowerCase().trim();
   const st = document.getElementById("cmd-statut").value;
+  const correspond = (c) => st === "a_integrer" ? A_INTEGRER.includes(c.statut) : c.statut === st;
   const vues = COMMANDES_ADMIN.filter(c =>
-    (!st || c.statut === st) &&
+    (!st || correspond(c)) &&
     (!q || [c.numero, c.nom, c.societe].some(v => (v || "").toLowerCase().includes(q))));
 
   // Le récap porte sur ce qui est affiché : filtrer par magasin ou par statut donne
@@ -2587,11 +2727,14 @@ function filtrerCommandesAdmin() {
   const annulees = vues.length - retenues.length;
   const chiffre = (valeur, libelle) =>
     `<div class="recap-chiffre"><b>${valeur}</b><span>${libelle}</span></div>`;
+  const aApprouver = COMMANDES_ADMIN.filter(c => c.statut === "validee").length;
+  const aIntegrer = COMMANDES_ADMIN.filter(c => A_INTEGRER.includes(c.statut)).length;
   document.getElementById("cmd-chiffres").innerHTML =
-    chiffre(vues.length, (q || st) ? "commandes (sélection)" : "commandes")
-    + chiffre(pieces.toLocaleString("fr-FR"), "pièces commandées")
+    (peutApprouver ? chiffre(aApprouver, "à approuver") : "")
+    + (peutIntegrer ? chiffre(aIntegrer, "à intégrer") : "")
+    + chiffre(vues.length, (q || st) ? "commandes (sélection)" : "commandes")
+    + chiffre(pieces.toLocaleString("fr-FR"), "pièces")
     + chiffre(eur(montant), "total HT")
-    + chiffre(retenues.length ? eur(montant / retenues.length) : eur(0), "panier moyen")
     + (annulees ? chiffre(annulees, "annulée" + (annulees > 1 ? "s" : "") + " (hors total)") : "");
 
   const sansMail = COMMANDES_ADMIN.filter(c => !c.envoye_le && c.statut !== "annulee").length;
@@ -2604,6 +2747,59 @@ function filtrerCommandesAdmin() {
   document.getElementById("cmd-liste").innerHTML = vues.length
     ? vues.map(rangCommandeAdmin).join("")
     : `<div class="cmd-carte" style="color:var(--encre2)">Aucune commande ne correspond à cette recherche.</div>`;
+  majBarreLot(vues);
+}
+
+/* --- cocher pour approuver (commercial) ou pour intégrer (ADV) --- */
+function basculerSelectionCmd(id, coche) {
+  if (coche) SELECTION_CMD.add(id); else SELECTION_CMD.delete(id);
+  document.getElementById("cmd-carte-" + id)?.classList.toggle("cochee", coche);
+  majBarreLot();
+}
+
+function cocherToutesCommandes(vues) {
+  const cochables = vues.filter(cmdCochable);
+  const toutCoche = cochables.length && cochables.every(c => SELECTION_CMD.has(c.id));
+  cochables.forEach(c => toutCoche ? SELECTION_CMD.delete(c.id) : SELECTION_CMD.add(c.id));
+  filtrerCommandesAdmin();
+}
+
+function majBarreLot(vues) {
+  if (vues) VUES_COMMANDES = vues;
+  const barre = document.getElementById("cmd-lot");
+  const cochables = (VUES_COMMANDES || []).filter(cmdCochable);
+  if (!cochables.length) { barre.style.display = "none"; return; }
+  const choisies = [...SELECTION_CMD];
+  const pourApprouver = choisies.filter(id => cmdAApprouver(COMMANDES_ADMIN.find(c => c.id === id) || {})).length;
+  const pourIntegrer = choisies.filter(id => cmdAIntegrer(COMMANDES_ADMIN.find(c => c.id === id) || {})).length;
+  barre.style.display = "flex";
+  barre.innerHTML = `
+    <button class="puce-claire" onclick="cocherToutesCommandes(VUES_COMMANDES)">Tout cocher / décocher</button>
+    <span><b>${choisies.length}</b> commande${choisies.length > 1 ? "s" : ""} cochée${choisies.length > 1 ? "s" : ""}</span>
+    ${pourApprouver ? `<button class="puce-claire forte" onclick="approuverSelection()">Approuver (${pourApprouver})</button>` : ""}
+    ${pourIntegrer ? `<button class="puce-claire forte" onclick="integrerSelection()">Marquer intégrées dans Fastmag (${pourIntegrer})</button>` : ""}
+    <span class="cmd-etat" id="cmd-lot-etat"></span>`;
+}
+let VUES_COMMANDES = [];
+
+async function approuverSelection() { await agirSurSelection("approuver_commandes", "approuvees", "approuvée"); }
+async function integrerSelection() { await agirSurSelection("integrer_commandes", "integrees", "intégrée"); }
+
+async function agirSurSelection(rpc, cle, mot) {
+  const etat = document.getElementById("cmd-lot-etat");
+  const ids = [...SELECTION_CMD];
+  if (!ids.length) { etat.textContent = "cochez au moins une commande"; return; }
+  etat.textContent = "enregistrement…";
+  try {
+    const r = await api(`/rest/v1/rpc/${rpc}`, { corps: { p_ids: ids } });
+    SELECTION_CMD.clear();
+    await rendreCommandesAdmin();
+    const n = r?.[cle] ?? 0;
+    const e = document.getElementById("cmd-lot-etat");
+    if (e) e.textContent = `${n} commande${n > 1 ? "s" : ""} ${mot}${n > 1 ? "s" : ""} ✓`;
+  } catch (e) {
+    etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 200);
+  }
 }
 
 function rangCommandeAdmin(c) {
@@ -2616,14 +2812,25 @@ function rangCommandeAdmin(c) {
     : c.envoi_erreur
       ? `<span class="badge-c alerte">envoi en échec</span>`
       : `<span class="badge-c attente">aucun e-mail</span>`;
-  return `<div class="cmd-carte">
+  const coche = cmdCochable(c)
+    ? `<label class="cmd-coche" title="${cmdAApprouver(c) ? "cocher pour approuver" : "cocher comme intégrée dans Fastmag"}">
+         <input type="checkbox" ${SELECTION_CMD.has(c.id) ? "checked" : ""}
+                onchange="basculerSelectionCmd('${c.id}', this.checked)"></label>`
+    : "";
+  const jalons = [
+    c.approuvee_le ? `approuvée le ${dateCourte(c.approuvee_le)}` : "",
+    c.integree_le ? `intégrée le ${dateCourte(c.integree_le)}` : "",
+  ].filter(Boolean).join(" · ");
+
+  return `<div class="cmd-carte ${SELECTION_CMD.has(c.id) ? "cochee" : ""}" id="cmd-carte-${c.id}">
     <div class="cmd-tete">
+      ${coche}
       <span class="cmd-num">${echapperHTML(c.numero)}</span>
       ${c.nom ? `<span class="cmd-nom">« ${echapperHTML(c.nom)} »</span>` : ""}
       <span class="cmd-montant">${eur(Number(c.total_ht))} HT</span>
     </div>
     <div class="cmd-meta"><b>${echapperHTML(c.societe)}</b> · ${c.nb_pieces} pièce${c.nb_pieces > 1 ? "s" : ""}
-      · ${jour} à ${heure}</div>
+      · ${jour} à ${heure}${jalons ? ` · ${jalons}` : ""}</div>
     <div class="cmd-badges">
       <span class="badge-c ${cls === "ok" ? "ok" : "attente"}">${lib}</span>${envoi}
     </div>
@@ -2633,7 +2840,7 @@ function rangCommandeAdmin(c) {
       <button class="puce-claire forte" onclick="telechargerRecapCommande('${c.id}')">Télécharger (Excel)</button>
       <button class="puce-claire" onclick="telechargerFichierCommande('${c.id}')">Fichier Fastmag</button>
       <button class="puce-claire" onclick="basculerDetailCommande('${c.id}')" id="cmd-btn-detail-${c.id}">Voir le détail</button>
-      <button class="puce-claire" onclick="renvoyerCommande('${c.id}')">${c.envoye_le ? "Renvoyer l'e-mail" : "Envoyer l'e-mail"}</button>
+      ${estAdmin ? `<button class="puce-claire" onclick="renvoyerCommande('${c.id}')">${c.envoye_le ? "Renvoyer l'e-mail" : "Envoyer l'e-mail"}</button>` : ""}
       <span class="cmd-etat" id="cmd-etat-${c.id}"></span>
     </div>
     <div id="cmd-detail-${c.id}"></div>
@@ -2732,7 +2939,8 @@ async function renvoyerCommande(id) {
 }
 
 /* ---------------- compte (données réelles, isolées par société) ---------------- */
-const LIBELLES_STATUT = { validee: ["VALIDÉE", "attente"], transmise: ["TRANSMISE", "attente"],
+const LIBELLES_STATUT = { validee: ["À APPROUVER", "attente"], approuvee: ["À INTÉGRER", "attente"],
+                          transmise: ["À INTÉGRER", "attente"],
                           integree: ["INTÉGRÉE FASTMAG", "ok"], annulee: ["ANNULÉE", ""] };
 
 async function rendreCompte() {
