@@ -975,10 +975,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787329082"></script>
-<script src="imports.js?v=1787329082"></script>
-<script src="merch-shopify.js?v=1787329082"></script>
-<script src="moteur-merch.js?v=1787329082"></script>
+<script src="config.js?v=1787329585"></script>
+<script src="imports.js?v=1787329585"></script>
+<script src="merch-shopify.js?v=1787329585"></script>
+<script src="moteur-merch.js?v=1787329585"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2869,10 +2869,30 @@ function majBarreLot(vues) {
     <button class="puce-claire" onclick="cocherToutesCommandes(VUES_COMMANDES)">Tout cocher / décocher</button>
     <span><b>${choisies.length}</b> commande${choisies.length > 1 ? "s" : ""} cochée${choisies.length > 1 ? "s" : ""}</span>
     ${pourApprouver ? `<button class="puce-claire forte" onclick="approuverSelection()">Approuver (${pourApprouver})</button>` : ""}
+    ${choisies.length ? `<button class="puce-claire" onclick="telechargerFastmagGroupe()">Fichier Fastmag groupé (${choisies.length})</button>` : ""}
     ${pourIntegrer ? `<button class="puce-claire forte" onclick="integrerSelection()">Marquer intégrées dans Fastmag (${pourIntegrer})</button>` : ""}
     <span class="cmd-etat" id="cmd-lot-etat"></span>`;
 }
 let VUES_COMMANDES = [];
+
+// Un seul fichier d'import pour toutes les commandes cochées : l'ADV saisit une fois,
+// chaque ligne portant déjà son numéro de commande et son client.
+async function telechargerFastmagGroupe() {
+  const etat = document.getElementById("cmd-lot-etat");
+  const ids = [...SELECTION_CMD];
+  if (!ids.length) { etat.textContent = "cochez au moins une commande"; return; }
+  etat.textContent = "assemblage du fichier…";
+  try {
+    const r = await api("/functions/v1/envoyer-commande", { corps: { commande_ids: ids } });
+    telechargerLatin1(r.fichier, r.contenu);
+    const oublies = (r.sans_fastmag || []).length
+      ? ` — ${r.sans_fastmag.length} écartée(s) faute d'ID Fastmag : ${r.sans_fastmag.join(", ")}`
+      : "";
+    etat.textContent = `${r.commandes} commande(s), ${r.lignes} ligne(s) dans un seul fichier ✓${oublies}`;
+  } catch (e) {
+    etat.textContent = "échec : " + String(e.donnees?.erreur || e.message).slice(0, 220);
+  }
+}
 
 async function approuverSelection() { await agirSurSelection("approuver_commandes", "approuvees", "approuvée"); }
 async function integrerSelection() { await agirSurSelection("integrer_commandes", "integrees", "intégrée"); }
