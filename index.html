@@ -490,6 +490,7 @@
         <a href="#/merch-shopify">Merch Shopify</a>
       </div>
     </div>
+    <a href="#/commandes" id="lien-commandes" style="display:none; color:#d9a441">COMMANDES</a>
     <a href="#/utilisateurs" id="lien-utilisateurs" style="display:none; color:#d9a441">UTILISATEURS</a>
     <a href="#/imports" id="lien-imports" style="display:none; color:#d9a441">IMPORTS</a>
   </div>
@@ -507,7 +508,7 @@
     <div class="hero">
       <div class="fk-fond">FK</div>
       <div class="sur">Espace professionnel Footkorner</div>
-      <h1>LA COLLECTION,<br><b>EN DIRECT.</b></h1>
+      <h1>LE<br><b>B2B 2.0</b></h1>
       <div class="actions">
         <button class="btn-contour" onclick="location.hash='#/collection/TOUT'">DÉCOUVRIR LE CATALOGUE</button>
         <button class="btn-contour" onclick="location.hash='#/compte'">MON ESPACE</button>
@@ -652,6 +653,32 @@
   </section>
 
   <!-- UTILISATEURS (admin) -->
+  <!-- COMMANDES (admin) : la copie de secours quand l'e-mail ne part pas -->
+  <section class="vue page-claire" id="vue-commandes">
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='#/'">&larr; ACCUEIL</span>
+      <h1>COMMANDES</h1>
+      <div class="compte-produits">Toutes les commandes du portail, tous magasins. Le fichier d'import Fastmag se reconstruit ici à la demande, même si l'e-mail n'est jamais parti.</div>
+    </div>
+
+    <div class="bloc-clair" style="margin: 0 22px 60px">
+      <div class="formu">
+        <input class="qte-claire" style="width:300px; text-align:left" id="cmd-recherche"
+               placeholder="numéro, magasin ou nom de commande…">
+        <select class="qte-claire" style="width:210px" id="cmd-statut">
+          <option value="">Tous les statuts</option>
+          <option value="validee">Validée (e-mail à envoyer)</option>
+          <option value="transmise">Transmise</option>
+          <option value="integree">Intégrée Fastmag</option>
+          <option value="annulee">Annulée</option>
+        </select>
+        <button class="puce-claire" id="cmd-rafraichir">Rafraîchir</button>
+      </div>
+      <div class="chips" id="cmd-chips" style="margin-top:12px"></div>
+      <div id="cmd-liste" style="margin-top:6px"></div>
+    </div>
+  </section>
+
   <section class="vue page-claire" id="vue-utilisateurs">
     <div class="col-tete">
       <span class="fil" onclick="location.hash='#/'">← ACCUEIL</span>
@@ -833,10 +860,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787310639"></script>
-<script src="imports.js?v=1787310639"></script>
-<script src="merch-shopify.js?v=1787310639"></script>
-<script src="moteur-merch.js?v=1787310639"></script>
+<script src="config.js?v=1787326646"></script>
+<script src="imports.js?v=1787326646"></script>
+<script src="merch-shopify.js?v=1787326646"></script>
+<script src="moteur-merch.js?v=1787326646"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -910,6 +937,7 @@ async function init() {
     document.getElementById("societe-nom").textContent = "Merchandiser";
   }
   if (estAdmin) {
+    document.getElementById("lien-commandes").style.display = "";
     document.getElementById("lien-utilisateurs").style.display = "";
     document.getElementById("lien-imports").style.display = "";
     // l'admin n'est rattaché à aucune société : catalogue toutes familles (prix mini)
@@ -1154,6 +1182,9 @@ function router() {
   } else if (route === "merch") {
     document.getElementById("vue-merch").classList.add("active");
     rendreMerch();
+  } else if (route === "commandes") {
+    document.getElementById("vue-commandes").classList.add("active");
+    rendreCommandesAdmin();
   } else if (route === "utilisateurs") {
     document.getElementById("vue-utilisateurs").classList.add("active");
     rendreUtilisateurs();
@@ -2454,6 +2485,132 @@ async function rendreUtilisateurs() {
         rendreUtilisateurs();
       } catch (e) { etat.textContent = "échec : " + e.message.slice(0, 150); }
     };
+  }
+}
+
+/* ---------------- commandes (admin) : le filet de sécurité ----------------
+   Quand l'e-mail ne part pas — clé Resend absente, domaine non vérifié, panne —
+   la commande existe quand même en base. Cet écran la retrouve, reconstruit son
+   fichier d'import Fastmag (par l'edge function, donc au format exact du mail)
+   et permet de relancer l'envoi. */
+let COMMANDES_ADMIN = [];
+let commandesAdminInitialise = false;
+
+async function rendreCommandesAdmin() {
+  const liste = document.getElementById("cmd-liste");
+  if (!COMMANDES_ADMIN.length) liste.innerHTML = `<div class="compte-produits">Chargement…</div>`;
+  const [commandes, societes] = await Promise.all([
+    api("/rest/v1/commandes?select=id,numero,nom,statut,nb_pieces,total_ht,cree_le,societe_id,envoye_le,envoi_erreur,commentaire&order=cree_le.desc&limit=500").catch(() => []),
+    api("/rest/v1/societes?select=id,nom,compte").catch(() => []),
+  ]);
+  const nomSociete = {};
+  societes.forEach(x => nomSociete[x.id] = x.nom || x.compte);
+  COMMANDES_ADMIN = commandes.map(c => ({ ...c, societe: nomSociete[c.societe_id] || "—" }));
+
+  if (!commandesAdminInitialise) {
+    commandesAdminInitialise = true;
+    document.getElementById("cmd-recherche").oninput = filtrerCommandesAdmin;
+    document.getElementById("cmd-statut").onchange = filtrerCommandesAdmin;
+    document.getElementById("cmd-rafraichir").onclick = () => rendreCommandesAdmin();
+  }
+  filtrerCommandesAdmin();
+}
+
+function filtrerCommandesAdmin() {
+  const q = (document.getElementById("cmd-recherche").value || "").toLowerCase().trim();
+  const st = document.getElementById("cmd-statut").value;
+  const vues = COMMANDES_ADMIN.filter(c =>
+    (!st || c.statut === st) &&
+    (!q || [c.numero, c.nom, c.societe].some(v => (v || "").toLowerCase().includes(q))));
+
+  const sansMail = COMMANDES_ADMIN.filter(c => !c.envoye_le && c.statut !== "annulee").length;
+  const enErreur = COMMANDES_ADMIN.filter(c => c.envoi_erreur).length;
+  document.getElementById("cmd-chips").innerHTML =
+    `<span class="chip grise">${COMMANDES_ADMIN.length} commande${COMMANDES_ADMIN.length > 1 ? "s" : ""}</span>`
+    + (sansMail ? `<span class="chip">${sansMail} sans e-mail parti</span>` : "")
+    + (enErreur ? `<span class="chip">${enErreur} en erreur d'envoi</span>` : "")
+    + (q || st ? `<span class="chip grise">${vues.length} affichée${vues.length > 1 ? "s" : ""}</span>` : "");
+
+  document.getElementById("cmd-liste").innerHTML = vues.length
+    ? vues.map(rangCommandeAdmin).join("")
+    : `<div class="rang" style="color:var(--gris)">Aucune commande ne correspond.</div>`;
+}
+
+function rangCommandeAdmin(c) {
+  const [lib, cls] = LIBELLES_STATUT[c.statut] || [c.statut, ""];
+  const quand = new Date(c.cree_le).toLocaleString("fr-FR");
+  const envoi = c.envoye_le
+    ? `<span class="etiquette ok">E-MAIL PARTI</span>`
+    : `<span class="etiquette attente">${c.envoi_erreur ? "ENVOI EN ÉCHEC" : "AUCUN E-MAIL"}</span>`;
+  return `<div class="rang" style="flex-wrap:wrap">
+    <b>${echapperHTML(c.numero)}</b>
+    ${c.nom ? `<span class="nom-cmd">« ${echapperHTML(c.nom)} »</span>` : ""}
+    <span class="etiquette ${cls}">${lib}</span>${envoi}
+    <span class="fin">${quand} · ${echapperHTML(c.societe)} · ${c.nb_pieces} pièces · ${eur(Number(c.total_ht))} HT</span>
+    <div style="width:100%; display:flex; gap:8px; margin-top:8px; align-items:center; flex-wrap:wrap">
+      <button class="puce" onclick="basculerDetailCommande('${c.id}')">Détail</button>
+      <button class="puce" onclick="telechargerFichierCommande('${c.id}')">Fichier Fastmag</button>
+      <button class="puce" onclick="renvoyerCommande('${c.id}')">${c.envoye_le ? "Renvoyer l'e-mail" : "Envoyer l'e-mail"}</button>
+      <span class="compte-produits" id="cmd-etat-${c.id}"></span>
+    </div>
+    ${c.envoi_erreur ? `<div class="compte-produits" style="width:100%; color:#a33">Dernière erreur : ${echapperHTML(c.envoi_erreur)}</div>` : ""}
+    ${c.commentaire ? `<div class="compte-produits" style="width:100%">Commentaire du client : ${echapperHTML(c.commentaire)}</div>` : ""}
+    <div style="width:100%" id="cmd-detail-${c.id}"></div>
+  </div>`;
+}
+
+async function basculerDetailCommande(id) {
+  const zone = document.getElementById("cmd-detail-" + id);
+  if (zone.innerHTML) { zone.innerHTML = ""; return; }
+  zone.innerHTML = `<div class="compte-produits">Chargement des lignes…</div>`;
+  const lignes = await api(`/rest/v1/commande_lignes?commande_id=eq.${id}`
+    + `&select=reference,couleur,taille,designation,quantite,prix&order=reference,taille`).catch(() => []);
+  zone.innerHTML = lignes.length
+    ? `<div style="margin:8px 0 4px">${lignes.map(l => `<div class="rang" style="padding:4px 0">
+        <span style="min-width:150px"><b>${echapperHTML(l.reference)}</b></span>
+        <span style="min-width:90px">${echapperHTML(l.taille || "")}</span>
+        <span>${echapperHTML(l.designation || "")} ${l.couleur ? `· ${echapperHTML(l.couleur)}` : ""}</span>
+        <span class="fin">${l.quantite} × ${eur(Number(l.prix))} = ${eur(l.quantite * Number(l.prix))}</span>
+      </div>`).join("")}</div>`
+    : `<div class="compte-produits">Aucune ligne enregistrée.</div>`;
+}
+
+// Fastmag lit de l'ISO-8859-1 : tout caractère hors table devient « ? », comme dans le mail.
+function telechargerLatin1(nom, texte) {
+  const octets = new Uint8Array(texte.length);
+  for (let i = 0; i < texte.length; i++) {
+    const c = texte.charCodeAt(i);
+    octets[i] = c <= 0xFF ? c : 0x3F;
+  }
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(new Blob([octets], { type: "text/plain;charset=iso-8859-1" }));
+  lien.download = nom;
+  lien.click();
+  URL.revokeObjectURL(lien.href);
+}
+
+async function telechargerFichierCommande(id) {
+  const etat = document.getElementById("cmd-etat-" + id);
+  etat.textContent = "reconstruction du fichier…";
+  try {
+    const r = await api("/functions/v1/envoyer-commande", { corps: { commande_id: id, sans_envoi: true } });
+    telechargerLatin1(r.fichier, r.contenu);
+    etat.textContent = "fichier téléchargé ✓";
+  } catch (e) {
+    etat.textContent = "échec : " + String(e.donnees?.erreur || e.message).slice(0, 200);
+  }
+}
+
+async function renvoyerCommande(id) {
+  const etat = document.getElementById("cmd-etat-" + id);
+  etat.textContent = "envoi en cours…";
+  try {
+    const r = await api("/functions/v1/envoyer-commande", { corps: { commande_id: id, forcer: true } });
+    etat.textContent = r.deja_envoye ? "déjà envoyé" : `envoyé ✓ à ${(r.destinataires || []).join(", ")}`;
+    await rendreCommandesAdmin();
+  } catch (e) {
+    // on garde le message affiché : la raison exacte compte plus que la mise à jour de la liste
+    etat.textContent = "échec : " + String(e.donnees?.erreur || e.message).slice(0, 220);
   }
 }
 
