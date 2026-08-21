@@ -975,10 +975,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787329585"></script>
-<script src="imports.js?v=1787329585"></script>
-<script src="merch-shopify.js?v=1787329585"></script>
-<script src="moteur-merch.js?v=1787329585"></script>
+<script src="config.js?v=1787330244"></script>
+<script src="imports.js?v=1787330244"></script>
+<script src="merch-shopify.js?v=1787330244"></script>
+<script src="moteur-merch.js?v=1787330244"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2770,7 +2770,10 @@ const SELECTION_CMD = new Set();
 const A_INTEGRER = ["approuvee", "transmise"];
 const cmdAApprouver = (c) => c.statut === "validee" && peutApprouver;
 const cmdAIntegrer = (c) => A_INTEGRER.includes(c.statut) && peutIntegrer;
-const cmdCochable = (c) => cmdAApprouver(c) || cmdAIntegrer(c);
+// on doit pouvoir revenir en arrière : une case cochée par erreur se décoche
+const cmdADesapprouver = (c) => c.statut === "approuvee" && peutApprouver;
+const cmdADesintegrer = (c) => c.statut === "integree" && peutIntegrer;
+const cmdCochable = (c) => cmdAApprouver(c) || cmdAIntegrer(c) || cmdADesapprouver(c) || cmdADesintegrer(c);
 
 async function rendreCommandesAdmin(file) {
   const liste = document.getElementById("cmd-liste");
@@ -2862,8 +2865,11 @@ function majBarreLot(vues) {
   const cochables = (VUES_COMMANDES || []).filter(cmdCochable);
   if (!cochables.length) { barre.style.display = "none"; return; }
   const choisies = [...SELECTION_CMD];
-  const pourApprouver = choisies.filter(id => cmdAApprouver(COMMANDES_ADMIN.find(c => c.id === id) || {})).length;
-  const pourIntegrer = choisies.filter(id => cmdAIntegrer(COMMANDES_ADMIN.find(c => c.id === id) || {})).length;
+  const combien = (test) => choisies.filter(id => test(COMMANDES_ADMIN.find(c => c.id === id) || {})).length;
+  const pourApprouver = combien(cmdAApprouver);
+  const pourIntegrer = combien(cmdAIntegrer);
+  const pourDesapprouver = combien(cmdADesapprouver);
+  const pourDesintegrer = combien(cmdADesintegrer);
   barre.style.display = "flex";
   barre.innerHTML = `
     <button class="puce-claire" onclick="cocherToutesCommandes(VUES_COMMANDES)">Tout cocher / décocher</button>
@@ -2871,6 +2877,8 @@ function majBarreLot(vues) {
     ${pourApprouver ? `<button class="puce-claire forte" onclick="approuverSelection()">Approuver (${pourApprouver})</button>` : ""}
     ${choisies.length ? `<button class="puce-claire" onclick="telechargerFastmagGroupe()">Fichier Fastmag groupé (${choisies.length})</button>` : ""}
     ${pourIntegrer ? `<button class="puce-claire forte" onclick="integrerSelection()">Marquer intégrées dans Fastmag (${pourIntegrer})</button>` : ""}
+    ${pourDesapprouver ? `<button class="puce-claire" onclick="desapprouverSelection()">Annuler l'approbation (${pourDesapprouver})</button>` : ""}
+    ${pourDesintegrer ? `<button class="puce-claire" onclick="desintegrerSelection()">Annuler l'intégration (${pourDesintegrer})</button>` : ""}
     <span class="cmd-etat" id="cmd-lot-etat"></span>`;
 }
 let VUES_COMMANDES = [];
@@ -2894,10 +2902,27 @@ async function telechargerFastmagGroupe() {
   }
 }
 
-async function approuverSelection() { await agirSurSelection("approuver_commandes", "approuvees", "approuvée"); }
-async function integrerSelection() { await agirSurSelection("integrer_commandes", "integrees", "intégrée"); }
+async function approuverSelection() { await agirSurSelection("approuver_commandes", "approuvees", "approuvée", "approuvées"); }
+async function integrerSelection() { await agirSurSelection("integrer_commandes", "integrees", "intégrée", "intégrées"); }
 
-async function agirSurSelection(rpc, cle, mot) {
+// Retours en arrière : on demande confirmation, et le journal garde trace de qui l'a fait.
+async function desapprouverSelection() {
+  const n = [...SELECTION_CMD].filter(id => cmdADesapprouver(COMMANDES_ADMIN.find(c => c.id === id) || {})).length;
+  if (!confirm(`Retirer l'approbation de ${n} commande(s) ?\n\n`
+    + "Elles repartent dans la file « à approuver » et sortent de celle de l'ADV. "
+    + "Si l'ADV a déjà téléchargé le fichier, prévenez-le.")) return;
+  await agirSurSelection("desapprouver_commandes", "desapprouvees", "remise à approuver", "remises à approuver");
+}
+
+async function desintegrerSelection() {
+  const n = [...SELECTION_CMD].filter(id => cmdADesintegrer(COMMANDES_ADMIN.find(c => c.id === id) || {})).length;
+  if (!confirm(`Annuler l'intégration Fastmag de ${n} commande(s) ?\n\n`
+    + "Elles repassent en « à intégrer ». Cela ne retire rien dans Fastmag : "
+    + "si la commande y a réellement été saisie, il faut l'y supprimer à la main.")) return;
+  await agirSurSelection("desintegrer_commandes", "desintegrees", "remise à intégrer", "remises à intégrer");
+}
+
+async function agirSurSelection(rpc, cle, motUn, motPlusieurs) {
   const etat = document.getElementById("cmd-lot-etat");
   const ids = [...SELECTION_CMD];
   if (!ids.length) { etat.textContent = "cochez au moins une commande"; return; }
@@ -2908,7 +2933,7 @@ async function agirSurSelection(rpc, cle, mot) {
     await rendreCommandesAdmin();
     const n = r?.[cle] ?? 0;
     const e = document.getElementById("cmd-lot-etat");
-    if (e) e.textContent = `${n} commande${n > 1 ? "s" : ""} ${mot}${n > 1 ? "s" : ""} ✓`;
+    if (e) e.textContent = `${n} commande${n > 1 ? "s" : ""} ${n > 1 ? motPlusieurs : motUn} ✓`;
   } catch (e) {
     etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 200);
   }
@@ -2966,15 +2991,24 @@ async function basculerDetailCommande(id) {
   zone.innerHTML = `<div class="cmd-lignes"><div class="cmd-etat" style="padding:8px 0">Chargement des lignes…</div></div>`;
   const lignes = await api(`/rest/v1/commande_lignes?commande_id=eq.${id}`
     + `&select=reference,couleur,taille,designation,quantite,prix&order=reference,taille`).catch(() => []);
+  const journal = await api(`/rest/v1/commandes_journal?commande_id=eq.${id}`
+    + `&select=action,par_email,par_role,quand&order=quand.desc`).catch(() => []);
   bouton.textContent = "Masquer le détail";
-  zone.innerHTML = lignes.length
+  const histoire = journal.length
+    ? `<div class="cmd-lignes"><div class="cmd-etat" style="padding:6px 0 2px">Historique</div>
+        ${journal.map(j => `<div class="cmd-ligne">
+          <span class="ref">${echapperHTML(j.action)}</span>
+          <span class="des">${echapperHTML(j.par_email || "—")}${j.par_role ? ` · ${echapperHTML(j.par_role)}` : ""}</span>
+          <span class="qte">${dateCourte(j.quand)}</span></div>`).join("")}</div>`
+    : "";
+  zone.innerHTML = histoire + (lignes.length
     ? `<div class="cmd-lignes">${lignes.map(l => `<div class="cmd-ligne">
         <span class="ref">${echapperHTML(l.reference)}</span>
         <span class="taille">${echapperHTML(l.taille || "")}</span>
         <span class="des">${echapperHTML(l.designation || "")}${l.couleur ? ` · ${echapperHTML(l.couleur)}` : ""}</span>
         <span class="qte">${l.quantite} × ${eur(Number(l.prix))} = <b>${eur(l.quantite * Number(l.prix))}</b></span>
       </div>`).join("")}</div>`
-    : `<div class="cmd-lignes"><div class="cmd-etat" style="padding:8px 0">Aucune ligne enregistrée.</div></div>`;
+    : `<div class="cmd-lignes"><div class="cmd-etat" style="padding:8px 0">Aucune ligne enregistrée.</div></div>`);
 }
 
 // Le récap lisible : la commande telle qu'on la lit, pas telle que Fastmag l'avale.
