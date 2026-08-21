@@ -700,6 +700,7 @@
           <option value="responsable">Responsable (client)</option>
           <option value="acheteur">Acheteur (client)</option>
           <option value="merch">Merchandiser (interne)</option>
+          <option value="admin">Administrateur (interne)</option>
         </select>
         <input class="qte-claire" style="width:240px; text-align:left" id="nu-societe" list="liste-societes"
                placeholder="ajouter un magasin (compte)…">
@@ -865,10 +866,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787327543"></script>
-<script src="imports.js?v=1787327543"></script>
-<script src="merch-shopify.js?v=1787327543"></script>
-<script src="moteur-merch.js?v=1787327543"></script>
+<script src="config.js?v=1787327855"></script>
+<script src="imports.js?v=1787327855"></script>
+<script src="merch-shopify.js?v=1787327855"></script>
+<script src="moteur-merch.js?v=1787327855"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2474,12 +2475,22 @@ async function rendreUtilisateurs() {
       const email = document.getElementById("nu-email").value.trim();
       if (!email) { etat.textContent = "e-mail requis"; return; }
       const roleChoisi = document.getElementById("nu-role").value;
-      if (roleChoisi !== "merch" && !societesChoisies.length) { etat.textContent = "ajoutez au moins un magasin"; return; }
+      // admin et merch sont des rôles internes : aucun magasin à rattacher
+      if (!["merch", "admin"].includes(roleChoisi) && !societesChoisies.length) {
+        etat.textContent = "ajoutez au moins un magasin"; return;
+      }
+      // un admin voit tous les magasins, tous les prix et tous les imports : on le fait dire
+      if (roleChoisi === "admin" && !confirm(
+        `Créer un ADMINISTRATEUR pour ${email} ?\n\n`
+        + "Il verra toutes les commandes de tous les magasins, tous les prix, "
+        + "et pourra déposer des imports, créer des comptes et envoyer des e-mails de commande.")) {
+        etat.textContent = "création annulée"; return;
+      }
       etat.textContent = "création…";
       try {
         const r = await apiFonction("creer_utilisateur", {
           email, nom: document.getElementById("nu-nom").value.trim() || null,
-          role: document.getElementById("nu-role").value,
+          role: roleChoisi,
           comptes_societes: societesChoisies,
         });
         etat.innerHTML = `Compte créé ✓ — mot de passe provisoire : <b>${r.mot_de_passe}</b>
