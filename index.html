@@ -860,10 +860,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787326646"></script>
-<script src="imports.js?v=1787326646"></script>
-<script src="merch-shopify.js?v=1787326646"></script>
-<script src="moteur-merch.js?v=1787326646"></script>
+<script src="config.js?v=1787326830"></script>
+<script src="imports.js?v=1787326830"></script>
+<script src="merch-shopify.js?v=1787326830"></script>
+<script src="moteur-merch.js?v=1787326830"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2549,6 +2549,7 @@ function rangCommandeAdmin(c) {
     <span class="fin">${quand} · ${echapperHTML(c.societe)} · ${c.nb_pieces} pièces · ${eur(Number(c.total_ht))} HT</span>
     <div style="width:100%; display:flex; gap:8px; margin-top:8px; align-items:center; flex-wrap:wrap">
       <button class="puce" onclick="basculerDetailCommande('${c.id}')">Détail</button>
+      <button class="puce" onclick="telechargerRecapCommande('${c.id}')">Télécharger (Excel)</button>
       <button class="puce" onclick="telechargerFichierCommande('${c.id}')">Fichier Fastmag</button>
       <button class="puce" onclick="renvoyerCommande('${c.id}')">${c.envoye_le ? "Renvoyer l'e-mail" : "Envoyer l'e-mail"}</button>
       <span class="compte-produits" id="cmd-etat-${c.id}"></span>
@@ -2573,6 +2574,40 @@ async function basculerDetailCommande(id) {
         <span class="fin">${l.quantite} × ${eur(Number(l.prix))} = ${eur(l.quantite * Number(l.prix))}</span>
       </div>`).join("")}</div>`
     : `<div class="compte-produits">Aucune ligne enregistrée.</div>`;
+}
+
+// Le récap lisible : la commande telle qu'on la lit, pas telle que Fastmag l'avale.
+// Généré depuis les lignes en base, sans passer par le serveur — clic, fichier.
+async function telechargerRecapCommande(id) {
+  const c = COMMANDES_ADMIN.find(x => x.id === id);
+  const etat = document.getElementById("cmd-etat-" + id);
+  etat.textContent = "préparation du récapitulatif…";
+  try {
+    const lignes = await api(`/rest/v1/commande_lignes?commande_id=eq.${id}`
+      + `&select=reference,couleur,taille,designation,quantite,prix&order=reference,taille`);
+    if (!lignes.length) { etat.textContent = "cette commande n'a aucune ligne"; return; }
+    const quand = new Date(c.cree_le).toLocaleString("fr-FR");
+    const csv = (v) => `"${String(v ?? "").replaceAll('"', '""')}"`;
+    const virgule = (n) => Number(n).toFixed(2).replace(".", ","); // Excel FR
+    const sortie = [
+      ["Commande", "Date", "Magasin", "Nom", "Statut", "Référence", "Couleur", "Taille",
+       "Désignation", "Quantité", "PU HT", "Total HT"].map(csv).join(";"),
+      ...lignes.map(l => [c.numero, quand, c.societe, c.nom || "", c.statut, l.reference,
+        l.couleur || "", l.taille, l.designation || "", l.quantite,
+        virgule(l.prix), virgule(l.quantite * Number(l.prix))].map(csv).join(";")),
+      ["", "", "", "", "", "", "", "", "TOTAL", c.nb_pieces, "",
+       virgule(Number(c.total_ht))].map(csv).join(";"),
+    ].join("\r\n");
+    // BOM : sans lui, Excel casse les accents ; les / du numéro ne passent pas dans un nom de fichier
+    const lien = document.createElement("a");
+    lien.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
+    lien.download = `Commande_${String(c.numero).replaceAll("/", "-")}.csv`;
+    lien.click();
+    URL.revokeObjectURL(lien.href);
+    etat.textContent = `récapitulatif téléchargé ✓ (${lignes.length} ligne${lignes.length > 1 ? "s" : ""})`;
+  } catch (e) {
+    etat.textContent = "échec : " + String(e.donnees?.erreur || e.message).slice(0, 200);
+  }
 }
 
 // Fastmag lit de l'ISO-8859-1 : tout caractère hors table devient « ? », comme dans le mail.
