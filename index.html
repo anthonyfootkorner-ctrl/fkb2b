@@ -833,10 +833,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787310364"></script>
-<script src="imports.js?v=1787310364"></script>
-<script src="merch-shopify.js?v=1787310364"></script>
-<script src="moteur-merch.js?v=1787310364"></script>
+<script src="config.js?v=1787310639"></script>
+<script src="imports.js?v=1787310639"></script>
+<script src="merch-shopify.js?v=1787310639"></script>
+<script src="moteur-merch.js?v=1787310639"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1983,12 +1983,16 @@ async function traiterFichierShopify(fichier) {
 
 let STOCKS_REFS = {}; // reference -> { total, tailles[] } (vue Merch Shopify)
 
+// Le merch Shopify parle du stock WEB (emplacement Duhamel) : rien à voir avec le stock
+// vendable du portail B2B. On lit donc stock_web, pas stock_disponible — cette dernière
+// suit source_stock() et ne montrait plus que le stock B2B.
+
 async function chargerStocksRefs(references) {
   STOCKS_REFS = {};
   for (let i = 0; i < references.length; i += 80) {
     const lot = references.slice(i, i + 80).map(r => '"' + r.replaceAll('"', "") + '"').join(",");
     const [rows, grilles] = await Promise.all([
-      api(`/rest/v1/stock_disponible?reference=in.(${encodeURIComponent(lot)})&select=reference,taille,disponible`).catch(() => []),
+      api(`/rest/v1/stock_web?reference=in.(${encodeURIComponent(lot)})&select=reference,taille,quantite`).catch(() => []),
       api(`/rest/v1/variantes?reference=in.(${encodeURIComponent(lot)})&select=reference,taille`).catch(() => []),
     ]);
     for (const g of grilles) {
@@ -1998,8 +2002,8 @@ async function chargerStocksRefs(references) {
     for (const r of rows) {
       const e = STOCKS_REFS[r.reference] ??= { total: 0, tailles: [], detail: [] };
       const d = e.detail.find(d => d.taille === r.taille);
-      if (d) d.stock = r.disponible; else e.detail.push({ taille: r.taille, stock: r.disponible });
-      if (r.disponible > 0) { e.total += r.disponible; e.tailles.push(r.taille); }
+      if (d) d.stock = r.quantite; else e.detail.push({ taille: r.taille, stock: r.quantite });
+      if (r.quantite > 0) { e.total += r.quantite; e.tailles.push(r.taille); }
     }
   }
 }
@@ -2007,7 +2011,7 @@ async function chargerStocksRefs(references) {
 function resumeShopify(reference) {
   const s = STOCKS_REFS[reference];
   if (!s || s.total === 0) {
-    return `<div class="ligne-info" style="color:#c0504d"><b>Épuisé (stock B2B Duhamel)</b></div>`
+    return `<div class="ligne-info" style="color:#c0504d"><b>Épuisé (stock web Duhamel)</b></div>`
       + lignesInfo(0, s?.detail || [], VENTES?.[reference]);
   }
   return lignesInfo(s.total, s.detail, VENTES?.[reference]);
