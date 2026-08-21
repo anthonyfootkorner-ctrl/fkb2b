@@ -632,6 +632,7 @@
       <span class="fil" onclick="location.hash='#/'">← ACCUEIL</span>
       <h1>CENTRE D'IMPORT</h1>
       <div class="compte-produits">Déposez un export Fastmag : le type est détecté automatiquement, la simulation montre ce qui sera fait, rien n'est écrit sans votre validation.</div>
+      <div id="etat-stock-b2b" style="margin-top:10px"></div>
     </div>
 
     <div class="bloc-clair" style="margin: 0 22px 26px">
@@ -832,10 +833,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787309832"></script>
-<script src="imports.js?v=1787309832"></script>
-<script src="merch-shopify.js?v=1787309832"></script>
-<script src="moteur-merch.js?v=1787309832"></script>
+<script src="config.js?v=1787310364"></script>
+<script src="imports.js?v=1787310364"></script>
+<script src="merch-shopify.js?v=1787310364"></script>
+<script src="moteur-merch.js?v=1787310364"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1788,7 +1789,7 @@ let importsInitialise = false;
 let analyseCourante = null;
 
 async function rendreImports() {
-  await rendreJournalImports();
+  await Promise.all([rendreJournalImports(), rendreEtatStockB2B()]);
   if (importsInitialise) return;
   importsInitialise = true;
   const zone = document.getElementById("zone-depot");
@@ -1800,6 +1801,24 @@ async function rendreImports() {
     e.preventDefault(); zone.style.borderColor = "#ccc";
     if (e.dataTransfer.files[0]) traiterFichier(e.dataTransfer.files[0]);
   };
+}
+
+// Le catalogue ne lit que le stock B2B : s'il est vide, tout s'affiche à 0 sans que rien
+// ne le signale ailleurs. On le dit ici, à l'endroit où on vient déposer les fichiers.
+async function rendreEtatStockB2B() {
+  const el = document.getElementById("etat-stock-b2b");
+  if (!el) return;
+  const [dispo, journal] = await Promise.all([
+    api("/rest/v1/stock_disponible?select=reference&limit=1").catch(() => null),
+    api("/rest/v1/journal_imports?modele=eq.stock_b2b&select=horodatage,fichier&order=horodatage.desc&limit=1").catch(() => []),
+  ]);
+  if (dispo === null) { el.innerHTML = ""; return; }
+  const d = journal[0];
+  const quand = d ? `${new Date(d.horodatage).toLocaleString("fr-FR")} · ${d.fichier}` : "origine inconnue";
+  el.innerHTML = dispo.length
+    ? `<div class="compte-produits">Stock du catalogue en place — dernier dépôt : ${quand}.</div>`
+    : `<div class="compte-produits" style="color:#a33"><b>Aucun stock B2B en base : le catalogue affiche 0 partout.</b>
+       Déposez un export stock B2B pour le rétablir${d ? ` (le dernier remonte au ${quand})` : ""}.</div>`;
 }
 
 async function rendreJournalImports() {
@@ -1841,7 +1860,7 @@ async function traiterFichier(fichier) {
       ${a.stats.reference_connue ? `<span class="chip grise">${a.stats.reference_connue} références reconnues</span>` : ""}
       ${a.stats.reference_inconnue ? `<span class="chip">${a.stats.reference_inconnue} références hors référentiel (ignorées par le catalogue)</span>` : ""}
       ${a.stats.decimales ? `<span class="chip grise">${a.stats.decimales} décimales converties</span>` : ""}
-      ${a.spec.remplacement_complet ? `<span class="chip">remplacement complet du stock + recalcul des actifs</span>` : ""}
+      ${a.spec.remplacement_complet ? `<span class="chip">${a.spec.remplacement_libelle || "remplacement complet du stock + recalcul des actifs"}</span>` : ""}
     </div>
     ${a.quarantaine.length ? `<div class="compte-produits" style="margin-top:10px">Quarantaine (extrait) :
       ${a.quarantaine.slice(0, 5).map(q => `ligne ${q.ligne} · ${q.valeur}`).join(" — ")}</div>` : ""}
@@ -1857,7 +1876,7 @@ async function traiterFichier(fichier) {
     try {
       const total = await executerImport(a, msg => progres.textContent = msg);
       progres.innerHTML = `<b>Import terminé ✓</b> — ${total} lignes écrites.`;
-      await rendreJournalImports();
+      await Promise.all([rendreJournalImports(), rendreEtatStockB2B()]);
       DATA.produits = await api("/rest/v1/rpc/catalogue",
         { corps: { limite: 300, p_societe: clientActif.id ?? null } });
       DATA.produits.forEach(trierTailles);

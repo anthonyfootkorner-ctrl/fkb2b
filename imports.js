@@ -25,10 +25,13 @@ const MODELES_IMPORT = {
     signature: ["CompteClient", "TarifVente", "Client", "AdrLivraison"],
   },
   stock_shopify: {
-    libelle: "Stock Shopify — emplacement Duhamel (stock B2B)",
+    // Ce dépôt alimente le stock WEB (Duhamel) qui sert au merch, PAS le stock vendable
+    // du catalogue B2B — le libellé disait l'inverse et a prêté à confusion le 21/08.
+    libelle: "Stock Shopify — emplacement Duhamel (stock web du merch)",
     sep: ",", encodage: "utf-8",
     signature: ["ID", "Handle", "Variant ID", "Option1 Value", "Inventory Available: Duhamel"],
     remplacement_complet: true,
+    remplacement_libelle: "remplace le stock web Duhamel — le catalogue B2B n'est pas touché",
   },
   ventes: {
     libelle: "Ventes quotidiennes (journal VENTE)",
@@ -77,7 +80,9 @@ function detecterStockB2B(tampon) {
       const preco = trouverColonne(entete, COLONNES_B2B.precommande);
       if (!ref || !(qte || preco)) continue;
       return { modele: "stock_b2b", texte, entete,
-        spec: { libelle: "Stock B2B (fichier Footkorner)", sep, encodage, remplacement_complet: true,
+        spec: { libelle: "Stock B2B (fichier Footkorner) — stock vendable du catalogue",
+                sep, encodage, remplacement_complet: true,
+                remplacement_libelle: "remplace le stock B2B du catalogue + recalcul des actifs",
                 colonnes: { ref, taille: trouverColonne(entete, COLONNES_B2B.taille), qte, preco } } };
     }
   }
