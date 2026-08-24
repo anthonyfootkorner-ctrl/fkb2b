@@ -982,10 +982,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787570255"></script>
-<script src="imports.js?v=1787570255"></script>
-<script src="merch-shopify.js?v=1787570255"></script>
-<script src="moteur-merch.js?v=1787570255"></script>
+<script src="config.js?v=1787572752"></script>
+<script src="imports.js?v=1787572752"></script>
+<script src="merch-shopify.js?v=1787572752"></script>
+<script src="moteur-merch.js?v=1787572752"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2001,20 +2001,75 @@ async function rendreCampagnesPreco() {
   if (!zone) return;
   const c = await api("/rest/v1/rpc/campagnes_precommande", { corps: {} }).catch(() => []);
   zone.innerHTML = (c || []).length
-    ? c.map(x => `<div class="rang">
+    ? c.map(x => `<div class="rang" style="flex-wrap:wrap">
         <b>${echapperHTML(x.campagne)}</b>
+        <span class="etiquette ${x.magasins && x.ouverte ? "ok" : "attente"}">${
+          !x.ouverte ? "FERMÉE" : x.magasins ? `${x.magasins} MAGASIN${x.magasins > 1 ? "S" : ""}` : "AUCUN ACCÈS"}</span>
         <span class="fin">${x.references} référence${x.references > 1 ? "s" : ""} · ${x.lignes} ligne${x.lignes > 1 ? "s" : ""}
           · ${Number(x.pieces || 0).toLocaleString("fr-FR")} pièces${x.illimitees ? ` · ${x.illimitees} en quantité libre` : ""}
-          · dernier dépôt ${new Date(x.derniere_maj).toLocaleString("fr-FR")}</span>
-        <button class="puce" style="margin-left:12px"
-                onclick="supprimerCampagnePreco(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")})">Supprimer</button>
+          ${x.derniere_maj ? `· dernier dépôt ${new Date(x.derniere_maj).toLocaleString("fr-FR")}` : ""}</span>
+        <div style="width:100%; display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:center">
+          <button class="puce-claire" onclick="ouvrirAccesCampagne(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")})">Magasins autorisés</button>
+          <button class="puce-claire" onclick="basculerOuvertureCampagne(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")}, ${!x.ouverte})">${x.ouverte ? "Fermer la campagne" : "Rouvrir la campagne"}</button>
+          <button class="puce-claire" onclick="supprimerCampagnePreco(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")})">Supprimer</button>
+          <span class="compte-produits" id="camp-etat-${encodeURIComponent(x.campagne)}"></span>
+        </div>
+        <div style="width:100%" id="camp-acces-${encodeURIComponent(x.campagne)}"></div>
       </div>`).join("")
     : `<div class="compte-produits">Aucune campagne pour le moment. Déposez un fichier de stock B2B en choisissant « Précommande ».</div>`;
 }
 
+// Une campagne n'est ouverte à personne tant qu'on n'a pas coché des magasins.
+async function ouvrirAccesCampagne(campagne) {
+  const zone = document.getElementById("camp-acces-" + encodeURIComponent(campagne));
+  if (zone.innerHTML) { zone.innerHTML = ""; return; }
+  zone.innerHTML = `<div class="compte-produits" style="padding:8px 0">Chargement des magasins…</div>`;
+  const [autorises, societes] = await Promise.all([
+    api("/rest/v1/rpc/acces_campagne", { corps: { p_campagne: campagne } }).catch(() => []),
+    api("/rest/v1/societes?select=compte,nom&order=compte").catch(() => []),
+  ]);
+  const choisis = new Set(autorises || []);
+  zone.innerHTML = `
+    <div style="margin:10px 0 4px" class="compte-produits">Cochez les magasins qui verront « ${echapperHTML(campagne)} » :</div>
+    <div style="max-height:260px; overflow:auto; border:1px solid var(--hairline); border-radius:10px; padding:10px">
+      ${(societes || []).map(x => `<label class="cmd-coche" style="padding:3px 0">
+        <input type="checkbox" data-compte="${echapperHTML(x.compte)}" ${choisis.has(x.compte) ? "checked" : ""}>
+        <span>${echapperHTML(x.nom || x.compte)} <span style="color:var(--encre2)">· ${echapperHTML(x.compte)}</span></span>
+      </label>`).join("")}
+    </div>
+    <div class="formu" style="margin-top:10px">
+      <button class="btn-noir" onclick="enregistrerAccesCampagne(${JSON.stringify(campagne).replaceAll('"', "&quot;")})">ENREGISTRER LES ACCÈS</button>
+      <span class="compte-produits" id="camp-acces-etat-${encodeURIComponent(campagne)}"></span>
+    </div>`;
+}
+
+async function enregistrerAccesCampagne(campagne) {
+  const zone = document.getElementById("camp-acces-" + encodeURIComponent(campagne));
+  const etat = document.getElementById("camp-acces-etat-" + encodeURIComponent(campagne));
+  const comptes = [...zone.querySelectorAll("input[type=checkbox]:checked")].map(i => i.dataset.compte);
+  etat.textContent = "enregistrement…";
+  try {
+    const n = await api("/rest/v1/rpc/definir_acces_campagne",
+      { corps: { p_campagne: campagne, p_comptes: comptes } });
+    etat.textContent = `${n} magasin${n > 1 ? "s" : ""} autorisé${n > 1 ? "s" : ""} ✓`;
+    await rendreCampagnesPreco();
+  } catch (e) {
+    etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 200);
+  }
+}
+
+async function basculerOuvertureCampagne(campagne, ouvrir) {
+  try {
+    await api("/rest/v1/rpc/ouvrir_campagne", { corps: { p_campagne: campagne, p_ouverte: ouvrir } });
+    await rendreCampagnesPreco();
+  } catch (e) {
+    alert("échec : " + String(e.donnees?.message || e.message).slice(0, 200));
+  }
+}
+
 async function supprimerCampagnePreco(campagne) {
   if (!confirm(`Supprimer toute la campagne « ${campagne} » ?\n\n`
-    + "Toutes les références déposées pour cette campagne disparaissent du portail. "
+    + "Toutes les références déposées et les accès magasins disparaissent. "
     + "Les commandes déjà passées ne sont pas touchées.")) return;
   try {
     const n = await api("/rest/v1/rpc/supprimer_campagne_precommande", { corps: { p_campagne: campagne } });
