@@ -441,6 +441,38 @@ async function executerImport(analyse, surProgres) {
   return total;
 }
 
+// Dépôt de précommande : même fichier que le stock B2B, mais rangé dans une campagne
+// et CUMULATIF — Anthony dépose marque par marque, rien n'est effacé entre deux dépôts.
+async function executerPrecommande(analyse, surProgres) {
+  const campagne = (document.getElementById("nom-campagne")?.value || "").trim();
+  if (!campagne) throw new Error("donnez un nom de campagne (ex. FW26) avant de déposer");
+
+  const { rows, precommandes, ignorees } = preparerStockB2B(analyse);
+  if (!rows.length) throw new Error("aucune ligne exploitable dans ce fichier");
+
+  let envoyees = 0;
+  for (let i = 0; i < rows.length; i += 2000) {
+    const lot = rows.slice(i, i + 2000);
+    await api("/rest/v1/rpc/precommande_lot", { corps: { p_campagne: campagne, p_rows: lot } });
+    envoyees += lot.length;
+    surProgres(`campagne ${campagne} : ${envoyees}/${rows.length} lignes…`);
+  }
+
+  const etat = (await api("/rest/v1/rpc/campagnes_precommande", { corps: {} }).catch(() => []))
+    .find(c => c.campagne === campagne);
+  const mots = [`${envoyees} ligne(s) déposée(s) dans « ${campagne} »`];
+  if (etat) mots.push(`la campagne compte maintenant ${etat.references} référence(s) et ${etat.lignes} ligne(s)`);
+  if (precommandes) mots.push(`${precommandes} en quantité libre`);
+  if (ignorees) mots.push(`${ignorees} ligne(s) ignorée(s) (sans référence ou quantité nulle)`);
+  surProgres("✓ " + mots.join(" · "));
+
+  await apiFonction("journal", { entree: {
+    fichier: `${analyse.fichier} → précommande ${campagne}`, modele: "precommande",
+    empreinte: analyse.empreinte, lignes_lues: analyse.lues, crees: envoyees, maj: 0, inchanges: 0,
+    quarantaine: analyse.quarantaine.length, statut: "OK" } });
+  return envoyees;
+}
+
 // Dépôt du stock B2B : préparation, envoi par lots, puis bascule côté serveur
 // (remplacement du stock, solde des commandes en attente, recalcul des actifs).
 async function executerStockB2B(analyse, surProgres) {

@@ -743,6 +743,13 @@
       <div id="rapport-import" style="margin-top:18px"></div>
     </div>
 
+    <div class="bloc-clair" style="margin: 0 22px 26px">
+      <h3 class="titre-bloc">Campagnes de précommande</h3>
+      <div class="compte-produits" style="margin-bottom:12px">Chaque campagne vit à part du stock vendable :
+        elle se remplit marque par marque et ne s'efface jamais toute seule.</div>
+      <div id="campagnes-preco"></div>
+    </div>
+
     <div class="bloc-clair" style="margin: 0 22px 60px">
       <h3 class="titre-bloc">Historique des imports</h3>
       <div id="journal-imports"></div>
@@ -975,10 +982,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787330244"></script>
-<script src="imports.js?v=1787330244"></script>
-<script src="merch-shopify.js?v=1787330244"></script>
-<script src="moteur-merch.js?v=1787330244"></script>
+<script src="config.js?v=1787570255"></script>
+<script src="imports.js?v=1787570255"></script>
+<script src="merch-shopify.js?v=1787570255"></script>
+<script src="moteur-merch.js?v=1787570255"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1957,7 +1964,7 @@ let importsInitialise = false;
 let analyseCourante = null;
 
 async function rendreImports() {
-  await Promise.all([rendreJournalImports(), rendreEtatStockB2B()]);
+  await Promise.all([rendreJournalImports(), rendreEtatStockB2B(), rendreCampagnesPreco()]);
   if (importsInitialise) return;
   importsInitialise = true;
   const zone = document.getElementById("zone-depot");
@@ -1989,6 +1996,35 @@ async function rendreEtatStockB2B() {
        Déposez un export stock B2B pour le rétablir${d ? ` (le dernier remonte au ${quand})` : ""}.</div>`;
 }
 
+async function rendreCampagnesPreco() {
+  const zone = document.getElementById("campagnes-preco");
+  if (!zone) return;
+  const c = await api("/rest/v1/rpc/campagnes_precommande", { corps: {} }).catch(() => []);
+  zone.innerHTML = (c || []).length
+    ? c.map(x => `<div class="rang">
+        <b>${echapperHTML(x.campagne)}</b>
+        <span class="fin">${x.references} référence${x.references > 1 ? "s" : ""} · ${x.lignes} ligne${x.lignes > 1 ? "s" : ""}
+          · ${Number(x.pieces || 0).toLocaleString("fr-FR")} pièces${x.illimitees ? ` · ${x.illimitees} en quantité libre` : ""}
+          · dernier dépôt ${new Date(x.derniere_maj).toLocaleString("fr-FR")}</span>
+        <button class="puce" style="margin-left:12px"
+                onclick="supprimerCampagnePreco(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")})">Supprimer</button>
+      </div>`).join("")
+    : `<div class="compte-produits">Aucune campagne pour le moment. Déposez un fichier de stock B2B en choisissant « Précommande ».</div>`;
+}
+
+async function supprimerCampagnePreco(campagne) {
+  if (!confirm(`Supprimer toute la campagne « ${campagne} » ?\n\n`
+    + "Toutes les références déposées pour cette campagne disparaissent du portail. "
+    + "Les commandes déjà passées ne sont pas touchées.")) return;
+  try {
+    const n = await api("/rest/v1/rpc/supprimer_campagne_precommande", { corps: { p_campagne: campagne } });
+    await rendreCampagnesPreco();
+    alert(`${n} ligne(s) supprimée(s).`);
+  } catch (e) {
+    alert("échec : " + String(e.donnees?.message || e.message).slice(0, 200));
+  }
+}
+
 async function rendreJournalImports() {
   const rows = await api("/rest/v1/journal_imports?select=horodatage,fichier,modele,lignes_lues,quarantaine,statut&order=horodatage.desc&limit=10").catch(() => []);
   document.getElementById("journal-imports").innerHTML = rows.length
@@ -1997,6 +2033,27 @@ async function rendreJournalImports() {
         <div class="fin" style="margin-left:auto; font-size:12px; color:var(--encre2)">
           ${j.lignes_lues} lignes · ${j.quarantaine} en quarantaine · ${j.statut}</div></div>`).join("")
     : `<div class="compte-produits">Aucun import pour le moment.</div>`;
+}
+
+// Le même fichier peut alimenter deux choses très différentes : on le fait dire à l'écran.
+function destinationImport() {
+  const choix = document.querySelector('input[name="destination-b2b"]:checked');
+  return choix ? choix.value : "stock";
+}
+
+function majDestinationImport() {
+  const preco = destinationImport() === "preco";
+  const bloc = document.getElementById("bloc-campagne");
+  if (bloc) bloc.style.display = preco ? "" : "none";
+  const btn = document.getElementById("btn-executer-import");
+  if (btn) btn.textContent = preco ? "AJOUTER À LA CAMPAGNE" : "EXÉCUTER L'IMPORT";
+}
+
+async function chargerCampagnesPreco() {
+  const liste = document.getElementById("liste-campagnes");
+  if (!liste) return;
+  const c = await api("/rest/v1/rpc/campagnes_precommande", { corps: {} }).catch(() => []);
+  liste.innerHTML = (c || []).map(x => `<option value="${echapperHTML(x.campagne)}">`).join("");
 }
 
 async function traiterFichier(fichier) {
@@ -2032,19 +2089,45 @@ async function traiterFichier(fichier) {
     </div>
     ${a.quarantaine.length ? `<div class="compte-produits" style="margin-top:10px">Quarantaine (extrait) :
       ${a.quarantaine.slice(0, 5).map(q => `ligne ${q.ligne} · ${q.valeur}`).join(" — ")}</div>` : ""}
-    ${deja.length ? `<div class="compte-produits" style="color:#a33; margin-top:12px">
+    ${a.modele === "stock_b2b" ? `
+      <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--hairline)">
+        <div class="titre-bloc" style="margin-bottom:10px">Où déposer ce fichier ?</div>
+        <div class="formu">
+          <label class="cmd-coche"><input type="radio" name="destination-b2b" value="stock" checked
+                 onchange="majDestinationImport()"> Stock B2B — <b>remplace tout</b> le stock vendable</label>
+          <label class="cmd-coche"><input type="radio" name="destination-b2b" value="preco"
+                 onchange="majDestinationImport()"> Précommande — <b>s'ajoute</b> à une campagne</label>
+        </div>
+        <div id="bloc-campagne" style="display:none; margin-top:12px">
+          <div class="formu">
+            <input class="qte-claire" style="width:260px; text-align:left" id="nom-campagne"
+                   list="liste-campagnes" placeholder="nom de la campagne (ex. FW26)">
+            <datalist id="liste-campagnes"></datalist>
+          </div>
+          <div class="compte-produits" style="margin-top:8px">Rien n'est effacé : déposez marque par marque,
+            chaque ligne (référence + taille) est corrigée si elle existe déjà dans cette campagne.</div>
+        </div>
+      </div>` : ""}
+    ${deja.length && a.modele !== "stock_b2b" ? `<div class="compte-produits" style="color:#a33; margin-top:12px">
         <b>Fichier déjà importé le ${new Date(deja[0].horodatage).toLocaleString("fr-FR")}</b> — réimport bloqué (anti-rejeu).</div>`
-      : `<div style="margin-top:14px; display:flex; gap:10px; align-items:center">
+      : `${deja.length ? `<div class="compte-produits" style="color:#a33; margin-top:12px">
+          <b>Ce fichier a déjà été déposé le ${new Date(deja[0].horodatage).toLocaleString("fr-FR")}.</b>
+          Le redéposer ne double rien — remplacement pour le stock, correction ligne à ligne pour une campagne —
+          mais vérifiez que c'est bien voulu.</div>` : ""}
+        <div style="margin-top:14px; display:flex; gap:10px; align-items:center">
         <button class="btn-noir" id="btn-executer-import">EXÉCUTER L'IMPORT</button>
         <span class="compte-produits" id="progres-import"></span></div>`}`;
+  if (a.modele === "stock_b2b") chargerCampagnesPreco();
   const btn = document.getElementById("btn-executer-import");
   if (btn) btn.onclick = async () => {
     btn.disabled = true;
     const progres = document.getElementById("progres-import");
     try {
-      const total = await executerImport(a, msg => progres.textContent = msg);
+      const total = a.modele === "stock_b2b" && destinationImport() === "preco"
+        ? await executerPrecommande(a, msg => progres.textContent = msg)
+        : await executerImport(a, msg => progres.textContent = msg);
       progres.innerHTML = `<b>Import terminé ✓</b> — ${total} lignes écrites.`;
-      await Promise.all([rendreJournalImports(), rendreEtatStockB2B()]);
+      await Promise.all([rendreJournalImports(), rendreEtatStockB2B(), rendreCampagnesPreco()]);
       DATA.produits = await api("/rest/v1/rpc/catalogue",
         { corps: { limite: 300, p_societe: clientActif.id ?? null } });
       DATA.produits.forEach(trierTailles);
