@@ -169,6 +169,38 @@
     .cmd-ligne .des { flex-basis: 100%; }
   }
 
+  /* Calendrier en tuiles : la photo porte, le voile rend le texte lisible. */
+  .cal-grille { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .cal-tuile { position: relative; border-radius: 14px; overflow: hidden; min-height: 260px;
+    background: #111 center/cover no-repeat; color: #fff; cursor: pointer;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    transition: transform 200ms var(--ease-out), box-shadow 200ms ease; }
+  .cal-tuile:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+  .cal-tuile::after { content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(10,10,10,.20) 0%, rgba(10,10,10,.55) 46%, rgba(10,10,10,.88) 100%); }
+  .cal-date { position: absolute; top: 0; left: 0; z-index: 2; background: #0a0a0a; color: #fff;
+    padding: 10px 14px 12px; text-align: center; border-bottom-right-radius: 12px; }
+  .cal-date .j { display: block; font-size: 26px; font-weight: 700; line-height: 1; }
+  .cal-date .m { display: block; font-size: 9.5px; letter-spacing: .18em; text-transform: uppercase;
+    color: #b9b9b9; margin-top: 4px; }
+  .cal-etat { position: absolute; top: 12px; right: 12px; z-index: 2; font-size: 9.5px;
+    letter-spacing: .12em; text-transform: uppercase; padding: 5px 10px; border-radius: 999px;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28); }
+  .cal-etat.chaud { background: rgba(242,117,31,.92); border-color: transparent; }
+  .cal-etat.froid { background: rgba(199,63,63,.88); border-color: transparent; }
+  .cal-corps { position: relative; z-index: 2; padding: 16px 16px 15px; }
+  .cal-corps .nom { font-size: 17px; font-weight: 700; letter-spacing: .02em; }
+  .cal-corps .sous { font-size: 11.5px; color: #d6d6d6; margin-top: 4px; }
+  .cal-corps .mot { font-size: 11.5px; color: #c9c9c9; margin-top: 8px; font-style: italic; }
+  .cal-corps .barre { height: 5px; background: rgba(255,255,255,.2); border-radius: 999px;
+    overflow: hidden; margin-top: 12px; }
+  .cal-corps .barre i { display: block; height: 100%; background: #f2751f; }
+  .cal-corps .chiffres { font-size: 11px; color: #e8e8e8; margin-top: 7px; display: flex;
+    justify-content: space-between; gap: 10px; }
+  @media (max-width: 1200px) { .cal-grille { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 900px)  { .cal-grille { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 700px)  { .cal-grille { grid-template-columns: 1fr; } .cal-tuile { min-height: 210px; } }
+
   .cal-jauge { display: flex; align-items: center; gap: 12px; padding: 6px 0; font-size: 12.5px; }
   .cal-jauge .titre { min-width: 110px; color: var(--encre); }
   .cal-jauge .barre { flex: 1; height: 7px; background: #ededea; border-radius: 999px; overflow: hidden; }
@@ -1025,10 +1057,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787573397"></script>
-<script src="imports.js?v=1787573397"></script>
-<script src="merch-shopify.js?v=1787573397"></script>
-<script src="moteur-merch.js?v=1787573397"></script>
+<script src="config.js?v=1787573982"></script>
+<script src="imports.js?v=1787573982"></script>
+<script src="merch-shopify.js?v=1787573982"></script>
+<script src="moteur-merch.js?v=1787573982"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2066,7 +2098,7 @@ async function rendreCampagnesPreco() {
           ${x.derniere_maj ? `· dernier dépôt ${new Date(x.derniere_maj).toLocaleString("fr-FR")}` : ""}</span>
         <div style="width:100%; display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:center">
           <button class="puce-claire" onclick="ouvrirAccesCampagne(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")})">Magasins &amp; budgets</button>
-          <button class="puce-claire" onclick="ouvrirDatesCampagne(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")}, ${JSON.stringify(x.deadline || "")}, ${JSON.stringify(x.livraison_prevue || "")}, ${JSON.stringify(x.note || "")})">Dates &amp; note</button>
+          <button class="puce-claire" onclick="ouvrirDatesCampagne(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")}, ${JSON.stringify(x.deadline || "")}, ${JSON.stringify(x.livraison_prevue || "")}, ${JSON.stringify(x.note || "")}, ${JSON.stringify(x.image || "")})">Dates, visuel &amp; note</button>
           <button class="puce-claire" onclick="basculerOuvertureCampagne(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")}, ${!x.ouverte})">${x.ouverte ? "Fermer la campagne" : "Rouvrir la campagne"}</button>
           <button class="puce-claire" onclick="supprimerCampagnePreco(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")})">Supprimer</button>
           <span class="compte-produits" id="camp-etat-${encodeURIComponent(x.campagne)}"></span>
@@ -2077,7 +2109,7 @@ async function rendreCampagnesPreco() {
 }
 
 // Deadline de prise de commande, livraison annoncée, mot d'accompagnement.
-function ouvrirDatesCampagne(campagne, deadline, livraison, note) {
+function ouvrirDatesCampagne(campagne, deadline, livraison, note, image) {
   const zone = document.getElementById("camp-acces-" + encodeURIComponent(campagne));
   if (zone.dataset.mode === "dates") { zone.innerHTML = ""; zone.dataset.mode = ""; return; }
   zone.dataset.mode = "dates";
@@ -2091,9 +2123,43 @@ function ouvrirDatesCampagne(campagne, deadline, livraison, note) {
     <div class="formu" style="margin-top:10px">
       <input class="qte-claire" style="width:420px; text-align:left" id="camp-note"
              placeholder="mot affiché aux magasins (facultatif)" value="${echapperHTML(note || "")}">
+    </div>
+    <div class="formu" style="margin-top:12px; align-items:flex-start">
+      <div>
+        <div class="compte-produits" style="margin-bottom:6px">Visuel de la campagne (affiché en fond dans le calendrier)</div>
+        <input type="file" id="camp-image-fichier" accept="image/*" style="font-size:12px"
+               onchange="deposerImageCampagne(${JSON.stringify(campagne).replaceAll('"', "&quot;")})">
+        <input class="qte-claire" style="width:420px; text-align:left; margin-top:8px; display:block"
+               id="camp-image" placeholder="ou collez l'adresse d'une image" value="${echapperHTML(image || "")}">
+      </div>
+      <img id="camp-image-apercu" src="${echapperHTML(image || "")}" alt=""
+           style="${image ? "" : "display:none;"} width:150px; height:100px; object-fit:cover; border-radius:10px; border:1px solid var(--hairline)">
+    </div>
+    <div class="formu" style="margin-top:12px">
       <button class="btn-noir" onclick="enregistrerDatesCampagne(${JSON.stringify(campagne).replaceAll('"', "&quot;")})">ENREGISTRER</button>
       <span class="compte-produits" id="camp-dates-etat"></span>
     </div>`;
+}
+
+// L'image part dans le bucket « campagnes » (public) : le portail l'affiche telle quelle.
+async function deposerImageCampagne(campagne) {
+  const champ = document.getElementById("camp-image-fichier");
+  const etat = document.getElementById("camp-dates-etat");
+  const fichier = champ.files[0];
+  if (!fichier) return;
+  if (fichier.size > 5 * 1024 * 1024) { etat.textContent = "image trop lourde (5 Mo maximum)"; return; }
+  etat.textContent = "dépôt de l'image…";
+  try {
+    const ext = (fichier.name.split(".").pop() || "jpg").toLowerCase();
+    const nom = `${campagne.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase()}-${Date.now()}.${ext}`;
+    const url = await envoyerFichier("campagnes", nom, fichier);
+    document.getElementById("camp-image").value = url;
+    const apercu = document.getElementById("camp-image-apercu");
+    apercu.src = url; apercu.style.display = "";
+    etat.textContent = "image déposée — n'oubliez pas d'enregistrer";
+  } catch (e) {
+    etat.textContent = "échec du dépôt : " + String(e.message).slice(0, 180);
+  }
 }
 
 async function enregistrerDatesCampagne(campagne) {
@@ -2104,7 +2170,8 @@ async function enregistrerDatesCampagne(campagne) {
       p_campagne: campagne,
       p_deadline: document.getElementById("camp-deadline").value || null,
       p_livraison: document.getElementById("camp-livraison").value || null,
-      p_note: document.getElementById("camp-note").value || null } });
+      p_note: document.getElementById("camp-note").value || null,
+      p_image: document.getElementById("camp-image").value || null } });
     etat.textContent = "enregistré ✓";
     await rendreCampagnesPreco();
   } catch (e) {
@@ -2974,44 +3041,45 @@ async function rendreCalendrier() {
   const lignes = await api("/rest/v1/rpc/calendrier_precommande",
     { corps: { p_societe: clientActif?.id ?? null } }).catch(() => []);
   if (!(lignes || []).length) {
+    zone.className = "";
     zone.innerHTML = `<div class="cmd-carte" style="color:var(--encre2)">Aucune campagne en cours.</div>`;
     return;
   }
-  zone.innerHTML = lignes.map(c => {
-    const budget = Number(c.budget || 0), engage = Number(c.engage || 0);
-    const part = budget > 0 ? Math.min(engage / budget, 1) : 0;
-    const reste = c.jours_restants;
-    const urgence = reste === null || reste === undefined ? ""
-      : reste < 0 ? "alerte" : reste <= 7 ? "attente" : "ok";
-    return `<div class="cmd-carte">
-      <div class="cmd-tete">
-        <span class="cmd-num">${echapperHTML(c.campagne)}</span>
-        ${c.deadline ? `<span class="badge-c ${urgence}">${
-          reste < 0 ? `clôturée depuis ${-reste} j` : reste === 0 ? "dernier jour" : `J−${reste}`}</span>` : ""}
-        <span class="cmd-montant">${budget ? eur(budget) : "budget non fixé"}</span>
-      </div>
-      <div class="cmd-meta">
-        ${c.deadline ? `Date limite <b>${new Date(c.deadline).toLocaleDateString("fr-FR")}</b>` : "Sans date limite"}
-        ${c.livraison_prevue ? ` · livraison ${new Date(c.livraison_prevue).toLocaleDateString("fr-FR")}` : ""}
-        · ${c.references} référence${c.references > 1 ? "s" : ""}
-      </div>
-      ${budget ? `<div style="margin-top:12px">
-        <div class="cal-jauge">
-          <span class="titre">Déjà engagé</span>
-          <span class="barre"><i style="width:${Math.round(part * 100)}%"></i></span>
-          <span class="chiffres">${eur(engage)} sur ${eur(budget)}</span>
-        </div>
-        <div class="compte-produits">${engage > budget
-          ? `Dépassement de ${eur(engage - budget)}`
-          : `Reste ${eur(budget - engage)} · ${c.commandes} commande${c.commandes > 1 ? "s" : ""} passée${c.commandes > 1 ? "s" : ""}`}</div>
-      </div>` : `<div class="compte-produits" style="margin-top:10px">${
-          engage ? `${eur(engage)} déjà engagé · ${c.commandes} commande(s)` : "Aucune commande passée"}</div>`}
-      ${c.note ? `<div class="cmd-note mot">${echapperHTML(c.note)}</div>` : ""}
-      <div class="cmd-actions">
-        <button class="puce-claire forte" onclick="location.hash='#/precommande/${encodeURIComponent(c.campagne)}'">Voir la campagne</button>
-      </div>
-    </div>`;
-  }).join("");
+  zone.className = "cal-grille";
+  zone.innerHTML = lignes.map(tuileCalendrier).join("");
+}
+
+// Une tuile = une campagne : sa photo en fond, sa date en pastille, son budget en bas.
+function tuileCalendrier(c) {
+  const budget = Number(c.budget || 0), engage = Number(c.engage || 0);
+  const part = budget > 0 ? Math.min(engage / budget, 1) : 0;
+  const reste = c.jours_restants;
+  const etat = reste === null || reste === undefined ? "sans date limite"
+    : reste < 0 ? "clôturée" : reste === 0 ? "dernier jour" : `J−${reste}`;
+  const ton = reste === null || reste === undefined ? "" : reste < 0 ? "froid" : reste <= 7 ? "chaud" : "";
+  const d = c.deadline ? new Date(c.deadline) : null;
+  const jour = d ? String(d.getDate()).padStart(2, "0") : "—";
+  const mois = d ? d.toLocaleDateString("fr-FR", { month: "short" }) : "";
+  const fond = c.image ? `background-image:url('${encodeURI(c.image)}')` : "";
+  const chiffres = budget
+    ? `<div class="barre"><i style="width:${Math.round(part * 100)}%"></i></div>
+       <div class="chiffres"><span>${eur(engage)} engagés</span>
+         <span>${engage > budget ? `dépassement ${eur(engage - budget)}` : `reste ${eur(budget - engage)}`}</span></div>`
+    : `<div class="chiffres" style="margin-top:12px"><span>${engage ? `${eur(engage)} engagés` : "aucune commande"}</span>
+         <span>budget non fixé</span></div>`;
+  return `<div class="cal-tuile" style="${fond}"
+       onclick="location.hash='#/precommande/${encodeURIComponent(c.campagne)}'">
+    <div class="cal-date"><span class="j">${jour}</span><span class="m">${mois}</span></div>
+    <div class="cal-etat ${ton}">${etat}</div>
+    <div class="cal-corps">
+      <div class="nom">${echapperHTML(c.campagne)}</div>
+      <div class="sous">${c.livraison_prevue
+        ? `Livraison ${new Date(c.livraison_prevue).toLocaleDateString("fr-FR")}` : "Livraison à préciser"}
+        · ${c.references} référence${c.references > 1 ? "s" : ""}</div>
+      ${c.note ? `<div class="mot">${echapperHTML(c.note)}</div>` : ""}
+      ${chiffres}
+    </div>
+  </div>`;
 }
 
 /* ---------------- tableau de bord (interne) ---------------- */

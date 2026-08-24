@@ -60,6 +60,26 @@ async function api(chemin, { corps, methode, jwt } = {}) {
   return donnees;
 }
 
+// Dépôt d'un fichier dans un bucket public (visuels de campagne). Renvoie l'URL publique.
+async function envoyerFichier(bucket, chemin, fichier) {
+  const session = await sessionValide();
+  const rep = await fetch(`${FKB2B.url}/storage/v1/object/${bucket}/${encodeURIComponent(chemin)}`, {
+    method: "POST",
+    headers: {
+      "apikey": FKB2B.cle,
+      "Authorization": `Bearer ${session.access_token}`,
+      "Content-Type": fichier.type || "application/octet-stream",
+      "x-upsert": "true",
+    },
+    body: fichier,
+  });
+  if (!rep.ok) {
+    const texte = await rep.text();
+    throw new Error(texte.slice(0, 200) || `dépôt refusé (${rep.status})`);
+  }
+  return `${FKB2B.url}/storage/v1/object/public/${bucket}/${encodeURIComponent(chemin)}`;
+}
+
 // Lecture complète d'une table/vue en pages de 1000 (PostgREST plafonne chaque réponse).
 async function apiTout(chemin) {
   const tout = [];
