@@ -169,6 +169,12 @@
     .cmd-ligne .des { flex-basis: 100%; }
   }
 
+  .cal-jauge { display: flex; align-items: center; gap: 12px; padding: 6px 0; font-size: 12.5px; }
+  .cal-jauge .titre { min-width: 110px; color: var(--encre); }
+  .cal-jauge .barre { flex: 1; height: 7px; background: #ededea; border-radius: 999px; overflow: hidden; }
+  .cal-jauge .barre i { display: block; height: 100%; background: #f2751f; border-radius: 999px; }
+  .cal-jauge .chiffres { color: var(--encre2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
   .recap-chiffres { display: flex; gap: 34px; flex-wrap: wrap; padding: 2px 0 20px; }
   .recap-chiffre b { display: block; font-size: 22px; font-weight: 700; }
   .recap-chiffre span { font-size: 10.5px; color: var(--encre2); letter-spacing: .14em; text-transform: uppercase; }
@@ -274,7 +280,8 @@
   .col-tete .fil { font-size: 10.5px; letter-spacing: .18em; color: var(--encre2); text-transform: uppercase; cursor: pointer; }
   .col-tete h1 { font-size: clamp(26px, 5vw, 44px); font-weight: 300; letter-spacing: .14em; margin-top: 10px; }
   .col-tete h1 b { font-weight: 800; }
-  .col-tete .compte-produits { font-size: 12px; color: var(--encre2); margin-top: 8px; letter-spacing: .05em; }
+  .compte-produits { font-size: 12.5px; color: var(--encre2); letter-spacing: .04em; }
+  .col-tete .compte-produits { font-size: 12px; margin-top: 8px; letter-spacing: .05em; }
   .col-filtres { display: flex; gap: 8px; padding: 0 22px 20px; flex-wrap: wrap; }
   .puce-claire { border: 1px solid #d8d8d5; background: transparent; color: var(--encre2); border-radius: 999px;
     padding: 7px 15px; font-size: 12px; cursor: pointer; letter-spacing: .06em;
@@ -1018,10 +1025,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787573118"></script>
-<script src="imports.js?v=1787573118"></script>
-<script src="merch-shopify.js?v=1787573118"></script>
-<script src="moteur-merch.js?v=1787573118"></script>
+<script src="config.js?v=1787573397"></script>
+<script src="imports.js?v=1787573397"></script>
+<script src="merch-shopify.js?v=1787573397"></script>
+<script src="moteur-merch.js?v=1787573397"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2989,11 +2996,10 @@ async function rendreCalendrier() {
         · ${c.references} référence${c.references > 1 ? "s" : ""}
       </div>
       ${budget ? `<div style="margin-top:12px">
-        <div class="bo-rang" style="border:0; padding:4px 0">
-          <span class="nom" style="min-width:120px">Déjà engagé</span>
-          <span class="jauge" style="flex:1; height:6px; background:#eeeeeb; border-radius:999px; overflow:hidden">
-            <i style="display:block; height:100%; width:${Math.round(part * 100)}%; background:#f2751f"></i></span>
-          <span class="val" style="color:var(--encre2)">${eur(engage)} sur ${eur(budget)}</span>
+        <div class="cal-jauge">
+          <span class="titre">Déjà engagé</span>
+          <span class="barre"><i style="width:${Math.round(part * 100)}%"></i></span>
+          <span class="chiffres">${eur(engage)} sur ${eur(budget)}</span>
         </div>
         <div class="compte-produits">${engage > budget
           ? `Dépassement de ${eur(engage - budget)}`
