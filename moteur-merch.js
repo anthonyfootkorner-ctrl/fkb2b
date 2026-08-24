@@ -37,6 +37,7 @@ function scoreTailles(p) {
   if (dispo.length > 1 && concentration > 0.7) pts *= 0.75;
 
   return { pts: Math.max(0, Math.min(25, pts)), tauxCoeur,
+           tauxGrille: dispo.length / Math.max(total, 1),
            monoTaille: dispo.length === 1, sansCoeur,
            fragmentee: total >= 4 && dispo.length / total < 0.5,
            presqueEpuise: stockTotal <= 3, stockTotal };
@@ -113,6 +114,7 @@ function scorerProduit(p, ventes) {
   return { reference: p.reference, produit: p, score: Math.round(Math.min(100, score)),
            statut, q7, q30, alertes, degrade,
            bandeCoeur: Math.round(st.tauxCoeur * 10),
+           tauxCoeurBrut: st.tauxCoeur, tauxGrille: st.tauxGrille,
            ventesCle: (q7 * 2 + q30) * facteurSaison + (rangSaison >= 0 && rangSaison <= 1 ? 5 : 0),
            ventesBrutes: q7 * 2 + q30,
            rangSaison: rangSaison < 0 ? 9 : Math.min(rangSaison, 9),
@@ -188,6 +190,84 @@ function raisonDuo(a, b, types) {
   return morceaux.join(" · ") + ` — scores ${a.score} et ${b.score}.`;
 }
 
+// --- tri sur mesure : jauges d'importance (0 = critère ignoré) ---
+// Chaque critère est ramené sur une échelle 0-1 comparable *à l'intérieur de la collection
+// travaillée* (rang centile pour les ventes/stock/nouveauté, qui sont très étalés ; ratio
+// direct pour les tailles). Le score est la moyenne pondérée : seul le poids RELATIF compte,
+// « ventes 7 j 10 / stock 5 » donne le même classement que « 6 / 3 ».
+const CRITERES_JAUGES = [
+  { cle: "nouveaute", nom: "Nouveauté",     aide: "date de mise en ligne Shopify (à défaut : fraîcheur de la saison)" },
+  { cle: "ventes7",   nom: "Ventes 7 j",    aide: "quantités vendues sur les 7 derniers jours" },
+  { cle: "ventes30",  nom: "Ventes 30 j",   aide: "quantités vendues sur les 30 derniers jours" },
+  { cle: "stock",     nom: "Stock",         aide: "quantité totale disponible (Duhamel)" },
+  { cle: "grille",    nom: "Tailles dispo", aide: "tailles en stock ÷ tailles du produit" },
+  { cle: "coeur",     nom: "Tailles cœur",  aide: "S/M/L en textile, tiers central de la grille en chaussure" },
+  { cle: "promo",     nom: "Promotion",     aide: "% de remise affiché (50 % et plus = maximum)" },
+];
+const POIDS_DEFAUT = { nouveaute: 5, ventes7: 5, ventes30: 2, stock: 2, grille: 3, coeur: 8, promo: 0 };
+
+// rang centile d'une valeur dans une série (ex æquo = même rang moyen) : 0 = la plus basse,
+// 1 = la plus haute. Robuste aux séries très déséquilibrées (beaucoup de zéros de ventes).
+function centileur(valeurs) {
+  const tries = [...valeurs].sort((a, b) => a - b), n = tries.length;
+  return v => {
+    if (n <= 1) return 1;
+    let lo = 0, hi = n;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (tries[m] < v) lo = m + 1; else hi = m; }
+    let lo2 = lo, hi2 = n;
+    while (lo2 < hi2) { const m = (lo2 + hi2) >> 1; if (tries[m] <= v) lo2 = m + 1; else hi2 = m; }
+    return ((lo + lo2 - 1) / 2) / (n - 1);
+  };
+}
+
+// « fraîcheur » d'un produit : date de création Shopify quand on l'a ; sinon la date médiane
+// des produits de la même saison (le produit se range au milieu de ses contemporains).
+function datesDeReference(notes) {
+  const parSaison = {};
+  for (const n of notes) {
+    const t = n.creation ? Date.parse(n.creation) : NaN;
+    if (!isNaN(t)) (parSaison[n.rangSaison] ??= []).push(t);
+  }
+  const median = {};
+  for (const [r, ts] of Object.entries(parSaison)) {
+    ts.sort((a, b) => a - b);
+    median[r] = ts[Math.floor(ts.length / 2)];
+  }
+  const connus = Object.values(median);
+  const plancher = connus.length ? Math.min(...connus) : 0;
+  return n => {
+    const t = n.creation ? Date.parse(n.creation) : NaN;
+    if (!isNaN(t)) return t;
+    // pas de date : médiane de sa saison, à défaut on la place derrière tout le monde
+    return median[n.rangSaison] ?? plancher - (n.rangSaison + 1) * 86400000;
+  };
+}
+
+function appliquerJauges(notes, poids) {
+  const p = { ...POIDS_DEFAUT, ...(poids || {}) };
+  const total = CRITERES_JAUGES.reduce((s, c) => s + Math.max(0, p[c.cle] || 0), 0);
+  if (!notes.length || !total) return false;   // toutes les jauges à zéro : rien à trier
+  const dateDe = datesDeReference(notes);
+  const cNouv = centileur(notes.map(dateDe));
+  const c7 = centileur(notes.map(n => n.q7));
+  const c30 = centileur(notes.map(n => n.q30));
+  const cStock = centileur(notes.map(n => n.stockTotal));
+  for (const n of notes) {
+    const v = {
+      nouveaute: cNouv(dateDe(n)),
+      ventes7: c7(n.q7),
+      ventes30: c30(n.q30),
+      stock: cStock(n.stockTotal),
+      grille: n.tauxGrille ?? 0,
+      coeur: n.tauxCoeurBrut ?? 0,
+      promo: Math.min(1, (n.promo || 0) / 50),
+    };
+    n.jauges = v;
+    n.scorePerso = CRITERES_JAUGES.reduce((s, c) => s + Math.max(0, p[c.cle] || 0) * v[c.cle], 0) / total;
+  }
+  return true;
+}
+
 // --- classement complet : scores, rotation, duos ---
 // Profils de tri : même moteur, priorités différentes. Les dégradés restent toujours en queue.
 const PROFILS_TRI = {
@@ -197,23 +277,33 @@ const PROFILS_TRI = {
   promotions: (x, y) => (Math.floor(y.promo / 10) - Math.floor(x.promo / 10)) || (y.ventesCle - x.ventesCle) || (y.bandeCoeur - x.bandeCoeur),
   // Tri antho : tailles cœur → date de création (approchée par la saison tant que
   // Created At manque à l'export) → ventes brutes → stock total
+  // Tri sur mesure : score pondéré par les jauges, départage par les tailles cœur
+  perso: (x, y) => (y.scorePerso - x.scorePerso) || (y.bandeCoeur - x.bandeCoeur),
   antho: (x, y) => (y.bandeCoeur - x.bandeCoeur)
     || (x.creation !== y.creation ? (y.creation > x.creation ? 1 : -1) : (x.rangSaison - y.rangSaison))
     || (y.ventesBrutes - x.ventesBrutes) || (y.stockTotal - x.stockTotal),
 };
 
-function classementAutomatique(produits, ventes, profil = "equilibre", decalage = 0) {
+function classementAutomatique(produits, ventes, profil = "equilibre", decalage = 0, options = {}) {
   let notes = produits.map(p => scorerProduit(p, ventes)).filter(Boolean);
-  const cmp = PROFILS_TRI[profil] || PROFILS_TRI.equilibre;
-  notes.sort((x, y) => ((x.degrade ? 1 : 0) - (y.degrade ? 1 : 0)) || cmp(x, y));
+  let cmp = PROFILS_TRI[profil] || PROFILS_TRI.equilibre;
+  // tri sur mesure : si toutes les jauges sont à zéro, on retombe sur le profil équilibré
+  if (profil === "perso" && !appliquerJauges(notes, options.poids)) cmp = PROFILS_TRI.equilibre;
+  const relegue = options.relegueDegrades !== false;
+  notes.sort((x, y) => (relegue ? (x.degrade ? 1 : 0) - (y.degrade ? 1 : 0) : 0) || cmp(x, y));
   // le score affiché reflète exactement le rang du tri (n° 1 = 100) : plus jamais de
   // contradiction score/position. Seuls les partenaires de duo peuvent l'entrecouper.
   notes.forEach((n, i) => {
     n.score = Math.max(1, 100 - Math.round((95 * i) / Math.max(notes.length - 1, 1)));
   });
 
-  // duos
+  // appairage
   const duos = [];
+  // mode « sans duos » : chaque produit occupe sa propre case, l'ordre est celui du tri
+  if (options.duos === false) {
+    for (const n of notes) duos.push({ seul: n, simple: true });
+    return rendreClassement(duos, produits);
+  }
   const restants = [...notes];
   const refsRestantes = new Set(restants.map(n => n.reference));
   let marquesConsecutives = [];
@@ -281,7 +371,11 @@ function classementAutomatique(produits, ventes, profil = "equilibre", decalage 
     if (marquesConsecutives.length > 2) marquesConsecutives.shift();
   }
 
-  // rapport JSON conforme à la spécification
+  return rendreClassement(duos, produits);
+}
+
+// --- rapport JSON conforme à la spécification, ordre et scores ---
+function rendreClassement(duos, produits) {
   const rapport = [];
   let pos = 1;
   for (let i = 0; i < duos.length; i++) {
@@ -291,8 +385,9 @@ function classementAutomatique(produits, ventes, profil = "equilibre", decalage 
         score_produit_1: d.seul.score, statut_produit_1: d.seul.statut,
         position_produit_2: null, identifiant_produit_2: null, score_produit_2: null, statut_produit_2: null,
         score_duo: d.seul.score, types_rapprochement: ["DUO_PAR_DEFAUT"],
-        raison_duo: d.cale ? "produit seul : complète la ligne de la zone figée pour caler les duos"
-                           : "produit restant (nombre impair)",
+        raison_duo: d.simple ? "appairage désactivé : classement au score seul"
+          : d.cale ? "produit seul : complète la ligne de la zone figée pour caler les duos"
+                   : "produit restant (nombre impair)",
         alerte: d.seul.alertes.join(" ; ") || null });
       pos += 1;
       continue;

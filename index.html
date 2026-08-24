@@ -603,7 +603,25 @@
     html { scroll-behavior: auto; }
     .panier, .tuile img, .carte img { transition-duration: 0ms; }
   }
-</style>
+
+    /* Tri sur mesure : jauges d'importance des critères */
+    .panneau-jauges { margin-top: 14px; padding: 16px 18px; background: #fafaf8;
+      border: 1px solid var(--hairline); border-radius: 14px; color: var(--encre); }
+    .panneau-jauges .entete { font-size: 12px; color: var(--encre2); margin-bottom: 12px; max-width: 780px; line-height: 1.5; }
+    .panneau-jauges .entete b { color: var(--encre); }
+    .panneau-jauges .rangee { display: flex; gap: 18px; flex-wrap: wrap; }
+    .panneau-jauges .jauge { width: 168px; }
+    .panneau-jauges .jauge label { display: flex; justify-content: space-between;
+      font-size: 12px; font-weight: 600; color: var(--encre); margin-bottom: 2px; }
+    .panneau-jauges .jauge label b { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .panneau-jauges .jauge.eteinte label, .panneau-jauges .jauge.eteinte label b { color: #a8a8a3; }
+    .panneau-jauges input[type=range] { width: 100%; accent-color: #111; margin: 0; }
+    .panneau-jauges .pied { display: flex; align-items: center; gap: 14px;
+      flex-wrap: wrap; margin-top: 14px; font-size: 12px; color: var(--encre2); }
+    .panneau-jauges .pied label { display: flex; align-items: center; gap: 6px;
+      cursor: pointer; color: var(--encre); }
+    .panneau-jauges .pied input[type=checkbox] { accent-color: #111; }
+  </style>
 </head>
 <body>
 <header>
@@ -715,12 +733,13 @@
         <button class="puce-claire" id="btn-tri-recent">Tri : du plus récent au plus ancien</button>
         <button class="btn-noir" id="btn-merch-sauver">ENREGISTRER L'ORDRE</button>
         <button class="puce-claire" id="btn-merch-reinit">Effacer l'ordre de ce périmètre</button>
-        <select class="qte-claire" id="merch-profil" style="width:190px; text-align:left"><option value="equilibre">Profil : équilibré</option><option value="nouveautes">Profil : nouveautés d'abord</option><option value="ventes">Profil : meilleures ventes</option><option value="promotions">Profil : promotions</option><option value="antho">Tri antho</option></select>
-        <button class="puce-claire" id="btn-auto-b2b" style="border-color:#111; font-weight:600">⚡ Classement auto (duos)</button>
+        <select class="qte-claire" id="merch-profil" style="width:190px; text-align:left"><option value="equilibre">Profil : équilibré</option><option value="nouveautes">Profil : nouveautés d'abord</option><option value="ventes">Profil : meilleures ventes</option><option value="promotions">Profil : promotions</option><option value="antho">Tri antho</option><option value="perso">Tri sur mesure (jauges)</option></select>
+        <select class="qte-claire" id="merch-duos" style="width:190px; text-align:left" title="Duos : les produits sont appairés 2 par 2 (haut+bas, coloris du même modèle, associés Shopify). Sans duos : classement au score, un produit après l'autre."><option value="duos">Affichage : en duos</option><option value="simple">Affichage : sans duos</option></select><button class="puce-claire" id="btn-auto-b2b" style="border-color:#111; font-weight:600">⚡ Classement auto</button>
         <button class="puce-claire" id="btn-rapport-b2b" style="display:none">Rapport JSON</button>
         <button class="puce-claire" onclick="location.hash='#/merch-shopify'" style="border-color:#95bf47; color:#5e8e3e">Merch Shopify (collections) →</button>
         <span class="compte-produits" id="merch-etat" style="margin:0"></span>
       </div>
+      <div id="jauges-merch" class="panneau-jauges" style="display:none"></div>
       <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; align-items:center">
         <span class="compte-produits" style="margin:0" id="merch-selection-info">Cochez des produits : déplacements groupés ci-dessous, et les cochés gardent leur position lors des tris ⚡ :</span>
         <button class="puce-claire" id="btn-sel-haut">⭱ Tout en haut</button>
@@ -756,12 +775,13 @@
         <button class="puce-claire" id="btn-shopify-bas">⭳ Tout en bas</button>
         <input class="qte-claire" id="shopify-position" type="number" min="1" placeholder="n°" style="width:70px">
         <button class="puce-claire" id="btn-shopify-pos">→ À cette position</button>
-        <select class="qte-claire" id="shopify-profil" style="width:190px; text-align:left"><option value="equilibre">Profil : équilibré</option><option value="nouveautes">Profil : nouveautés d'abord</option><option value="ventes">Profil : meilleures ventes</option><option value="promotions">Profil : promotions</option><option value="antho">Tri antho</option></select>
-        <button class="puce-claire" id="btn-auto-shopify" style="border-color:#111; font-weight:600">⚡ Classement auto (duos)</button>
+        <select class="qte-claire" id="shopify-profil" style="width:190px; text-align:left"><option value="equilibre">Profil : équilibré</option><option value="nouveautes">Profil : nouveautés d'abord</option><option value="ventes">Profil : meilleures ventes</option><option value="promotions">Profil : promotions</option><option value="antho">Tri antho</option><option value="perso">Tri sur mesure (jauges)</option></select>
+        <select class="qte-claire" id="shopify-duos" style="width:190px; text-align:left" title="Duos : les produits sont appairés 2 par 2 (haut+bas, coloris du même modèle, associés Shopify). Sans duos : classement au score, un produit après l'autre."><option value="duos">Affichage : en duos</option><option value="simple">Affichage : sans duos</option></select><button class="puce-claire" id="btn-auto-shopify" style="border-color:#111; font-weight:600">⚡ Classement auto</button>
         <button class="puce-claire" id="btn-rapport-shopify" style="display:none">Rapport JSON</button>
         <button class="btn-noir" id="btn-shopify-export">TÉLÉCHARGER LE CSV POUR MATRIXIFY</button>
         <span class="compte-produits" id="etat-shopify"></span>
       </div>
+      <div id="jauges-shopify" class="panneau-jauges" style="display:none"></div>
     </div>
     <div class="bloc-clair" style="margin: 0 22px 26px; padding: 10px 16px"
       title="Une collection en tri manuel n'évolue plus seule : repassez dessus régulièrement (les nouveautés arrivent sans position).">
@@ -1057,10 +1077,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787573982"></script>
-<script src="imports.js?v=1787573982"></script>
-<script src="merch-shopify.js?v=1787573982"></script>
-<script src="moteur-merch.js?v=1787573982"></script>
+<script src="config.js?v=1787583894"></script>
+<script src="imports.js?v=1787583894"></script>
+<script src="merch-shopify.js?v=1787583894"></script>
+<script src="moteur-merch.js?v=1787583894"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1185,15 +1205,18 @@ async function init() {
   document.getElementById("cgv-ok").onchange = majBoutonCommande;
 
   restaurerPanier();
+  initialiserJauges();
   // paramétrage de base du merch : dernier profil de tri et N figés retenus
   for (const [id, cle] of [["merch-profil","fkb2b-profil"],["shopify-profil","fkb2b-profil"],
-                            ["merch-figer","fkb2b-figer"],["shopify-figer","fkb2b-figer"]]) {
+                            ["merch-figer","fkb2b-figer"],["shopify-figer","fkb2b-figer"],
+                            ["merch-duos","fkb2b-duos"],["shopify-duos","fkb2b-duos"]]) {
     const el = document.getElementById(id);
     if (!el) continue;
     const memo = localStorage.getItem(cle);
     if (memo) el.value = memo;
     el.addEventListener("change", () => localStorage.setItem(cle, el.value));
   }
+  basculerJauges();
   await chargerMerch();
   rendreMenuCatalogue();
   rendreAccueil();
@@ -2686,13 +2709,112 @@ function annoterCarte(carte, note) {
   carte.querySelector(".infos").appendChild(chip);
 }
 
+/* ---------------- tri sur mesure : jauges d'importance ---------------- */
+const CLE_POIDS = "fkb2b-poids", CLE_RELEGUE = "fkb2b-relegue";
+
+function lirePoids() {
+  try { return { ...POIDS_DEFAUT, ...JSON.parse(localStorage.getItem(CLE_POIDS) || "{}") }; }
+  catch (e) { return { ...POIDS_DEFAUT }; }
+}
+
+function optionsTri(idDuos) {
+  return { poids: lirePoids(), relegueDegrades: localStorage.getItem(CLE_RELEGUE) !== "0",
+           duos: document.getElementById(idDuos)?.value !== "simple" };
+}
+
+// libellé de la ligne d'état selon le mode d'appairage
+function resumeClassement(res, avecDuos) {
+  const n = avecDuos ? `${res.rapport.length} duos` : `${res.ordre.length} produits classés`;
+  return `classement auto : ${n}${res.exclus ? `, ${res.exclus} exclu(s) en rupture` : ""}`;
+}
+
+// résumé lisible des jauges actives, pour la ligne d'état
+function resumePoids() {
+  const p = lirePoids();
+  const actifs = CRITERES_JAUGES.filter(c => (p[c.cle] || 0) > 0);
+  const total = actifs.reduce((s, c) => s + p[c.cle], 0) || 1;
+  return actifs.sort((x, y) => p[y.cle] - p[x.cle])
+    .map(c => `${c.nom.toLowerCase()} ${Math.round((p[c.cle] / total) * 100)} %`).join(" · ");
+}
+
+function initialiserJauges() {
+  for (const id of ["jauges-merch", "jauges-shopify"]) {
+    const zone = document.getElementById(id);
+    if (!zone) continue;
+    zone.innerHTML =
+      `<div class="entete">Réglez l'importance de chaque critère : seul le poids <b>relatif</b> compte,
+        <b>0 = critère ignoré</b>. Les produits en rupture restent exclus ; la zone figée, les épingles
+        et le choix duos / sans duos fonctionnent comme d'habitude. Bougez les jauges puis relancez le
+        classement auto.</div>
+       <div class="rangee">` +
+      CRITERES_JAUGES.map(c =>
+        `<div class="jauge" data-cle="${c.cle}" title="${c.aide}">
+           <label>${c.nom} <b></b></label>
+           <input type="range" min="0" max="10" step="1" value="0">
+         </div>`).join("") +
+      `</div>
+       <div class="pied">
+         <label><input type="checkbox" class="jauge-relegue"> Reléguer les produits abîmés en fin
+           (mono-taille, presque épuisé, grille cassée)</label>
+         <button class="puce-claire jauge-reset" style="padding:4px 10px">Réglages par défaut</button>
+       </div>`;
+    zone.querySelectorAll(".jauge input").forEach(inp => {
+      inp.addEventListener("input", () => {
+        const poids = lirePoids();
+        poids[inp.closest(".jauge").dataset.cle] = parseInt(inp.value, 10) || 0;
+        localStorage.setItem(CLE_POIDS, JSON.stringify(poids));
+        peindreJauges();
+      });
+    });
+    zone.querySelector(".jauge-relegue").addEventListener("change", e => {
+      localStorage.setItem(CLE_RELEGUE, e.target.checked ? "1" : "0");
+      peindreJauges();
+    });
+    zone.querySelector(".jauge-reset").addEventListener("click", () => {
+      localStorage.setItem(CLE_POIDS, JSON.stringify(POIDS_DEFAUT));
+      peindreJauges();
+    });
+  }
+  for (const id of ["merch-profil", "shopify-profil"])
+    document.getElementById(id)?.addEventListener("change", basculerJauges);
+  peindreJauges();
+}
+
+// répercute les poids mémorisés sur les deux panneaux (ils partagent le même réglage)
+function peindreJauges() {
+  const p = lirePoids();
+  const total = CRITERES_JAUGES.reduce((s, c) => s + Math.max(0, p[c.cle] || 0), 0);
+  const relegue = localStorage.getItem(CLE_RELEGUE) !== "0";
+  for (const id of ["jauges-merch", "jauges-shopify"]) {
+    const zone = document.getElementById(id);
+    if (!zone) continue;
+    zone.querySelectorAll(".jauge").forEach(j => {
+      const v = Math.max(0, p[j.dataset.cle] || 0);
+      j.querySelector("input").value = v;
+      j.querySelector("label b").textContent = !v ? "—"
+        : total ? Math.round((v / total) * 100) + " %" : "";
+      j.classList.toggle("eteinte", !v);
+    });
+    zone.querySelector(".jauge-relegue").checked = relegue;
+  }
+}
+
+function basculerJauges() {
+  for (const [selId, zoneId] of [["merch-profil", "jauges-merch"], ["shopify-profil", "jauges-shopify"]]) {
+    const zone = document.getElementById(zoneId);
+    if (zone) zone.style.display = document.getElementById(selId)?.value === "perso" ? "" : "none";
+  }
+}
+
 async function classementAutoB2B() {
   await chargerVentes();
   await chargerAssocies();
   const etat = document.getElementById("merch-etat");
   const prods = produitsDuContexte(contexteMerch());
   const nFigesB2B = parseInt(document.getElementById("merch-figer")?.value || "0", 10) || 0;
-  const res = classementAutomatique(prods, VENTES, document.getElementById("merch-profil")?.value, nFigesB2B);
+  const profilB2B = document.getElementById("merch-profil")?.value;
+  const optB2B = optionsTri("merch-duos");
+  const res = classementAutomatique(prods, VENTES, profilB2B, nFigesB2B, optB2B);
   const grille = document.getElementById("grille-merch");
   const cartes = new Map([...grille.querySelectorAll(".carte")].map(x => [x.dataset.ref, x]));
   const actuel = [...cartes.keys()];
@@ -2704,7 +2826,8 @@ async function classementAutoB2B() {
   travailNonEnregistre = true;
   DERNIER_RAPPORT = res.rapport;
   document.getElementById("btn-rapport-b2b").style.display = "";
-  etat.textContent = `classement auto : ${res.rapport.length} duos${res.exclus ? `, ${res.exclus} exclu(s) en rupture` : ""} — ajustez puis enregistrez`;
+  etat.textContent = resumeClassement(res, optB2B.duos)
+    + (profilB2B === "perso" ? ` — jauges : ${resumePoids() || "aucune (tri équilibré)"}` : "") + " — ajustez puis enregistrez";
 }
 
 async function classementAutoShopify() {
@@ -2727,7 +2850,9 @@ async function classementAutoShopify() {
   }
   if (!prods.length) { etat.textContent = "aucune donnée produit exploitable pour classer"; return; }
   const nFigesShop = parseInt(document.getElementById("shopify-figer")?.value || "0", 10) || 0;
-  const res = classementAutomatique(prods, VENTES, document.getElementById("shopify-profil")?.value, nFigesShop);
+  const profilShop = document.getElementById("shopify-profil")?.value;
+  const optShop = optionsTri("shopify-duos");
+  const res = classementAutomatique(prods, VENTES, profilShop, nFigesShop, optShop);
   const parHandle = new Map(cartes.map(x => [x.dataset.handle, x]));
   const actuel = cartes.map(x => x.dataset.handle);
   const ordreHandles = res.ordre.map(r => handleParRef[r]).filter(Boolean);
@@ -2743,7 +2868,8 @@ async function classementAutoShopify() {
   renumShopify();
   DERNIER_RAPPORT = res.rapport;
   document.getElementById("btn-rapport-shopify").style.display = "";
-  etat.textContent = `classement auto : ${res.rapport.length} duos${res.exclus ? `, ${res.exclus} exclu(s) en rupture` : ""} — ajustez puis téléchargez le CSV`;
+  etat.textContent = resumeClassement(res, optShop.duos)
+    + (profilShop === "perso" ? ` — jauges : ${resumePoids() || "aucune (tri équilibré)"}` : "") + " — ajustez puis téléchargez le CSV";
 }
 
 /* ---------------- marques interdites par magasin (admin) ---------------- */
