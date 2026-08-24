@@ -578,6 +578,13 @@
         <a href="#/familles">Nos familles <small id="menu-nb-familles"></small></a>
       </div>
     </div>
+    <div class="menu-deroulant" id="lien-preco" style="display:none">
+      <a>PRÉCOMMANDES ▾</a>
+      <div class="sous-menu">
+        <a href="#/precommandes">Les campagnes</a>
+        <a href="#/calendrier">Calendrier &amp; budgets</a>
+      </div>
+    </div>
     <a href="#/compte">MON COMPTE</a>
     <div class="menu-deroulant" id="lien-backoffice" style="display:none">
       <a style="color:#d9a441">BACK OFFICE ▾</a>
@@ -757,6 +764,35 @@
   </section>
 
   <!-- UTILISATEURS (admin) -->
+  <!-- PRÉCOMMANDES (clients autorisés) -->
+  <section class="vue page-claire" id="vue-precommandes">
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='#/'">&larr; ACCUEIL</span>
+      <h1>PRÉCOMMANDES</h1>
+      <div class="compte-produits">Les campagnes ouvertes à votre magasin. Ces produits ne sont pas en stock : ils sont commandés à l'avance pour une livraison annoncée.</div>
+    </div>
+    <div id="preco-campagnes" style="margin: 0 22px 60px"></div>
+  </section>
+
+  <section class="vue page-claire" id="vue-precommande">
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='#/precommandes'">&larr; PRÉCOMMANDES</span>
+      <h1 id="preco-titre"></h1>
+      <div class="compte-produits" id="preco-sous-titre"></div>
+    </div>
+    <div class="col-filtres" id="preco-filtres" style="padding: 0 22px 16px; display:flex; gap:8px; flex-wrap:wrap"></div>
+    <div class="grille-col" id="preco-grille" style="margin: 0 22px 60px"></div>
+  </section>
+
+  <section class="vue page-claire" id="vue-calendrier">
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='#/'">&larr; ACCUEIL</span>
+      <h1>CALENDRIER</h1>
+      <div class="compte-produits">Les échéances des campagnes en cours, votre budget prévisionnel et ce qui est déjà engagé.</div>
+    </div>
+    <div id="calendrier-contenu" style="margin: 0 22px 60px"></div>
+  </section>
+
   <!-- TABLEAU DE BORD (interne) -->
   <section class="vue page-sombre" id="vue-backoffice">
     <div class="bo-tete">
@@ -982,10 +1018,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787572752"></script>
-<script src="imports.js?v=1787572752"></script>
-<script src="merch-shopify.js?v=1787572752"></script>
-<script src="moteur-merch.js?v=1787572752"></script>
+<script src="config.js?v=1787573118"></script>
+<script src="imports.js?v=1787573118"></script>
+<script src="merch-shopify.js?v=1787573118"></script>
+<script src="moteur-merch.js?v=1787573118"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1098,6 +1134,8 @@ async function init() {
   DATA.produits.forEach(trierTailles);
   memoriser(DATA.produits);
   NAVIGATION = navigation;
+  // le menu Précommandes n'apparaît que si une campagne est ouverte à ce magasin
+  chargerMesCampagnes();
 
   document.getElementById("recherche").oninput = e => { texteRecherche = e.target.value.trim().toLowerCase(); rendreCollection(); };
   document.getElementById("btn-panier").onclick = () => basculer("panier", true);
@@ -1249,6 +1287,8 @@ async function changerSociete(id) {
   DATA.produits = produits;
   DATA.produits.forEach(trierTailles);
   NAVIGATION = navigation;
+  // les campagnes ouvertes dépendent du magasin choisi
+  chargerMesCampagnes();
   duPanier.forEach(trierTailles);
   memoriser(DATA.produits); memoriser(duPanier);
   // le panier suit : on raccroche les lignes aux nouveaux objets produits (prix recalculés)
@@ -1322,6 +1362,15 @@ function router() {
   } else if (route === "merch") {
     document.getElementById("vue-merch").classList.add("active");
     rendreMerch();
+  } else if (route === "precommandes") {
+    document.getElementById("vue-precommandes").classList.add("active");
+    rendreCampagnesClient();
+  } else if (route === "precommande") {
+    document.getElementById("vue-precommande").classList.add("active");
+    rendreCataloguePreco(decodeURIComponent(args.join("/")));
+  } else if (route === "calendrier") {
+    document.getElementById("vue-calendrier").classList.add("active");
+    rendreCalendrier();
   } else if (route === "backoffice") {
     document.getElementById("vue-backoffice").classList.add("active");
     rendreBackOffice();
@@ -2009,7 +2058,8 @@ async function rendreCampagnesPreco() {
           · ${Number(x.pieces || 0).toLocaleString("fr-FR")} pièces${x.illimitees ? ` · ${x.illimitees} en quantité libre` : ""}
           ${x.derniere_maj ? `· dernier dépôt ${new Date(x.derniere_maj).toLocaleString("fr-FR")}` : ""}</span>
         <div style="width:100%; display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:center">
-          <button class="puce-claire" onclick="ouvrirAccesCampagne(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")})">Magasins autorisés</button>
+          <button class="puce-claire" onclick="ouvrirAccesCampagne(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")})">Magasins &amp; budgets</button>
+          <button class="puce-claire" onclick="ouvrirDatesCampagne(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")}, ${JSON.stringify(x.deadline || "")}, ${JSON.stringify(x.livraison_prevue || "")}, ${JSON.stringify(x.note || "")})">Dates &amp; note</button>
           <button class="puce-claire" onclick="basculerOuvertureCampagne(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")}, ${!x.ouverte})">${x.ouverte ? "Fermer la campagne" : "Rouvrir la campagne"}</button>
           <button class="puce-claire" onclick="supprimerCampagnePreco(${JSON.stringify(x.campagne).replaceAll('"', "&quot;")})">Supprimer</button>
           <span class="compte-produits" id="camp-etat-${encodeURIComponent(x.campagne)}"></span>
@@ -2019,23 +2069,68 @@ async function rendreCampagnesPreco() {
     : `<div class="compte-produits">Aucune campagne pour le moment. Déposez un fichier de stock B2B en choisissant « Précommande ».</div>`;
 }
 
+// Deadline de prise de commande, livraison annoncée, mot d'accompagnement.
+function ouvrirDatesCampagne(campagne, deadline, livraison, note) {
+  const zone = document.getElementById("camp-acces-" + encodeURIComponent(campagne));
+  if (zone.dataset.mode === "dates") { zone.innerHTML = ""; zone.dataset.mode = ""; return; }
+  zone.dataset.mode = "dates";
+  zone.innerHTML = `
+    <div class="formu" style="margin-top:12px">
+      <label class="compte-produits">Date limite de commande
+        <input class="qte-claire" style="width:170px; margin-left:8px" type="date" id="camp-deadline" value="${deadline || ""}"></label>
+      <label class="compte-produits">Livraison prévue
+        <input class="qte-claire" style="width:170px; margin-left:8px" type="date" id="camp-livraison" value="${livraison || ""}"></label>
+    </div>
+    <div class="formu" style="margin-top:10px">
+      <input class="qte-claire" style="width:420px; text-align:left" id="camp-note"
+             placeholder="mot affiché aux magasins (facultatif)" value="${echapperHTML(note || "")}">
+      <button class="btn-noir" onclick="enregistrerDatesCampagne(${JSON.stringify(campagne).replaceAll('"', "&quot;")})">ENREGISTRER</button>
+      <span class="compte-produits" id="camp-dates-etat"></span>
+    </div>`;
+}
+
+async function enregistrerDatesCampagne(campagne) {
+  const etat = document.getElementById("camp-dates-etat");
+  etat.textContent = "enregistrement…";
+  try {
+    await api("/rest/v1/rpc/regler_campagne", { corps: {
+      p_campagne: campagne,
+      p_deadline: document.getElementById("camp-deadline").value || null,
+      p_livraison: document.getElementById("camp-livraison").value || null,
+      p_note: document.getElementById("camp-note").value || null } });
+    etat.textContent = "enregistré ✓";
+    await rendreCampagnesPreco();
+  } catch (e) {
+    etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 200);
+  }
+}
+
 // Une campagne n'est ouverte à personne tant qu'on n'a pas coché des magasins.
 async function ouvrirAccesCampagne(campagne) {
   const zone = document.getElementById("camp-acces-" + encodeURIComponent(campagne));
-  if (zone.innerHTML) { zone.innerHTML = ""; return; }
+  if (zone.innerHTML && zone.dataset.mode === "acces") { zone.innerHTML = ""; zone.dataset.mode = ""; return; }
+  zone.dataset.mode = "acces";
   zone.innerHTML = `<div class="compte-produits" style="padding:8px 0">Chargement des magasins…</div>`;
   const [autorises, societes] = await Promise.all([
     api("/rest/v1/rpc/acces_campagne", { corps: { p_campagne: campagne } }).catch(() => []),
     api("/rest/v1/societes?select=compte,nom&order=compte").catch(() => []),
   ]);
-  const choisis = new Set(autorises || []);
+  const budgets = {};
+  (autorises || []).forEach(a => budgets[a.compte] = a.budget);
+  const choisis = new Set(Object.keys(budgets));
   zone.innerHTML = `
-    <div style="margin:10px 0 4px" class="compte-produits">Cochez les magasins qui verront « ${echapperHTML(campagne)} » :</div>
-    <div style="max-height:260px; overflow:auto; border:1px solid var(--hairline); border-radius:10px; padding:10px">
-      ${(societes || []).map(x => `<label class="cmd-coche" style="padding:3px 0">
-        <input type="checkbox" data-compte="${echapperHTML(x.compte)}" ${choisis.has(x.compte) ? "checked" : ""}>
-        <span>${echapperHTML(x.nom || x.compte)} <span style="color:var(--encre2)">· ${echapperHTML(x.compte)}</span></span>
-      </label>`).join("")}
+    <div style="margin:10px 0 4px" class="compte-produits">Cochez les magasins qui verront « ${echapperHTML(campagne)} »
+      et, si vous le souhaitez, leur budget prévisionnel sur cette campagne :</div>
+    <div style="max-height:300px; overflow:auto; border:1px solid var(--hairline); border-radius:10px; padding:10px">
+      ${(societes || []).map(x => `<div style="display:flex; align-items:center; gap:10px; padding:3px 0">
+        <label class="cmd-coche" style="flex:1">
+          <input type="checkbox" data-compte="${echapperHTML(x.compte)}" ${choisis.has(x.compte) ? "checked" : ""}>
+          <span>${echapperHTML(x.nom || x.compte)} <span style="color:var(--encre2)">· ${echapperHTML(x.compte)}</span></span>
+        </label>
+        <input class="qte-claire" style="width:120px" type="number" min="0" step="100"
+               data-budget="${echapperHTML(x.compte)}" placeholder="budget €"
+               value="${budgets[x.compte] ?? ""}">
+      </div>`).join("")}
     </div>
     <div class="formu" style="margin-top:10px">
       <button class="btn-noir" onclick="enregistrerAccesCampagne(${JSON.stringify(campagne).replaceAll('"', "&quot;")})">ENREGISTRER LES ACCÈS</button>
@@ -2046,11 +2141,15 @@ async function ouvrirAccesCampagne(campagne) {
 async function enregistrerAccesCampagne(campagne) {
   const zone = document.getElementById("camp-acces-" + encodeURIComponent(campagne));
   const etat = document.getElementById("camp-acces-etat-" + encodeURIComponent(campagne));
-  const comptes = [...zone.querySelectorAll("input[type=checkbox]:checked")].map(i => i.dataset.compte);
+  const lignes = [...zone.querySelectorAll("input[type=checkbox]:checked")].map(i => {
+    const compte = i.dataset.compte;
+    const budget = zone.querySelector(`input[data-budget="${CSS.escape(compte)}"]`)?.value;
+    return { compte, budget: budget === "" ? null : budget };
+  });
   etat.textContent = "enregistrement…";
   try {
     const n = await api("/rest/v1/rpc/definir_acces_campagne",
-      { corps: { p_campagne: campagne, p_comptes: comptes } });
+      { corps: { p_campagne: campagne, p_lignes: lignes } });
     etat.textContent = `${n} magasin${n > 1 ? "s" : ""} autorisé${n > 1 ? "s" : ""} ✓`;
     await rendreCampagnesPreco();
   } catch (e) {
@@ -2771,6 +2870,142 @@ async function rendreUtilisateurs() {
       } catch (e) { etat.textContent = "échec : " + e.message.slice(0, 150); }
     };
   }
+}
+
+/* ---------------- précommandes (côté client) ----------------
+   Les campagnes vivent hors du catalogue : produits sans stock, livrés plus tard,
+   visibles seulement par les magasins qu'on a autorisés. */
+let CAMPAGNES_MOI = [];
+
+async function chargerMesCampagnes() {
+  CAMPAGNES_MOI = await api("/rest/v1/rpc/mes_campagnes",
+    { corps: { p_societe: clientActif?.id ?? null } }).catch(() => []);
+  const lien = document.getElementById("lien-preco");
+  if (lien) lien.style.display = (CAMPAGNES_MOI || []).length ? "" : "none";
+  return CAMPAGNES_MOI;
+}
+
+async function rendreCampagnesClient() {
+  const zone = document.getElementById("preco-campagnes");
+  zone.innerHTML = `<div class="compte-produits">Chargement…</div>`;
+  const [campagnes, calendrier] = await Promise.all([
+    chargerMesCampagnes(),
+    api("/rest/v1/rpc/calendrier_precommande", { corps: { p_societe: clientActif?.id ?? null } }).catch(() => []),
+  ]);
+  const infos = {};
+  (calendrier || []).forEach(c => infos[c.campagne] = c);
+  zone.innerHTML = (campagnes || []).length
+    ? campagnes.map(c => {
+        const i = infos[c.campagne] || {};
+        const reste = i.jours_restants;
+        const urgence = reste === null || reste === undefined ? ""
+          : reste < 0 ? "alerte" : reste <= 7 ? "attente" : "ok";
+        return `<div class="cmd-carte" onclick="location.hash='#/precommande/${encodeURIComponent(c.campagne)}'"
+                     style="cursor:pointer">
+          <div class="cmd-tete">
+            <span class="cmd-num">${echapperHTML(c.campagne)}</span>
+            ${i.deadline ? `<span class="badge-c ${urgence}">${
+              reste < 0 ? "clôturée" : reste === 0 ? "dernier jour" : `${reste} jour${reste > 1 ? "s" : ""} pour commander`}</span>` : ""}
+            <span class="cmd-montant">${c.references} référence${c.references > 1 ? "s" : ""}</span>
+          </div>
+          <div class="cmd-meta">
+            ${i.deadline ? `Commandes jusqu'au <b>${new Date(i.deadline).toLocaleDateString("fr-FR")}</b>` : "Sans date limite"}
+            ${i.livraison_prevue ? ` · livraison prévue ${new Date(i.livraison_prevue).toLocaleDateString("fr-FR")}` : ""}
+            ${i.budget ? ` · budget ${eur(Number(i.budget))}` : ""}
+          </div>
+          ${i.note ? `<div class="cmd-note mot">${echapperHTML(i.note)}</div>` : ""}
+        </div>`;
+      }).join("")
+    : `<div class="cmd-carte" style="color:var(--encre2)">Aucune campagne n'est ouverte à votre magasin pour le moment.</div>`;
+}
+
+let PRECO_COURANTE = null, PRECO_PRODUITS = [], PRECO_MARQUE = null;
+
+async function rendreCataloguePreco(campagne) {
+  PRECO_COURANTE = campagne;
+  document.getElementById("preco-titre").innerHTML = `<b>${echapperHTML(campagne)}</b>`;
+  const sous = document.getElementById("preco-sous-titre");
+  sous.textContent = "Chargement…";
+  document.getElementById("preco-grille").innerHTML = "";
+  try {
+    PRECO_PRODUITS = await api("/rest/v1/rpc/catalogue_precommande",
+      { corps: { p_campagne: campagne, limite: 300, p_societe: clientActif?.id ?? null } });
+  } catch (e) {
+    sous.textContent = "accès refusé à cette campagne";
+    return;
+  }
+  PRECO_PRODUITS.forEach(trierTailles);
+  memoriser(PRECO_PRODUITS);
+  PRECO_MARQUE = null;
+  rendreGrillePreco();
+}
+
+function rendreGrillePreco() {
+  const produits = PRECO_MARQUE
+    ? PRECO_PRODUITS.filter(p => p.marque === PRECO_MARQUE) : PRECO_PRODUITS;
+  document.getElementById("preco-sous-titre").textContent =
+    `${produits.length} référence${produits.length > 1 ? "s" : ""} proposée${produits.length > 1 ? "s" : ""}`
+    + " · livraison à la date annoncée, ces produits ne sont pas en stock"
+    + (famille() ? ` · tarif ${famille()}` : "");
+
+  const marques = [...new Set(PRECO_PRODUITS.map(p => p.marque).filter(Boolean))].sort();
+  document.getElementById("preco-filtres").innerHTML = marques.length > 1
+    ? `<button class="puce-claire ${PRECO_MARQUE ? "" : "actif"}" onclick="affinerPreco(null)">Toutes les marques</button>`
+      + marques.map(m => `<button class="puce-claire ${m === PRECO_MARQUE ? "actif" : ""}"
+          onclick="affinerPreco(${JSON.stringify(m).replaceAll('"', "&quot;")})">${echapperHTML(m)}</button>`).join("")
+    : "";
+
+  document.getElementById("preco-grille").innerHTML = produits.map(carteHTML).join("")
+    || `<div class="vide" style="grid-column:1/-1;color:#777">Aucun produit dans cette campagne.</div>`;
+}
+
+function affinerPreco(marque) { PRECO_MARQUE = marque; rendreGrillePreco(); }
+
+async function rendreCalendrier() {
+  const zone = document.getElementById("calendrier-contenu");
+  zone.innerHTML = `<div class="compte-produits">Chargement…</div>`;
+  const lignes = await api("/rest/v1/rpc/calendrier_precommande",
+    { corps: { p_societe: clientActif?.id ?? null } }).catch(() => []);
+  if (!(lignes || []).length) {
+    zone.innerHTML = `<div class="cmd-carte" style="color:var(--encre2)">Aucune campagne en cours.</div>`;
+    return;
+  }
+  zone.innerHTML = lignes.map(c => {
+    const budget = Number(c.budget || 0), engage = Number(c.engage || 0);
+    const part = budget > 0 ? Math.min(engage / budget, 1) : 0;
+    const reste = c.jours_restants;
+    const urgence = reste === null || reste === undefined ? ""
+      : reste < 0 ? "alerte" : reste <= 7 ? "attente" : "ok";
+    return `<div class="cmd-carte">
+      <div class="cmd-tete">
+        <span class="cmd-num">${echapperHTML(c.campagne)}</span>
+        ${c.deadline ? `<span class="badge-c ${urgence}">${
+          reste < 0 ? `clôturée depuis ${-reste} j` : reste === 0 ? "dernier jour" : `J−${reste}`}</span>` : ""}
+        <span class="cmd-montant">${budget ? eur(budget) : "budget non fixé"}</span>
+      </div>
+      <div class="cmd-meta">
+        ${c.deadline ? `Date limite <b>${new Date(c.deadline).toLocaleDateString("fr-FR")}</b>` : "Sans date limite"}
+        ${c.livraison_prevue ? ` · livraison ${new Date(c.livraison_prevue).toLocaleDateString("fr-FR")}` : ""}
+        · ${c.references} référence${c.references > 1 ? "s" : ""}
+      </div>
+      ${budget ? `<div style="margin-top:12px">
+        <div class="bo-rang" style="border:0; padding:4px 0">
+          <span class="nom" style="min-width:120px">Déjà engagé</span>
+          <span class="jauge" style="flex:1; height:6px; background:#eeeeeb; border-radius:999px; overflow:hidden">
+            <i style="display:block; height:100%; width:${Math.round(part * 100)}%; background:#f2751f"></i></span>
+          <span class="val" style="color:var(--encre2)">${eur(engage)} sur ${eur(budget)}</span>
+        </div>
+        <div class="compte-produits">${engage > budget
+          ? `Dépassement de ${eur(engage - budget)}`
+          : `Reste ${eur(budget - engage)} · ${c.commandes} commande${c.commandes > 1 ? "s" : ""} passée${c.commandes > 1 ? "s" : ""}`}</div>
+      </div>` : `<div class="compte-produits" style="margin-top:10px">${
+          engage ? `${eur(engage)} déjà engagé · ${c.commandes} commande(s)` : "Aucune commande passée"}</div>`}
+      ${c.note ? `<div class="cmd-note mot">${echapperHTML(c.note)}</div>` : ""}
+      <div class="cmd-actions">
+        <button class="puce-claire forte" onclick="location.hash='#/precommande/${encodeURIComponent(c.campagne)}'">Voir la campagne</button>
+      </div>
+    </div>`;
+  }).join("");
 }
 
 /* ---------------- tableau de bord (interne) ---------------- */
