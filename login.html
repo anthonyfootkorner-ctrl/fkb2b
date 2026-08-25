@@ -61,11 +61,53 @@
   <button type="submit" id="btn">SE CONNECTER</button>
   <p class="note" id="message">Accès réservé aux clients autorisés.</p>
   <p class="note" style="margin-top:14px">
+    <a href="#" id="lien-direct" style="color:var(--gris); text-decoration:underline">Recevoir un lien de connexion</a>
+    &nbsp;·&nbsp;
     <a href="#" id="oubli" style="color:var(--gris); text-decoration:underline">Mot de passe oublié ?</a></p>
 </form>
-<script src="config.js?v=1787666899"></script>
+<script src="config.js?v=1787667874"></script>
 <script>
+// Retour d'un lien de connexion (ou d'un lien reçu par e-mail) : la session arrive dans l'adresse.
+(function ouvrirDepuisLien() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  const jeton = h.get("access_token");
+  if (!jeton) return;
+  if (h.get("type") === "recovery" || h.get("type") === "invite") {
+    location.href = "motdepasse.html" + location.hash;   // là, on choisit son mot de passe
+    return;
+  }
+  try {
+    const charge = JSON.parse(atob(jeton.split(".")[1]));
+    localStorage.setItem("fkb2b-session", JSON.stringify({
+      access_token: jeton, refresh_token: h.get("refresh_token"),
+      expire_a: charge.exp, email: charge.email,
+    }));
+    location.href = "index.html";
+  } catch (e) { /* jeton illisible : on reste sur la page de connexion */ }
+})();
+
 if (sessionCourante()) location.href = "index.html";
+
+// Lien de connexion : pratique pour qui ne se connecte que quelques fois par an.
+// create_user: false — ce lien ne doit jamais créer de compte, seulement en ouvrir un existant.
+document.getElementById("lien-direct").addEventListener("click", async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById("message");
+  const email = document.getElementById("email").value.trim();
+  if (!email) {
+    msg.innerHTML = "<b>Saisissez d'abord votre e-mail</b>, puis recliquez sur le lien.";
+    document.getElementById("email").focus();
+    return;
+  }
+  msg.textContent = "Envoi du lien…";
+  try {
+    await api("/auth/v1/otp", { corps: {
+      email, create_user: false,
+      options: { email_redirect_to: location.href.split("#")[0] } } });
+  } catch (err) { /* on ne révèle jamais si l'adresse existe */ }
+  msg.innerHTML = "<b>Si un compte existe pour cette adresse</b>, un lien de connexion vient d'être envoyé. "
+    + "Il est valable une heure.";
+});
 
 // Mot de passe oublié : Supabase envoie un lien qui ramène sur motdepasse.html.
 document.getElementById("oubli").addEventListener("click", async (e) => {
