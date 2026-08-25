@@ -515,6 +515,31 @@
   .groupe { padding: 13px 0; border-bottom: 1px solid #1e1e1e; }
   .groupe .ligne { padding: 0; border-bottom: 0; }
   .groupe .tailles { display: flex; flex-wrap: wrap; gap: 6px; margin: 11px 0 0 58px; }
+  /* Ajouter une référence au panier sans quantité, depuis la collection. */
+  .carte .epingle { position: absolute; top: 10px; left: 10px; z-index: 3; width: 30px; height: 30px;
+    border-radius: 50%; border: 1px solid var(--hairline); background: rgba(255,255,255,.92);
+    color: var(--encre); font-size: 17px; line-height: 1; cursor: pointer; opacity: 0;
+    transition: opacity 160ms ease, background 160ms ease, transform 160ms var(--ease-out); }
+  .carte:hover .epingle, .carte .epingle.dedans { opacity: 1; }
+  .carte .epingle:hover { transform: scale(1.08); }
+  .carte .epingle.dedans { background: var(--encre); color: #fff; border-color: var(--encre); }
+  @media (hover: none) { .carte .epingle { opacity: 1; } }
+
+  /* Saisie des quantités directement dans le panier. */
+  .grille-qte { display: flex; flex-wrap: wrap; gap: 6px; margin: 11px 0 0 58px; }
+  .case-taille { display: flex; flex-direction: column; align-items: center; gap: 4px;
+    background: var(--noir3); border: 1px solid var(--bord); border-radius: 10px; padding: 6px 7px 7px;
+    min-width: 52px; }
+  .case-taille span { font-size: 10.5px; color: var(--gris); letter-spacing: .04em; }
+  .case-taille.epuisee { opacity: .38; }
+  .case-taille.preco span { color: #7aa7e0; }
+  .case-taille input { width: 40px; background: var(--noir); border: 1px solid var(--bord); color: var(--blanc);
+    border-radius: 6px; text-align: center; font-size: 13px; padding: 4px 2px; -moz-appearance: textfield; }
+  .case-taille input::-webkit-outer-spin-button,
+  .case-taille input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .case-taille input:focus { outline: none; border-color: var(--blanc); }
+  .case-taille input.rempli { background: var(--blanc); color: var(--noir); font-weight: 700; }
+
   .t-puce { display: flex; align-items: center; gap: 8px; background: var(--noir3); border: 1px solid var(--bord);
     border-radius: 999px; padding: 5px 7px 5px 12px; font-size: 11.5px; color: var(--gris); }
   .t-puce b { color: var(--blanc); font-weight: 600; }
@@ -1077,10 +1102,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787583894"></script>
-<script src="imports.js?v=1787583894"></script>
-<script src="merch-shopify.js?v=1787583894"></script>
-<script src="moteur-merch.js?v=1787583894"></script>
+<script src="config.js?v=1787649877"></script>
+<script src="imports.js?v=1787649877"></script>
+<script src="merch-shopify.js?v=1787649877"></script>
+<script src="moteur-merch.js?v=1787649877"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1110,6 +1135,9 @@ window.addEventListener("beforeunload", e => {
   if (travailNonEnregistre) { e.preventDefault(); e.returnValue = ""; }
 });
 const panier = new Map();    // clé "ref|taille" -> {produit, taille, qte, prix}
+// Références ajoutées depuis la collection sans quantité : elles apparaissent dans le
+// panier avec leur grille de tailles, à remplir d'un coup au moment de commander.
+const enAttente = new Map(); // reference -> produit
 const selection = new Map(); // saisie en cours sur la fiche ouverte : taille -> qte (rien n'entre au panier avant « Ajouter »)
 
 const eur = n => n.toLocaleString("fr-FR", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €";
@@ -1353,6 +1381,10 @@ async function changerSociete(id) {
   chargerMesCampagnes();
   duPanier.forEach(trierTailles);
   memoriser(DATA.produits); memoriser(duPanier);
+  for (const ref of [...enAttente.keys()]) {
+    const p = produitConnu(ref);
+    if (p) enAttente.set(ref, p); else enAttente.delete(ref);
+  }
   // le panier suit : on raccroche les lignes aux nouveaux objets produits (prix recalculés)
   let retirees = 0, ajustees = 0;
   for (const [cle, l] of [...panier]) {
@@ -1531,7 +1563,11 @@ function blocSansVisuel(p) {
 function carteHTML(p) {
   const pastilles = p.tailles.slice(0, 5).map(t =>
     `<i style="background:${t.precommande ? "#3d6fb4" : t.stock === 0 ? "#c0504d" : t.stock > 20 ? "#2e9e4f" : "#d9a441"}"></i>`).join("");
+  const dedans = auPanier(p.reference);
   return `<div class="carte" onclick="location.hash='#/produit/${encodeURIComponent(p.reference)}'">
+    <button class="epingle ${dedans ? "dedans" : ""}" data-ref="${echapperHTML(p.reference)}"
+      title="${dedans ? "Retirer du panier" : "Ajouter au panier (quantités à saisir dans le panier)"}"
+      onclick="event.stopPropagation(); basculerAuPanier(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">${dedans ? "✓" : "+"}</button>
     <div class="dispo-mini">${pastilles}</div>
     ${p.photo ? `<div class="visuel"><img loading="lazy" src="${p.photo}" alt=""></div>`
               : blocSansVisuel(p)}
@@ -1784,7 +1820,9 @@ function ajouterAuPanier(ref) {
     if (qte > 0) panier.set(cle, {produit: p, taille: t.taille, qte, prix: prixDe(t)});
     else panier.delete(cle);
   }
+  if ([...panier.values()].some(l => l.produit.reference === ref)) enAttente.delete(ref);
   rendrePanier();
+  majBoutonsEpingle();
   const btn = document.getElementById("btn-ajouter");
   btn.textContent = "AJOUTÉ AU PANIER ✓";
   setTimeout(() => btn.textContent = "AJOUTER AU PANIER", 1600);
@@ -3794,51 +3832,55 @@ function rendrePanier() {
     l.prix = prixDe(l.produit.tailles.find(t => t.taille === l.taille));
     pieces += l.qte; ht += l.qte * l.prix; refs.add(l.produit.reference);
   }
-  // Regroupement par référence : une carte produit, ses tailles en pastilles dessous.
+  // Une carte par référence, avec TOUTES ses tailles : les quantités se saisissent ici,
+  // que la référence vienne d'une fiche produit ou d'un ajout rapide depuis la collection.
   const groupes = new Map();
-  for (const [cle, l] of panier.entries()) {
-    const g = groupes.get(l.produit.reference)
-      || { produit: l.produit, lignes: [], pieces: 0, total: 0 };
-    g.lignes.push({ cle, ...l });
-    g.pieces += l.qte; g.total += l.qte * l.prix;
+  for (const [ref, produit] of enAttente) groupes.set(ref, { produit, qtes: {}, total: 0 });
+  for (const l of panier.values()) {
+    const g = groupes.get(l.produit.reference) || { produit: l.produit, qtes: {}, total: 0 };
+    g.qtes[l.taille] = l.qte;
+    g.total += l.qte * l.prix;
     groupes.set(l.produit.reference, g);
+    refs.add(l.produit.reference);
   }
-  for (const g of groupes.values()) {
-    const rang = t => g.produit.tailles.findIndex(x => x.taille === t);
-    g.lignes.sort((a, b) => rang(a.taille) - rang(b.taille));
-  }
+  for (const ref of enAttente.keys()) refs.add(ref);
 
-  corps.innerHTML = panier.size === 0 ? `<div class="vide">Votre panier est vide</div>` :
-    [...groupes.values()].map(g => `
-      <div class="groupe">
+  corps.innerHTML = groupes.size === 0 ? `<div class="vide">Votre panier est vide</div>` :
+    [...groupes.values()].map(g => {
+      const p = g.produit;
+      const cases = p.tailles.map(t => {
+        const q = g.qtes[t.taille] || 0;
+        const epuisee = !t.precommande && t.stock <= 0;
+        return `<label class="case-taille ${epuisee ? "epuisee" : ""} ${t.precommande ? "preco" : ""}"
+          title="${t.precommande ? "précommande — quantité libre" : `${t.stock} en stock`}">
+          <input type="number" min="0" ${epuisee ? "disabled" : ""} ${t.precommande ? "" : `max="${t.stock}"`}
+            class="${q ? "rempli" : ""}" value="${q || ""}"
+            oninput="majQtePanier(${JSON.stringify(p.reference).replaceAll('"', "&quot;")}, ${JSON.stringify(t.taille).replaceAll('"', "&quot;")}, this.value, this)">
+          <span>${echapperHTML(t.taille)}</span>
+        </label>`;
+      }).join("");
+      return `<div class="groupe">
         <div class="ligne">
-          <div class="visuel"><img src="${g.produit.photo}" alt=""></div>
+          <div class="visuel">${p.photo ? `<img src="${p.photo}" alt="">` : ""}</div>
           <div class="det">
-            <div class="n">${echapperHTML(g.produit.designation || g.produit.reference)}</div>
-            <div class="d">${echapperHTML(g.produit.reference)}${g.produit.couleur ? " · " + echapperHTML(g.produit.couleur) : ""}
-              · ${g.pieces} pièce${g.pieces > 1 ? "s" : ""}</div>
+            <div class="n">${echapperHTML(p.designation || p.reference)}</div>
+            <div class="d">${echapperHTML(p.reference)}${p.couleur ? " · " + echapperHTML(p.couleur) : ""}
+              · dès ${eur(prixMini(p))} HT</div>
           </div>
-          <div class="m">${eur(g.total)}</div>
+          <div class="m" data-total-ref="${echapperHTML(p.reference)}">${g.total ? eur(g.total) : "—"}</div>
           <button class="sup" title="Retirer la référence"
-            onclick="retirerReference('${g.produit.reference.replace(/'/g, "\\'")}')">×</button>
+            onclick="retirerReference(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">×</button>
         </div>
-        <div class="tailles">
-          ${g.lignes.map(l => `<span class="t-puce"><b>${echapperHTML(l.taille)}</b> × ${l.qte}
-            <span style="opacity:.7">${eur(l.prix)}</span>
-            <button class="x" title="Retirer cette taille"
-              onclick="panier.delete('${l.cle.replace(/'/g, "\\'")}'); rendrePanier()">×</button></span>`).join("")}
-        </div>
-      </div>`).join("");
+        <div class="grille-qte">${cases}</div>
+      </div>`;
+    }).join("");
+
   document.getElementById("badge").textContent = pieces;
   document.getElementById("t-pieces").textContent = `${pieces} pièce${pieces > 1 ? "s" : ""}`;
   document.getElementById("t-refs").textContent = `${refs.size} référence${refs.size > 1 ? "s" : ""}`;
   document.getElementById("t-ht").textContent = eur(ht);
   majBoutonCommande();
-  // filet de sécurité : le panier en cours survit à une actualisation (localStorage)
-  try {
-    localStorage.setItem("fkb2b-panier-auto", JSON.stringify(
-      [...panier.values()].map(l => ({ref: l.produit.reference, taille: l.taille, qte: l.qte}))));
-  } catch (e) { /* stockage local indisponible */ }
+  sauvegardeAutoPanier();
 }
 
 // La commande n'est ouverte qu'avec un panier non vide ET les CGV cochées.
@@ -3849,7 +3891,84 @@ function majBoutonCommande() {
 
 function retirerReference(reference) {
   for (const [cle, l] of [...panier]) if (l.produit.reference === reference) panier.delete(cle);
+  enAttente.delete(reference);
   rendrePanier();
+  majBoutonsEpingle();
+}
+
+/* ---- ajout rapide depuis la collection : la référence d'abord, les quantités ensuite ---- */
+const auPanier = (ref) => enAttente.has(ref)
+  || [...panier.values()].some(l => l.produit.reference === ref);
+
+function basculerAuPanier(ref) {
+  if (auPanier(ref)) { retirerReference(ref); return; }
+  const p = produitConnu(ref);
+  if (!p) return;
+  enAttente.set(ref, p);
+  rendrePanier();
+  majBoutonsEpingle();
+  basculer("panier", true);
+}
+
+// Les cartes déjà affichées suivent l'état du panier sans tout redessiner.
+function majBoutonsEpingle() {
+  document.querySelectorAll(".carte .epingle").forEach(b => {
+    const dedans = auPanier(b.dataset.ref);
+    b.classList.toggle("dedans", dedans);
+    b.textContent = dedans ? "✓" : "+";
+    b.title = dedans ? "Retirer du panier" : "Ajouter au panier (quantités à saisir dans le panier)";
+  });
+}
+
+// Saisie d'une quantité dans le panier : on ne redessine pas, sinon le champ perd le focus.
+function majQtePanier(ref, taille, valeur, champ) {
+  const p = produitConnu(ref) || enAttente.get(ref);
+  if (!p) return;
+  const t = p.tailles.find(x => x.taille === taille);
+  if (!t) return;
+  let qte = Math.max(0, parseInt(valeur, 10) || 0);
+  const plafond = t.precommande ? 9999 : t.stock;
+  if (qte > plafond) { qte = plafond; if (champ) champ.value = plafond || ""; }
+  const cle = ref + "|" + taille;
+  if (qte > 0) { panier.set(cle, { produit: p, taille, qte, prix: prixDe(t) }); enAttente.delete(ref); }
+  else {
+    panier.delete(cle);
+    // la référence reste visible dans le panier tant qu'on ne l'a pas retirée
+    if (![...panier.values()].some(l => l.produit.reference === ref)) enAttente.set(ref, p);
+  }
+  if (champ) champ.classList.toggle("rempli", qte > 0);
+  majTotauxPanier();
+}
+
+// Totaux et badges, sans reconstruire les champs de saisie.
+function majTotauxPanier() {
+  let pieces = 0, ht = 0;
+  const refs = new Set([...enAttente.keys()]);
+  const parRef = {};
+  for (const l of panier.values()) {
+    const montant = l.qte * l.prix;
+    pieces += l.qte; ht += montant; refs.add(l.produit.reference);
+    parRef[l.produit.reference] = (parRef[l.produit.reference] || 0) + montant;
+  }
+  document.querySelectorAll("[data-total-ref]").forEach(el => {
+    const r = el.dataset.totalRef;
+    el.textContent = parRef[r] ? eur(parRef[r]) : "—";
+  });
+  document.getElementById("badge").textContent = pieces;
+  document.getElementById("t-pieces").textContent = `${pieces} pièce${pieces > 1 ? "s" : ""}`;
+  document.getElementById("t-refs").textContent = `${refs.size} référence${refs.size > 1 ? "s" : ""}`;
+  document.getElementById("t-ht").textContent = eur(ht);
+  majBoutonCommande();
+  sauvegardeAutoPanier();
+}
+
+function sauvegardeAutoPanier() {
+  try {
+    const lignes = [...panier.values()].map(l => ({ ref: l.produit.reference, taille: l.taille, qte: l.qte }));
+    // une référence sans quantité se note avec une taille vide : elle revient après rechargement
+    for (const ref of enAttente.keys()) lignes.push({ ref, taille: "", qte: 0 });
+    localStorage.setItem("fkb2b-panier-auto", JSON.stringify(lignes));
+  } catch (e) { /* stockage local indisponible */ }
 }
 
 function basculer(id, ouvert) {
@@ -3890,11 +4009,15 @@ async function restaurerPanier() {
     }
     for (const l of lignes) {
       const p = produitConnu(l.ref);
-      const t = p && p.tailles.find(t => t.taille === l.taille);
-      if (t && t.stock > 0) panier.set(l.ref + "|" + l.taille, {produit: p, taille: l.taille,
-        qte: Math.min(l.qte, t.stock), prix: prixDe(t)});
+      if (!p) continue;
+      // taille vide = référence ajoutée sans quantité, à remplir dans le panier
+      if (!l.taille) { enAttente.set(l.ref, p); continue; }
+      const t = p.tailles.find(t => t.taille === l.taille);
+      if (t && (t.stock > 0 || t.precommande)) panier.set(l.ref + "|" + l.taille, {produit: p, taille: l.taille,
+        qte: t.precommande ? l.qte : Math.min(l.qte, t.stock), prix: prixDe(t)});
     }
     rendrePanier();
+    majBoutonsEpingle();
   } catch (e) { /* pas de panier enregistré */ }
 }
 
@@ -3925,6 +4048,7 @@ async function validerCommande() {
     localStorage.removeItem("fkb2b-panier-auto");
     await api("/rest/v1/paniers?user_id=eq." + monUserId(), { methode: "DELETE" }).catch(() => {});
     panier.clear();
+    enAttente.clear();
     document.getElementById("cgv-ok").checked = false; // à recocher pour la commande suivante
     document.getElementById("nom-commande").value = "";
     rendrePanier();
