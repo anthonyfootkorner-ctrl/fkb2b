@@ -157,6 +157,67 @@ async function dezipper(tampon) {
   return fichiers;
 }
 
+// Un .xlsx est un ZIP de XML : on en tire la première feuille, convertie en TSV,
+// pour la faire passer par le même chemin que les fichiers texte.
+function estXlsx(fichiers) {
+  return fichiers.some(f => f.nom === "xl/workbook.xml");
+}
+
+function xlsxVersTexte(fichiers) {
+  const texteDe = (nom) => {
+    const f = fichiers.find(x => x.nom === nom);
+    return f ? new TextDecoder("utf-8").decode(f.tampon) : "";
+  };
+  const desechapper = (s) => s
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n))
+    .replace(/&amp;/g, "&");
+
+  // chaînes partagées : Excel range le texte des cellules dans une table à part
+  const partagees = [];
+  for (const bloc of texteDe("xl/sharedStrings.xml").split(/<si[ >]/).slice(1)) {
+    const morceaux = [...bloc.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(m => desechapper(m[1]));
+    partagees.push(morceaux.join(""));
+  }
+
+  // première feuille déclarée dans le classeur
+  const feuille = (fichiers.find(f => /^xl\/worksheets\/sheet1\.xml$/.test(f.nom))
+    || fichiers.find(f => /^xl\/worksheets\/.*\.xml$/.test(f.nom)));
+  if (!feuille) throw new Error("aucune feuille dans ce classeur");
+  const xml = new TextDecoder("utf-8").decode(feuille.tampon);
+
+  const colonne = (ref) => {   // "BC12" -> index 0-based de la colonne
+    let n = 0;
+    for (const c of (ref.match(/^[A-Z]+/) || ["A"])[0]) n = n * 26 + (c.charCodeAt(0) - 64);
+    return n - 1;
+  };
+
+  const lignes = [];
+  for (const bloc of xml.split(/<row[ >]/).slice(1)) {
+    const cellules = [];
+    let large = 0;
+    for (const m of bloc.matchAll(/<c ([^>]*?)(\/>|>([\s\S]*?)<\/c>)/g)) {
+      const attrs = m[1], corps = m[3] || "";
+      const ref = (attrs.match(/r="([A-Z]+\d+)"/) || [])[1] || "";
+      const type = (attrs.match(/t="([^"]+)"/) || [])[1] || "";
+      const brut = (corps.match(/<v>([\s\S]*?)<\/v>/) || [])[1];
+      const enligne = [...corps.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(x => desechapper(x[1])).join("");
+      let valeur = "";
+      if (type === "s" && brut !== undefined) valeur = partagees[+brut] ?? "";
+      else if (type === "inlineStr") valeur = enligne;
+      else if (brut !== undefined) valeur = desechapper(brut);
+      const i = ref ? colonne(ref) : cellules.length;
+      while (cellules.length < i) cellules.push("");
+      cellules[i] = valeur.replace(/[\t\r\n]+/g, " ");
+      large = Math.max(large, i + 1);
+    }
+    if (large === 0) continue;                 // ligne vide : Excel en déclare beaucoup
+    if (cellules.every(c => !c)) continue;
+    lignes.push(cellules.join("\t"));
+  }
+  return lignes.join("\r\n");
+}
+
 function estZip(tampon) {
   return tampon.byteLength > 4 && new DataView(tampon).getUint32(0, true) === 0x04034b50;
 }

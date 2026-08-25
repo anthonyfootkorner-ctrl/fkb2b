@@ -154,18 +154,32 @@ async function analyserFichierFastmag(fichier) {
   const empreinte = [...new Uint8Array(await crypto.subtle.digest("SHA-256", tampon))]
     .map(b => b.toString(16).padStart(2, "0")).join("");
 
-  // .zip accepté tel quel : on cherche dedans le premier CSV au format connu
+  // .zip et .xlsx acceptés tels quels : un classeur Excel est un ZIP de XML,
+  // on en tire la première feuille ; sinon on cherche un CSV au format connu.
   let nomAffiche = fichier.name, d = null;
   if (estZip(tampon)) {
     let entrees;
     try { entrees = await dezipper(tampon); }
-    catch (e) { return { erreur: "lecture du ZIP impossible : " + e.message, empreinte }; }
-    for (const e of entrees) {
-      if (!/\.(csv|txt|tsv)$/i.test(e.nom) || /summary/i.test(e.nom)) continue;
-      d = detecterModeleImport(e.tampon) || detecterStockB2B(e.tampon);
-      if (d) { nomAffiche = fichier.name + " \u2192 " + e.nom; break; }
+    catch (e) { return { erreur: "lecture du fichier impossible : " + e.message, empreinte }; }
+
+    if (estXlsx(entrees)) {
+      let texte;
+      try { texte = xlsxVersTexte(entrees); }
+      catch (e) { return { erreur: "classeur Excel illisible : " + e.message, empreinte }; }
+      if (!texte.trim()) return { erreur: "la première feuille de ce classeur est vide", empreinte };
+      const octets = new TextEncoder().encode(texte).buffer;
+      d = detecterModeleImport(octets) || detecterStockB2B(octets);
+      if (!d) return { erreur: "format non reconnu : l'en-tête de la feuille ne correspond "
+        + "à aucun modèle connu", empreinte };
+      nomAffiche = fichier.name + " → feuille 1";
+    } else {
+      for (const e of entrees) {
+        if (!/\.(csv|txt|tsv)$/i.test(e.nom) || /summary/i.test(e.nom)) continue;
+        d = detecterModeleImport(e.tampon) || detecterStockB2B(e.tampon);
+        if (d) { nomAffiche = fichier.name + " \u2192 " + e.nom; break; }
+      }
+      if (!d) return { erreur: "aucun fichier au format connu dans ce ZIP", empreinte };
     }
-    if (!d) return { erreur: "aucun fichier au format connu dans ce ZIP", empreinte };
   } else {
     // les mod\u00e8les Fastmag/Shopify d'abord (signature stricte), le stock B2B en dernier recours
     d = detecterModeleImport(tampon) || detecterStockB2B(tampon);
