@@ -1167,10 +1167,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787666325"></script>
-<script src="imports.js?v=1787666325"></script>
-<script src="merch-shopify.js?v=1787666325"></script>
-<script src="moteur-merch.js?v=1787666325"></script>
+<script src="config.js?v=1787666899"></script>
+<script src="imports.js?v=1787666899"></script>
+<script src="merch-shopify.js?v=1787666899"></script>
+<script src="moteur-merch.js?v=1787666899"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -3081,6 +3081,10 @@ async function rendreUtilisateurs() {
   document.getElementById("liste-utilisateurs").innerHTML = (liste || []).map(u => `
     <div class="rang-util" data-user="${u.user_id}">
       <div class="qui"><b>${u.email}</b><span>${u.nom || "—"} · ${u.role}</span></div>
+      <span class="etiquette ${u.actif ? "ok" : "attente"}" title="${
+        u.actif ? `dernière connexion ${new Date(u.derniere_connexion).toLocaleString("fr-FR")}`
+                : u.invite_le ? `invité le ${new Date(u.invite_le).toLocaleString("fr-FR")}` : ""}">${
+        u.actif ? "ACTIF" : "EN ATTENTE"}</span>
       <div class="acces">
         <div class="chips">${chipsHTML(u.societes.map(s => s.compte), false)}</div>
         ${u.role !== "admin" ? `
@@ -3089,7 +3093,9 @@ async function rendreUtilisateurs() {
                  placeholder="modifier les magasins…" id="acc-${u.user_id}">
           <button class="puce-claire" onclick="ajouterAcces('${u.user_id}')">+ magasin</button>
           <button class="puce-claire" onclick="sauverAcces('${u.user_id}')">Enregistrer les accès</button>
-          <button class="puce-claire" onclick="reinitialiserMdp('${u.user_id}', '${u.email}')">Réinitialiser le mot de passe</button>
+          <button class="puce-claire" onclick="envoyerLienMdp('${u.user_id}', ${JSON.stringify(u.email).replaceAll('"', "&quot;")}, ${u.actif})">${
+            u.actif ? "Envoyer un lien de réinitialisation" : "Renvoyer l'invitation"}</button>
+          <button class="puce-claire" onclick="reinitialiserMdp('${u.user_id}', '${u.email}')">Mot de passe provisoire</button>
           <span class="compte-produits" id="etat-${u.user_id}"></span>
         </div>
         <div class="chips" id="edit-${u.user_id}">${chipsHTML(u.societes.map(s => s.compte), true, `retirerAcces_${u.user_id.replaceAll("-", "_")}`)}</div>` : ""}
@@ -3122,6 +3128,21 @@ async function rendreUtilisateurs() {
   };
   // Réinitialisation de mot de passe par l'admin : génère un mot de passe lisible,
   // le définit côté serveur, l'affiche une seule fois.
+  // Relance par e-mail : la personne choisit son mot de passe, rien ne transite en clair.
+  window.envoyerLienMdp = async (uid, email, actif) => {
+    const quoi = actif ? "un lien de réinitialisation" : "une nouvelle invitation";
+    if (!confirm(`Envoyer ${quoi} à ${email} ?`)) return;
+    const zone = document.getElementById(`etat-${uid}`);
+    zone.textContent = "envoi…";
+    try {
+      await api("/auth/v1/recover", { corps: {
+        email, redirect_to: location.href.replace(/index\.html.*$/, "").replace(/#.*$/, "") + "motdepasse.html" } });
+      zone.innerHTML = `Lien envoyé à <b>${echapperHTML(email)}</b> ✓ — valable 1 heure.`;
+    } catch (e) {
+      zone.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 160);
+    }
+  };
+
   window.reinitialiserMdp = async (uid, email) => {
     if (!confirm(`Réinitialiser le mot de passe de ${email} ?\nL'ancien ne fonctionnera plus.`)) return;
     const zone = document.getElementById(`etat-${uid}`);
