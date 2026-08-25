@@ -896,6 +896,18 @@
     </div>
 
     <div class="bloc-clair" style="margin: 0 22px 26px">
+      <h3 class="titre-bloc">Produits en stock sans tarif</h3>
+      <div class="compte-produits" style="margin-bottom:12px">Ces références sont en rayon mais
+        invisibles au catalogue, faute de prix. Comparaison sur les quatre grilles suivies —
+        GROS, FRA, FRANCHISE, SP2000 — et pour SP2000 uniquement les produits FK.</div>
+      <div class="formu">
+        <button class="puce-claire" id="btn-sans-tarif">Vérifier</button>
+        <span class="compte-produits" id="etat-sans-tarif"></span>
+      </div>
+      <div id="resume-sans-tarif" style="margin-top:12px"></div>
+    </div>
+
+    <div class="bloc-clair" style="margin: 0 22px 26px">
       <h3 class="titre-bloc">Campagnes de précommande</h3>
       <div class="compte-produits" style="margin-bottom:12px">Chaque campagne vit à part du stock vendable :
         elle se remplit marque par marque et ne s'efface jamais toute seule.</div>
@@ -1173,10 +1185,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787676801"></script>
-<script src="imports.js?v=1787676801"></script>
-<script src="merch-shopify.js?v=1787676801"></script>
-<script src="moteur-merch.js?v=1787676801"></script>
+<script src="config.js?v=1787678115"></script>
+<script src="imports.js?v=1787678115"></script>
+<script src="merch-shopify.js?v=1787678115"></script>
+<script src="moteur-merch.js?v=1787678115"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2207,6 +2219,7 @@ async function rendreImports() {
   await Promise.all([rendreJournalImports(), rendreEtatStockB2B(), rendreCampagnesPreco()]);
   if (importsInitialise) return;
   importsInitialise = true;
+  document.getElementById("btn-sans-tarif").onclick = () => verifierSansTarif(false);
   const zone = document.getElementById("zone-depot");
   const champ = document.getElementById("fichier-import");
   champ.onchange = () => champ.files[0] && traiterFichier(champ.files[0]);
@@ -2234,6 +2247,59 @@ async function rendreEtatStockB2B() {
     ? `<div class="compte-produits">Stock du catalogue en place — dernier dépôt : ${quand}.</div>`
     : `<div class="compte-produits" style="color:#a33"><b>Aucun stock B2B en base : le catalogue affiche 0 partout.</b>
        Déposez un export stock B2B pour le rétablir${d ? ` (le dernier remonte au ${quand})` : ""}.</div>`;
+}
+
+// Contrôle des tarifs manquants : on résume à l'écran, et on sort la liste pour Excel.
+let SANS_TARIF = null;
+
+async function verifierSansTarif(silencieux) {
+  const etat = document.getElementById("etat-sans-tarif");
+  const zone = document.getElementById("resume-sans-tarif");
+  if (!etat || !zone) return;
+  etat.textContent = "vérification…";
+  try {
+    SANS_TARIF = await api("/rest/v1/rpc/produits_sans_tarif", { corps: {} });
+  } catch (e) {
+    etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 160);
+    return;
+  }
+  const r = SANS_TARIF;
+  if (!r) { etat.textContent = "réservé à l'administrateur"; return; }
+  etat.textContent = "";
+  const parFamille = Object.entries(r.par_famille || {}).sort((a, b) => b[1] - a[1]);
+  zone.innerHTML = r.total === 0
+    ? `<div class="rang" style="color:#2e9e4f"><b>Aucun tarif manquant</b>
+        <span class="fin">${r.couples_en_stock} référence-taille en stock, toutes tarifées</span></div>`
+    : `<div class="rang" style="flex-wrap:wrap">
+        <b style="color:#a33">${r.total} manque${r.total > 1 ? "s" : ""} de tarif</b>
+        <span class="fin">${r.references} référence${r.references > 1 ? "s" : ""} concernée${r.references > 1 ? "s" : ""}
+          · ${r.couples_en_stock} référence-taille en stock</span>
+        <div class="chips" style="width:100%; margin-top:8px">
+          ${parFamille.map(([f, n]) => `<span class="chip grise">${echapperHTML(f)} : ${n}</span>`).join("")}
+        </div>
+        <div style="width:100%; margin-top:10px">
+          <button class="puce-claire forte" onclick="telechargerSansTarif()">Télécharger la liste (Excel)</button>
+        </div>
+      </div>`;
+  if (!silencieux && r.total) zone.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function telechargerSansTarif() {
+  const lignes = SANS_TARIF?.lignes || [];
+  if (!lignes.length) return;
+  const csv = (v) => `"${String(v ?? "").replaceAll('"', '""')}"`;
+  const sortie = [
+    ["Famille tarifaire", "Référence", "Taille", "Gencod", "Désignation", "Marque",
+     "Famille produit", "Saison", "Quantité", "Emplacement"].map(csv).join(";"),
+    ...lignes.map(l => [l.famille_tarifaire, l.reference, l.taille, l.gencod, l.designation,
+      l.marque, l.famille_produit, l.saison, l.quantite, l.emplacements].map(csv).join(";")),
+  ].join("\r\n");
+  const jour = new Date().toISOString().slice(0, 10);
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(new Blob(["\ufeff" + sortie], { type: "text/csv;charset=utf-8" }));
+  lien.download = `FKB2B_produits_sans_tarif_${jour}.csv`;
+  lien.click();
+  URL.revokeObjectURL(lien.href);
 }
 
 async function rendreCampagnesPreco() {
@@ -2508,6 +2574,8 @@ async function traiterFichier(fichier) {
         : await executerImport(a, msg => progres.textContent = msg);
       progres.innerHTML = `<b>Import terminé ✓</b> — ${total} lignes écrites.`;
       await Promise.all([rendreJournalImports(), rendreEtatStockB2B(), rendreCampagnesPreco()]);
+      // un dépôt de stock ou de tarifs peut laisser des produits sans prix : on regarde aussitôt
+      if (["stock_b2b", "tarifs"].includes(a.modele)) verifierSansTarif(true);
       DATA.produits = await api("/rest/v1/rpc/catalogue",
         { corps: { limite: 300, p_societe: clientActif.id ?? null } });
       DATA.produits.forEach(trierTailles);

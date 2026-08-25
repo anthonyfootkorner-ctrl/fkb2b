@@ -52,7 +52,12 @@ const COLONNES_B2B = {
              "dispo", "total stock", "nombre", "nb"],
   precommande: ["precommande", "preco", "precommand", "pre-commande", "illimite", "illimité",
                 "infini", "stock infini", "sur commande"],
+  // deux emplacements depuis le 25/08/2026 : CENTRAL sert en premier, WEB en dernier recours
+  magasin: ["magasin", "depot", "dépôt", "emplacement", "site", "code_origine", "origine"],
+  gencod: ["gencod", "ean", "code barre", "code-barres", "codebarre", "barcode", "ean13"],
 };
+// « CENTRAL » et « WEB » sont les seuls emplacements du stock vendable.
+const EMPLACEMENTS = { CENTRAL: "CENTRAL", CENTRALE: "CENTRAL", WEB: "WEB", SHOP: "WEB", SITE: "WEB" };
 const sansAccent = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
   .toLowerCase().replace(/\s+/g, " ").trim();
 const estVrai = v => ["oui", "o", "yes", "y", "x", "1", "true", "vrai"].includes(sansAccent(v));
@@ -83,7 +88,9 @@ function detecterStockB2B(tampon) {
         spec: { libelle: "Stock B2B (fichier Footkorner) — stock vendable du catalogue",
                 sep, encodage, remplacement_complet: true,
                 remplacement_libelle: "remplace le stock B2B du catalogue + recalcul des actifs",
-                colonnes: { ref, taille: trouverColonne(entete, COLONNES_B2B.taille), qte, preco } } };
+                colonnes: { ref, taille: trouverColonne(entete, COLONNES_B2B.taille), qte, preco,
+                            magasin: trouverColonne(entete, COLONNES_B2B.magasin),
+                            gencod: trouverColonne(entete, COLONNES_B2B.gencod) } } };
     }
   }
   return null;
@@ -228,24 +235,36 @@ async function verifierReferences(analyse) {
 // Fichier de stock B2B → lignes prêtes pour la base, avec le détail de ce qui a été lu
 // (les colonnes ayant été reconnues à l'intitulé, autant les montrer avant d'exécuter).
 function preparerStockB2B(analyse) {
-  const { ref, taille, qte, preco } = analyse.spec.colonnes;
+  const { ref, taille, qte, preco, magasin, gencod } = analyse.spec.colonnes;
   const parCle = new Map();
-  let precommandes = 0, ignorees = 0;
+  let precommandes = 0, ignorees = 0, inconnus = new Set();
   for (const l of analyse.lignes) {
     const reference = (l[ref] || "").trim();
     if (!reference) { ignorees++; continue; }
     const t = ((taille ? l[taille] : "") || "").trim();
+    // sans colonne magasin, tout va au central : c'est l'ancien comportement
+    const brut = ((magasin ? l[magasin] : "") || "CENTRAL").trim().toUpperCase();
+    const emplacement = EMPLACEMENTS[brut];
+    if (!emplacement) { inconnus.add(brut); ignorees++; continue; }
     const illimite = preco ? estVrai(l[preco]) : false;
     const q = qte ? (parseInt(parseFloat((l[qte] || "0").replace(",", ".")), 10) || 0) : 0;
     if (!illimite && q <= 0) { ignorees++; continue; }
-    const cle = reference + "|" + t;
-    const e = parCle.get(cle) || { reference, taille: t, quantite: 0, illimite: false };
+    const cle = emplacement + "|" + reference + "|" + t;
+    const e = parCle.get(cle)
+      || { magasin: emplacement, reference, taille: t, quantite: 0, illimite: false, gencod: null };
     e.quantite += q;
     e.illimite = e.illimite || illimite;
+    e.gencod ??= gencod ? ((l[gencod] || "").trim() || null) : null;
     parCle.set(cle, e);
   }
-  for (const e of parCle.values()) if (e.illimite) precommandes++;
-  return { rows: [...parCle.values()], precommandes, ignorees };
+  const rows = [...parCle.values()];
+  for (const e of rows) if (e.illimite) precommandes++;
+  return {
+    rows, precommandes, ignorees,
+    central: rows.filter(r => r.magasin === "CENTRAL").length,
+    web: rows.filter(r => r.magasin === "WEB").length,
+    emplacementsInconnus: [...inconnus],
+  };
 }
 
 function mapperVersTables(analyse) {
@@ -476,7 +495,8 @@ async function executerPrecommande(analyse, surProgres) {
 // Dépôt du stock B2B : préparation, envoi par lots, puis bascule côté serveur
 // (remplacement du stock, solde des commandes en attente, recalcul des actifs).
 async function executerStockB2B(analyse, surProgres) {
-  const { rows, precommandes, ignorees } = preparerStockB2B(analyse);
+  const prepare = preparerStockB2B(analyse);
+  const { rows, precommandes, ignorees } = prepare;
   if (!rows.length) throw new Error("aucune ligne de stock exploitable dans ce fichier");
 
   surProgres("préparation du dépôt…");
@@ -494,6 +514,10 @@ async function executerStockB2B(analyse, surProgres) {
   const bilan = await api("/rest/v1/rpc/stock_b2b_fin", { corps: {} });
 
   const mots = [`${bilan.lignes} lignes de stock`];
+  if (bilan.central || bilan.web) mots.push(`${bilan.central || 0} au central · ${bilan.web || 0} au web`);
+  if (prepare.emplacementsInconnus?.length) {
+    mots.push(`⚠ emplacement inconnu ignoré : ${prepare.emplacementsInconnus.join(", ")}`);
+  }
   if (precommandes) mots.push(`${precommandes} en précommande`);
   if (bilan.commandes_soldees) mots.push(`${bilan.commandes_soldees} commande(s) en attente soldée(s)`);
   if (ignorees) mots.push(`${ignorees} ligne(s) ignorée(s) (sans référence ou quantité nulle)`);
