@@ -581,6 +581,17 @@
   .repart-panier button:hover { background: #dc650f; }
   .repart-panier button:active { transform: scale(0.97); }
   .repart-panier .sans-grille { font-size: 11px; color: var(--gris); }
+  .retour-panier { background: none; border: 0; color: var(--gris); font-size: 12px; letter-spacing: .04em;
+    cursor: pointer; padding: 0 0 14px; }
+  .retour-panier:hover { color: var(--blanc); }
+  .recap-ligne { display: flex; gap: 12px; align-items: baseline; font-size: 12.5px; color: var(--gris);
+    padding: 7px 0; border-bottom: 1px solid #1e1e1e; }
+  .recap-ligne:last-child { border-bottom: 0; }
+  .recap-ligne .n { color: var(--blanc); flex: 1; }
+  .recap-ligne .q { white-space: nowrap; }
+  .recap-ligne .m { color: var(--blanc); white-space: nowrap; }
+  .panier-corps.recap { padding-top: 16px; }
+
   .panier-alerte { background: rgba(199,63,63,.12); border: 1px solid #5a2626; color: #ef9a9a;
     border-radius: 10px; padding: 10px 12px; font-size: 12px; line-height: 1.5; margin-bottom: 12px; }
 
@@ -1123,9 +1134,11 @@
     <button class="fermer" id="fermer-panier" style="margin-left:auto">×</button>
   </div>
   <div class="panier-corps" id="panier-corps"></div>
-  <div class="panier-pied">
-    <div class="totaux"><span id="t-pieces">0 pièce</span><span id="t-refs">0 référence</span></div>
-    <div class="totaux grand"><span>TOTAL HT</span><span id="t-ht">0,00 €</span></div>
+
+  <!-- Étape 2 : le récapitulatif ne s'affiche qu'une fois les quantités saisies. -->
+  <div class="panier-corps recap" id="panier-recap" style="display:none">
+    <button class="retour-panier" onclick="etapePanier(1)">← Modifier le panier</button>
+    <div id="recap-lignes"></div>
     <label class="nom-commande" for="nom-commande">Nom de la commande
       <input id="nom-commande" maxlength="40" placeholder="ex. Réassort rentrée" autocomplete="off">
       <span>Repris comme critère dans Fastmag — 40 caractères maximum.</span>
@@ -1135,10 +1148,16 @@
       <span><label for="cgv-ok">Je déclare avoir pris connaissance et accepter les </label><a href="#/cgv"
         onclick="basculer('panier', false)">conditions générales de vente</a>.</span>
     </div>
-    <div id="panier-alerte" class="panier-alerte" style="display:none"></div>
-    <button class="btn-plein" id="btn-export" style="width:100%" disabled>VALIDER LA COMMANDE</button>
-    <button class="puce" id="btn-sauver" style="width:100%; margin-top:10px">Enregistrer le panier pour plus tard</button>
     <p class="note">À la validation, la commande est transmise à Footkorner et le stock est réservé. Vous recevez un récapitulatif par e-mail.</p>
+  </div>
+
+  <div class="panier-pied">
+    <div class="totaux"><span id="t-pieces">0 pièce</span><span id="t-refs">0 référence</span></div>
+    <div class="totaux grand"><span>TOTAL HT</span><span id="t-ht">0,00 €</span></div>
+    <div id="panier-alerte" class="panier-alerte" style="display:none"></div>
+    <button class="btn-plein" id="btn-continuer" style="width:100%" onclick="etapePanier(2)">CONTINUER</button>
+    <button class="btn-plein" id="btn-export" style="width:100%; display:none" disabled>VALIDER LA COMMANDE</button>
+    <button class="puce" id="btn-sauver" style="width:100%; margin-top:10px">Enregistrer le panier pour plus tard</button>
   </div>
 </aside>
 
@@ -1147,10 +1166,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787651311"></script>
-<script src="imports.js?v=1787651311"></script>
-<script src="merch-shopify.js?v=1787651311"></script>
-<script src="moteur-merch.js?v=1787651311"></script>
+<script src="config.js?v=1787652642"></script>
+<script src="imports.js?v=1787652642"></script>
+<script src="merch-shopify.js?v=1787652642"></script>
+<script src="moteur-merch.js?v=1787652642"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -3961,9 +3980,11 @@ function rendrePanier() {
 function majBoutonCommande() {
   const cgv = document.getElementById("cgv-ok");
   document.getElementById("btn-export").disabled = panier.size === 0 || !cgv?.checked;
+  const continuer = document.getElementById("btn-continuer");
+  if (continuer) continuer.disabled = panier.size === 0 && enAttente.size === 0;
   const zone = document.getElementById("panier-alerte");
   if (!zone) return;
-  if (!enAttente.size) { zone.style.display = "none"; zone.innerHTML = ""; return; }
+  if (!enAttente.size || ETAPE_PANIER === 2) { zone.style.display = "none"; zone.innerHTML = ""; return; }
   const noms = [...enAttente.values()].map(p => p.designation || p.reference);
   zone.style.display = "";
   zone.innerHTML = `<b>${enAttente.size} référence${enAttente.size > 1 ? "s" : ""} sans quantité</b> —
@@ -3971,7 +3992,40 @@ function majBoutonCommande() {
     Saisissez les quantités ou retirez-${enAttente.size > 1 ? "les" : "la"} du panier.`;
 }
 
-// Au clic sur « valider » : on refuse tant qu'une référence reste sans quantité.
+/* Le tiroir en deux temps : les produits d'abord, le récapitulatif ensuite.
+   Le pied restait plus haut que la liste alors qu'il ne sert qu'à la fin. */
+let ETAPE_PANIER = 1;
+
+function etapePanier(n) {
+  if (n === 2 && !panierPretAValider()) return;   // pas de CGV avec un panier incomplet
+  if (n === 2 && !panier.size) return;
+  ETAPE_PANIER = n;
+  document.getElementById("panier-corps").style.display = n === 1 ? "" : "none";
+  document.getElementById("panier-recap").style.display = n === 2 ? "" : "none";
+  document.getElementById("btn-continuer").style.display = n === 1 ? "" : "none";
+  document.getElementById("btn-export").style.display = n === 2 ? "" : "none";
+  document.querySelector("#panier .panier-tete h2").textContent = n === 1 ? "PANIER" : "VALIDATION";
+  if (n === 2) rendreRecapPanier();
+  majBoutonCommande();
+}
+
+// Le détail de ce qui part : une ligne par référence, pièces et montant.
+function rendreRecapPanier() {
+  const parRef = new Map();
+  for (const l of panier.values()) {
+    const g = parRef.get(l.produit.reference) || { produit: l.produit, pieces: 0, total: 0 };
+    g.pieces += l.qte; g.total += l.qte * l.prix;
+    parRef.set(l.produit.reference, g);
+  }
+  document.getElementById("recap-lignes").innerHTML = [...parRef.values()].map(g => `
+    <div class="recap-ligne">
+      <span class="n">${echapperHTML(g.produit.designation || g.produit.reference)}</span>
+      <span class="q">${g.pieces} pc</span>
+      <span class="m">${eur(g.total)}</span>
+    </div>`).join("");
+}
+
+// Au clic sur « continuer » : on refuse tant qu'une référence reste sans quantité.
 function panierPretAValider() {
   if (!enAttente.size) return true;
   const zone = document.getElementById("panier-alerte");
@@ -4150,6 +4204,7 @@ function sauvegardeAutoPanier() {
 }
 
 function basculer(id, ouvert) {
+  if (id === "panier" && ouvert && ETAPE_PANIER !== 1) etapePanier(1);
   document.getElementById(id).classList.toggle("ouvert", ouvert);
   document.getElementById("voile").classList.toggle("ouvert", ouvert);
 }
@@ -4234,13 +4289,16 @@ async function validerCommande() {
     const motEnvoi = erreurEnvoi
       ? `<span style="color:#e0a24d">Envoi de l'e-mail à confirmer — nos équipes ont bien la commande en base.</span><br>`
       : (envoi?.copie_client ? "Un récapitulatif vient de vous être envoyé par e-mail.<br>" : "");
+    etapePanier(1);
     document.getElementById("panier-corps").innerHTML = `<div class="vide">Commande <b>${r.numero}</b> transmise ✓<br>
       ${r.nom ? `<span style="font-size:12px">« ${echapperHTML(r.nom)} »</span>` : ""}<br>
       <span style="font-size:12px">${r.nb_pieces} pièces — ${eur(Number(r.total_ht))} HT<br>
       Enregistrée côté serveur : le stock est réservé.<br>
       ${motEnvoi}</span></div>`;
   } catch (e) {
-    document.getElementById("panier-corps").insertAdjacentHTML("afterbegin",
+    const zone = ETAPE_PANIER === 2 ? document.getElementById("panier-recap")
+                                    : document.getElementById("panier-corps");
+    zone.insertAdjacentHTML("afterbegin",
       `<div class="vide" style="color:#e08a87; padding:20px 0">${String(e.donnees?.message || e.message).replace(/</g, "&lt;")}</div>`);
   }
   btn.textContent = "VALIDER LA COMMANDE";
