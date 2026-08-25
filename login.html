@@ -65,15 +65,17 @@
     &nbsp;·&nbsp;
     <a href="#" id="oubli" style="color:var(--gris); text-decoration:underline">Mot de passe oublié ?</a></p>
 </form>
-<script src="config.js?v=1787667874"></script>
+<script src="config.js?v=1787668028"></script>
 <script>
 // Retour d'un lien de connexion (ou d'un lien reçu par e-mail) : la session arrive dans l'adresse.
 (function ouvrirDepuisLien() {
   const h = new URLSearchParams(location.hash.slice(1));
   const jeton = h.get("access_token");
   if (!jeton) return;
-  if (h.get("type") === "recovery" || h.get("type") === "invite") {
-    location.href = "motdepasse.html" + location.hash;   // là, on choisit son mot de passe
+  // invitation, réinitialisation ou confirmation d'adresse : la personne n'a pas encore
+  // de mot de passe à elle, on l'emmène le choisir plutôt que d'ouvrir une session muette.
+  if (["recovery", "invite", "signup"].includes(h.get("type"))) {
+    location.href = "motdepasse.html" + location.hash;
     return;
   }
   try {
