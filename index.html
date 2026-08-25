@@ -1166,10 +1166,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787652884"></script>
-<script src="imports.js?v=1787652884"></script>
-<script src="merch-shopify.js?v=1787652884"></script>
-<script src="moteur-merch.js?v=1787652884"></script>
+<script src="config.js?v=1787653085"></script>
+<script src="imports.js?v=1787653085"></script>
+<script src="merch-shopify.js?v=1787653085"></script>
+<script src="moteur-merch.js?v=1787653085"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -3940,7 +3940,7 @@ function rendrePanier() {
           <span>${echapperHTML(t.taille)}</span>
         </label>`;
       }).join("");
-      return `<div class="groupe">
+      return `<div class="groupe" data-groupe-ref="${echapperHTML(p.reference)}">
         <div class="ligne">
           <div class="visuel">${p.photo ? `<img src="${p.photo}" alt="">` : ""}</div>
           <div class="det">
@@ -3985,11 +3985,9 @@ function majBoutonCommande() {
   const zone = document.getElementById("panier-alerte");
   if (!zone) return;
   if (!enAttente.size || ETAPE_PANIER === 2) { zone.style.display = "none"; zone.innerHTML = ""; return; }
-  const noms = [...enAttente.values()].map(p => p.designation || p.reference);
   zone.style.display = "";
   zone.innerHTML = `<b>${enAttente.size} référence${enAttente.size > 1 ? "s" : ""} sans quantité</b> —
-    ${noms.slice(0, 4).map(echapperHTML).join(", ")}${noms.length > 4 ? `, et ${noms.length - 4} autre${noms.length - 4 > 1 ? "s" : ""}` : ""}.
-    Saisissez les quantités ou retirez-${enAttente.size > 1 ? "les" : "la"} du panier.`;
+    saisissez les quantités ou retirez-${enAttente.size > 1 ? "les" : "la"} du panier.`;
 }
 
 /* Le tiroir en deux temps : les produits d'abord, le récapitulatif ensuite.
@@ -4028,17 +4026,18 @@ function rendreRecapPanier() {
 // Au clic sur « continuer » : on refuse tant qu'une référence reste sans quantité.
 function panierPretAValider() {
   if (!enAttente.size) return true;
-  const zone = document.getElementById("panier-alerte");
+  const ref = [...enAttente.keys()][0];
+  const groupe = document.querySelector(`#panier-corps [data-groupe-ref="${CSS.escape(ref)}"]`);
   const premier = document.querySelector(
-    `#panier-corps input[data-ref="${CSS.escape([...enAttente.keys()][0])}"]:not([disabled])`);
-  if (zone) {
-    zone.style.display = "";
-    zone.animate?.([{ transform: "translateX(0)" }, { transform: "translateX(-5px)" },
-                    { transform: "translateX(5px)" }, { transform: "translateX(0)" }],
-                   { duration: 260 });
-    zone.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
-  premier?.focus();
+    `#panier-corps input[data-ref="${CSS.escape(ref)}"]:not([disabled])`);
+  document.getElementById("panier-alerte")?.animate?.(
+    [{ transform: "translateX(0)" }, { transform: "translateX(-5px)" },
+     { transform: "translateX(5px)" }, { transform: "translateX(0)" }], { duration: 260 });
+  // on emmène directement sur la première référence à compléter
+  groupe?.scrollIntoView({ behavior: "smooth", block: "center" });
+  groupe?.animate?.([{ backgroundColor: "rgba(242,117,31,.16)" }, { backgroundColor: "transparent" }],
+                    { duration: 900 });
+  setTimeout(() => premier?.focus({ preventScroll: true }), 260);
   return false;
 }
 
