@@ -567,6 +567,10 @@
   .case-taille input:focus { outline: none; border-color: var(--blanc); }
   .case-taille input.rempli { background: var(--blanc); color: var(--noir); font-weight: 700; }
 
+  .groupe .ligne .m { text-align: right; line-height: 1.35; }
+  .groupe .ligne .m .pieces { display: block; font-size: 10.5px; color: var(--gris); letter-spacing: .04em; }
+  .groupe .ligne .m .pieces.vide { color: #b06a6a; }
+
   .repart-panier { display: flex; align-items: center; gap: 8px; margin: 10px 0 0 58px; }
   .repart-panier input { width: 62px; background: var(--noir3); border: 1px solid var(--bord); color: var(--blanc);
     border-radius: 999px; text-align: center; font-size: 12px; padding: 6px 8px; }
@@ -1143,10 +1147,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787651185"></script>
-<script src="imports.js?v=1787651185"></script>
-<script src="merch-shopify.js?v=1787651185"></script>
-<script src="moteur-merch.js?v=1787651185"></script>
+<script src="config.js?v=1787651311"></script>
+<script src="imports.js?v=1787651311"></script>
+<script src="merch-shopify.js?v=1787651311"></script>
+<script src="moteur-merch.js?v=1787651311"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -3891,11 +3895,12 @@ function rendrePanier() {
   // Une carte par référence, avec TOUTES ses tailles : les quantités se saisissent ici,
   // que la référence vienne d'une fiche produit ou d'un ajout rapide depuis la collection.
   const groupes = new Map();
-  for (const [ref, produit] of enAttente) groupes.set(ref, { produit, qtes: {}, total: 0 });
+  for (const [ref, produit] of enAttente) groupes.set(ref, { produit, qtes: {}, total: 0, pieces: 0 });
   for (const l of panier.values()) {
-    const g = groupes.get(l.produit.reference) || { produit: l.produit, qtes: {}, total: 0 };
+    const g = groupes.get(l.produit.reference) || { produit: l.produit, qtes: {}, total: 0, pieces: 0 };
     g.qtes[l.taille] = l.qte;
     g.total += l.qte * l.prix;
+    g.pieces += l.qte;
     groupes.set(l.produit.reference, g);
     refs.add(l.produit.reference);
   }
@@ -3924,7 +3929,11 @@ function rendrePanier() {
             <div class="d">${echapperHTML(p.reference)}${p.couleur ? " · " + echapperHTML(p.couleur) : ""}
               · dès ${eur(prixMini(p))} HT</div>
           </div>
-          <div class="m" data-total-ref="${echapperHTML(p.reference)}">${g.total ? eur(g.total) : "—"}</div>
+          <div class="m">
+            <span class="pieces" data-pieces-ref="${echapperHTML(p.reference)}">${
+              g.pieces ? `${g.pieces} pièce${g.pieces > 1 ? "s" : ""}` : "aucune quantité"}</span>
+            <span data-total-ref="${echapperHTML(p.reference)}">${g.total ? eur(g.total) : "—"}</span>
+          </div>
           <button class="sup" title="Retirer la référence"
             onclick="retirerReference(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">×</button>
         </div>
@@ -4107,15 +4116,21 @@ function majQtePanier(ref, taille, valeur, champ) {
 function majTotauxPanier() {
   let pieces = 0, ht = 0;
   const refs = new Set([...enAttente.keys()]);
-  const parRef = {};
+  const parRef = {}, piecesRef = {};
   for (const l of panier.values()) {
     const montant = l.qte * l.prix;
     pieces += l.qte; ht += montant; refs.add(l.produit.reference);
     parRef[l.produit.reference] = (parRef[l.produit.reference] || 0) + montant;
+    piecesRef[l.produit.reference] = (piecesRef[l.produit.reference] || 0) + l.qte;
   }
   document.querySelectorAll("[data-total-ref]").forEach(el => {
     const r = el.dataset.totalRef;
     el.textContent = parRef[r] ? eur(parRef[r]) : "—";
+  });
+  document.querySelectorAll("[data-pieces-ref]").forEach(el => {
+    const n = piecesRef[el.dataset.piecesRef] || 0;
+    el.textContent = n ? `${n} pièce${n > 1 ? "s" : ""}` : "aucune quantité";
+    el.classList.toggle("vide", !n);
   });
   document.getElementById("badge").textContent = pieces;
   document.getElementById("t-pieces").textContent = `${pieces} pièce${pieces > 1 ? "s" : ""}`;
