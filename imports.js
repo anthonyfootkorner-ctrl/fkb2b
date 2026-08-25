@@ -292,10 +292,21 @@ function mapperVersTables(analyse) {
       // s'il trouvait les deux (il lit min(prix)).
       const parCle = new Map();
       let doublons = 0;
+      // Un prix à zéro n'est jamais un vrai tarif : c'est une fiche incomplète côté
+      // Fastmag. L'importer rendrait le produit commandable pour rien — on le rejette
+      // et on le liste, plutôt que de laisser passer une vente à 0 €.
+      const rejets = [];
       for (const l of L) {
         if (!l.BarCode) continue;
         const prix = parseFloat(l.Prix);
         if (!l.Tarif || isNaN(prix)) continue;
+        if (prix <= 0) {
+          rejets.push({ reference: l.BarCode, couleur: l.Couleur || "", taille: l.Taille || "",
+                        famille_tarifaire: l.Tarif, prix,
+                        designation: l.Designation || l.DESIGNATION || "",
+                        prix_achat: l.PrixAchat || "" });
+          continue;
+        }
         const r = { reference: l.BarCode, couleur: l.Couleur || "", taille: l.Taille || "",
                     famille_tarifaire: l.Tarif, prix,
                     prix_achat: l.PrixAchat ? parseFloat(l.PrixAchat) : null };
@@ -306,6 +317,8 @@ function mapperVersTables(analyse) {
         if (r.prix < vu.prix) parCle.set(cle, r);
       }
       analyse.stats.doublons = doublons;
+      analyse.rejetsPrixZero = rejets;
+      analyse.stats.prix_zero = rejets.length;
       return [{ table: "tarifs", rows: [...parCle.values()] }];
     }
     case "stock_shopify": {
