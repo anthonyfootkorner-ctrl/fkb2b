@@ -233,6 +233,8 @@
     display: grid; place-items: center; overflow: hidden; }
   .tuile-logo img { max-width: 46%; max-height: 38%; object-fit: contain; mix-blend-mode: multiply;
     transition: transform 400ms var(--ease-out); }
+  /* Un ecusson (logo aussi haut que large) serait minuscule a 38% : on lui laisse de la place. */
+  .tuile-logo img.logo-haut { max-width: 32%; max-height: 54%; }
   .tuile-logo .wordmark { font-size: clamp(17px, 2.2vw, 24px); font-weight: 800; letter-spacing: .26em;
     color: var(--encre); padding-left: .26em; transition: transform 400ms var(--ease-out); }
   @media (hover: hover) and (pointer: fine) {
@@ -1347,6 +1349,11 @@ function nettoyerHTML(html) {
   return doc.body.innerHTML;
 }
 
+// Les wordmarks sont larges, les ecussons presque carres : on adapte la taille apres chargement.
+function ajusterLogo(img) {
+  if (img.naturalHeight && img.naturalWidth / img.naturalHeight < 1.6) img.classList.add("logo-haut");
+}
+
 // Essaie logos/<M>.png puis logos/<M>.svg, puis retombe sur le wordmark typographique.
 function logoSuivant(img) {
   if (img.dataset.essai === "png") {
@@ -1594,7 +1601,7 @@ function rendreAccueil() {
     const n = DATA.produits.filter(x => x.marque === m).length;
     return `<div class="tuile-logo" onclick="location.hash='#/collection/marque/${encodeURIComponent(m)}'">
       <img loading="lazy" src="logos/${encodeURIComponent(m)}.png" alt="${m}" data-marque="${m}" data-essai="png"
-           onerror="logoSuivant(this)">
+           onload="ajusterLogo(this)" onerror="logoSuivant(this)">
       <div class="sous-marque">${n} référence${n > 1 ? "s" : ""}</div>
     </div>`;
   }).join("");
@@ -1795,7 +1802,8 @@ function rendrePageMarques() {
   document.getElementById("tuiles-toutes-marques").innerHTML = liste.map(({ valeur, refs }) => `
     <div class="tuile-logo" onclick="location.hash='#/collection/marque/${encodeURIComponent(valeur)}'">
       <img loading="lazy" src="logos/${encodeURIComponent(valeur)}.png" alt="${echapperHTML(valeur)}"
-           data-marque="${echapperHTML(valeur)}" data-essai="png" onerror="logoSuivant(this)">
+           data-marque="${echapperHTML(valeur)}" data-essai="png"
+           onload="ajusterLogo(this)" onerror="logoSuivant(this)">
       <div class="nb-m">${refs} référence${refs > 1 ? "s" : ""}</div>
     </div>`).join("");
 }
