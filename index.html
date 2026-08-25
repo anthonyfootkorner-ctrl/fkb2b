@@ -1173,10 +1173,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787675444"></script>
-<script src="imports.js?v=1787675444"></script>
-<script src="merch-shopify.js?v=1787675444"></script>
-<script src="moteur-merch.js?v=1787675444"></script>
+<script src="config.js?v=1787676801"></script>
+<script src="imports.js?v=1787676801"></script>
+<script src="merch-shopify.js?v=1787676801"></script>
+<script src="moteur-merch.js?v=1787676801"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -3522,6 +3522,8 @@ async function rendreBackOffice() {
 let COMMANDES_ADMIN = [];
 let commandesAdminInitialise = false;
 
+// L'export Fastmag n'est ouvert qu'une fois la commande approuvée par le commercial.
+const EXPORTABLES_CMD = ["approuvee", "transmise", "integree"];
 const SELECTION_CMD = new Set();
 const A_INTEGRER = ["approuvee", "transmise"];
 const cmdAApprouver = (c) => c.statut === "validee" && peutApprouver;
@@ -3649,10 +3651,16 @@ async function telechargerFastmagGroupe() {
   try {
     const r = await api("/functions/v1/envoyer-commande", { corps: { commande_ids: ids } });
     telechargerLatin1(r.fichier, r.contenu);
-    const oublies = (r.sans_fastmag || []).length
-      ? ` — ${r.sans_fastmag.length} écartée(s) faute d'ID Fastmag : ${r.sans_fastmag.join(", ")}`
-      : "";
-    etat.textContent = `${r.commandes} commande(s), ${r.lignes} ligne(s) dans un seul fichier ✓${oublies}`;
+    const ecartees = [
+      (r.non_approuvees || []).length
+        ? `${r.non_approuvees.length} pas encore approuvée(s) : ${r.non_approuvees.join(", ")}`
+        : "",
+      (r.sans_fastmag || []).length
+        ? `${r.sans_fastmag.length} sans ID Fastmag : ${r.sans_fastmag.join(", ")}`
+        : "",
+    ].filter(Boolean).join(" · ");
+    etat.textContent = `${r.commandes} commande(s), ${r.lignes} ligne(s) dans un seul fichier ✓`
+      + (ecartees ? ` — écartées : ${ecartees}` : "");
   } catch (e) {
     etat.textContent = "échec : " + String(e.donnees?.erreur || e.message).slice(0, 220);
   }
@@ -3731,7 +3739,11 @@ function rangCommandeAdmin(c) {
     ${c.commentaire ? `<div class="cmd-note mot">Mot du client : ${echapperHTML(c.commentaire)}</div>` : ""}
     <div class="cmd-actions">
       <button class="puce-claire forte" onclick="telechargerRecapCommande('${c.id}')">Télécharger (Excel)</button>
-      <button class="puce-claire" onclick="telechargerFichierCommande('${c.id}')">Fichier Fastmag</button>
+      <button class="puce-claire" onclick="telechargerFichierCommande('${c.id}')"
+        ${EXPORTABLES_CMD.includes(c.statut) ? "" : "disabled style=\"opacity:.45; cursor:not-allowed\""}
+        title="${EXPORTABLES_CMD.includes(c.statut)
+          ? "fichier d'import Fastmag"
+          : "en attente d'approbation : l'export Fastmag n'est pas ouvert"}">Fichier Fastmag</button>
       <button class="puce-claire" onclick="basculerDetailCommande('${c.id}')" id="cmd-btn-detail-${c.id}">Voir le détail</button>
       ${estAdmin ? `<button class="puce-claire" onclick="renvoyerCommande('${c.id}')">${c.envoye_le ? "Renvoyer l'e-mail" : "Envoyer l'e-mail"}</button>` : ""}
       <span class="cmd-etat" id="cmd-etat-${c.id}"></span>
