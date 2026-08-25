@@ -485,7 +485,14 @@
     padding: 14px 22px; background: rgba(255,255,255,.94); backdrop-filter: blur(10px); border-top: 1px solid var(--hairline);
     color: var(--encre); }
   .prod-barre.visible { display: flex; }
-  .prod-barre .total b { font-size: 16px; }
+  .prod-barre .total { margin-left: auto; text-align: right; font-size: 12.5px; color: var(--encre2);
+    letter-spacing: .04em; }
+  .prod-barre .total b { font-size: 17px; color: var(--encre); margin-left: 8px; }
+  .prod-barre .btn-noir { margin-left: 16px; }
+  @media (max-width: 560px) {
+    .prod-barre { gap: 10px; padding: 12px 16px; }
+    .prod-barre .total b { font-size: 15px; }
+  }
   .btn-noir { margin-left: auto; background: var(--encre); color: #fff; border: 0; border-radius: 999px;
     padding: 12px 26px; font-weight: 700; font-size: 12.5px; letter-spacing: .08em; cursor: pointer;
     transition: transform 160ms var(--ease-out), opacity 150ms ease; }
@@ -1105,10 +1112,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787649959"></script>
-<script src="imports.js?v=1787649959"></script>
-<script src="merch-shopify.js?v=1787649959"></script>
-<script src="moteur-merch.js?v=1787649959"></script>
+<script src="config.js?v=1787650410"></script>
+<script src="imports.js?v=1787650410"></script>
+<script src="merch-shopify.js?v=1787650410"></script>
+<script src="moteur-merch.js?v=1787650410"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
