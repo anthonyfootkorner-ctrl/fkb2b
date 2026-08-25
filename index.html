@@ -365,6 +365,12 @@
   .carte .prix { font-size: 12px; color: var(--encre2); margin-top: 5px; }
   .carte .dispo-mini { position: absolute; top: 12px; left: 12px; display: flex; gap: 4px; }
   .carte .dispo-mini i { width: 7px; height: 7px; border-radius: 999px; display: block; }
+  /* Les tailles disponibles, lisibles, sous le prix : « XS S M L XL » colorés
+     valent mieux que cinq points sans étiquette. */
+  .carte .tailles-carte { font-size: 11px; color: var(--encre2); margin-top: 6px;
+    line-height: 1.5; letter-spacing: .02em; }
+  .carte .tailles-carte b { font-weight: 700; margin-right: 3px; }
+  .carte .tailles-carte .epuise { opacity: .55; text-decoration: line-through; }
 
   /* ---------- FICHE PRODUIT pleine page (surface claire) ---------- */
   /* Le visuel occupe exactement la moitié gauche de l'écran, les informations
@@ -1167,10 +1173,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787668028"></script>
-<script src="imports.js?v=1787668028"></script>
-<script src="merch-shopify.js?v=1787668028"></script>
-<script src="moteur-merch.js?v=1787668028"></script>
+<script src="config.js?v=1787675444"></script>
+<script src="imports.js?v=1787675444"></script>
+<script src="merch-shopify.js?v=1787675444"></script>
+<script src="moteur-merch.js?v=1787675444"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1636,11 +1642,15 @@ const iconePanier = (dedans) => dedans
        <path d="M18.5 13.5v5M16 16h5"/></svg>`;
 
 function carteHTML(p) {
-  const pastilles = p.tailles.slice(0, 5).map(t =>
-    `<i style="background:${t.precommande ? "#3d6fb4" : t.stock === 0 ? "#c0504d" : t.stock > 20 ? "#2e9e4f" : "#d9a441"}"></i>`).join("");
+  // les tailles telles quelles, colorées selon le stock : vert dès 5 pièces,
+  // orange en dessous, barré si épuisé, bleu pour une précommande
+  const tailles = p.tailles.map(t => {
+    const couleur = t.precommande ? "#3d6fb4" : couleurTaille(t.stock);
+    return `<b class="${!t.precommande && t.stock === 0 ? "epuise" : ""}"
+      style="color:${couleur}" title="${t.precommande ? "précommande" : `${t.stock} en stock`}">${echapperHTML(t.taille)}</b>`;
+  }).join(" ");
   const dedans = auPanier(p.reference);
   return `<div class="carte" onclick="location.hash='#/produit/${encodeURIComponent(p.reference)}'">
-    <div class="dispo-mini">${pastilles}</div>
     <div class="media ${p.photo ? "" : "sans"}">
       ${p.photo ? `<div class="visuel"><img loading="lazy" src="${p.photo}" alt=""></div>`
                 : blocSansVisuel(p)}
@@ -1652,6 +1662,7 @@ function carteHTML(p) {
       <div class="nom">${p.designation || p.reference}</div>
       <div class="sousnom">${p.marque || ""} · ${p.reference}</div>
       <div class="prix">dès ${eur(prixMini(p))} HT</div>
+      <div class="tailles-carte">${tailles || "—"}</div>
     </div>
   </div>`;
 }
