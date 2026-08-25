@@ -320,6 +320,9 @@
     transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, transform 160ms var(--ease-out); }
   .puce-claire:active { transform: scale(0.97); }
   .puce-claire.actif { background: var(--encre); color: #fff; border-color: var(--encre); font-weight: 600; }
+  /* action mise en avant sur fond clair (répartition auto) */
+  .puce-claire.orange { background: #f2751f; border-color: #f2751f; color: #fff; font-weight: 600; }
+  .puce-claire.orange:hover { background: #dc650f; border-color: #dc650f; }
 
   .grille-col { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1px;
     background: var(--hairline); border-top: 1px solid var(--hairline); }
@@ -1102,10 +1105,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787649877"></script>
-<script src="imports.js?v=1787649877"></script>
-<script src="merch-shopify.js?v=1787649877"></script>
-<script src="moteur-merch.js?v=1787649877"></script>
+<script src="config.js?v=1787649959"></script>
+<script src="imports.js?v=1787649959"></script>
+<script src="merch-shopify.js?v=1787649959"></script>
+<script src="moteur-merch.js?v=1787649959"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1732,6 +1735,9 @@ async function rendreProduit(ref) {
   selection.clear();
   for (const [cle, l] of panier) if (cle.startsWith(ref + "|")) selection.set(l.taille, l.qte);
   const galerie = Array.isArray(p.photos) && p.photos.length > 1 ? p.photos : null;
+  // Répartir une quantité globale n'a de sens qu'avec plusieurs tailles à servir :
+  // sur une taille unique (TU, accessoires), on saisit directement la quantité.
+  const plusieursTailles = p.tailles.filter(t => t.precommande || t.stock > 0).length > 1;
   const visuelPrincipal = p.photo
     ? `<img id="visuel-principal" src="${p.photo}" alt="">` : blocSansVisuel(p);
   vue.innerHTML = `
@@ -1751,14 +1757,14 @@ async function rendreProduit(ref) {
           <span><i class="pastille rouge"></i><b>Épuisé</b> — commande impossible</span>
         </div>
 
-        <div class="repartition">
+        ${plusieursTailles ? `<div class="repartition">
           <label for="qte-globale">Quantité globale</label>
           <input class="qte-claire" id="qte-globale" type="number" min="0" inputmode="numeric" placeholder="24">
-          <button class="puce-claire" onclick="repartir('${ref}')">Répartir selon la grille</button>
-        </div>
+          <button class="puce-claire orange" onclick="repartir('${ref}')">Répartition auto</button>
+        </div>` : ""}
 
         <table class="t-prod"><thead>
-          <tr><th>Taille · % grille</th><th class="num">Dispo</th><th class="num">Prix HT</th><th class="num">Quantité</th></tr>
+          <tr><th>${plusieursTailles ? "Taille · % grille" : "Taille"}</th><th class="num">Dispo</th><th class="num">Prix HT</th><th class="num">Quantité</th></tr>
         </thead><tbody>
           ${p.tailles.map(t => {
             const deja = selection.get(t.taille);
@@ -1779,7 +1785,7 @@ async function rendreProduit(ref) {
               <td class="num"><span class="rupture">Épuisé</span></td>
             </tr>`;
             return `<tr>
-              <td><b>${t.taille}</b> <span style="color:#999;font-size:11px">${pctGrille(p, t)}%</span></td>
+              <td><b>${t.taille}</b>${plusieursTailles ? ` <span style="color:#999;font-size:11px">${pctGrille(p, t)}%</span>` : ""}</td>
               <td class="num"><span class="pastille ${niveau}"></span></td>
               <td class="num">${eur(prixDe(t))}</td>
               <td class="num"><input class="qte-claire" data-taille="${t.taille}" type="number" min="0" max="${t.stock}" inputmode="numeric"
