@@ -1166,10 +1166,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787652642"></script>
-<script src="imports.js?v=1787652642"></script>
-<script src="merch-shopify.js?v=1787652642"></script>
-<script src="moteur-merch.js?v=1787652642"></script>
+<script src="config.js?v=1787652884"></script>
+<script src="imports.js?v=1787652884"></script>
+<script src="merch-shopify.js?v=1787652884"></script>
+<script src="moteur-merch.js?v=1787652884"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1296,7 +1296,7 @@ async function init() {
   document.getElementById("btn-sauver").onclick = sauverPanier;
   document.getElementById("cgv-ok").onchange = majBoutonCommande;
 
-  restaurerPanier();
+  await restaurerPanier();
   initialiserJauges();
   // paramétrage de base du merch : dernier profil de tri et N figés retenus
   for (const [id, cle] of [["merch-profil","fkb2b-profil"],["shopify-profil","fkb2b-profil"],
@@ -4194,13 +4194,35 @@ function majTotauxPanier() {
   sauvegardeAutoPanier();
 }
 
+// Tant que le panier enregistré n'a pas été relu, aucun rendu ne doit l'écraser :
+// c'est ainsi qu'un panier se perdait à l'actualisation.
+let panierRestaure = false;
+let sauvegardeServeur = null;
+
 function sauvegardeAutoPanier() {
+  if (!panierRestaure) return;
+  let lignes;
   try {
-    const lignes = [...panier.values()].map(l => ({ ref: l.produit.reference, taille: l.taille, qte: l.qte }));
+    lignes = [...panier.values()].map(l => ({ ref: l.produit.reference, taille: l.taille, qte: l.qte }));
     // une référence sans quantité se note avec une taille vide : elle revient après rechargement
     for (const ref of enAttente.keys()) lignes.push({ ref, taille: "", qte: 0 });
     localStorage.setItem("fkb2b-panier-auto", JSON.stringify(lignes));
-  } catch (e) { /* stockage local indisponible */ }
+  } catch (e) { return; /* stockage local indisponible */ }
+
+  // et une copie côté serveur, pour retrouver son panier depuis un autre poste
+  clearTimeout(sauvegardeServeur);
+  sauvegardeServeur = setTimeout(() => enregistrerPanierServeur(lignes), 2500);
+}
+
+async function enregistrerPanierServeur(lignes) {
+  if (!clientActif?.id) return;   // admin ou merch : pas de société à rattacher
+  try {
+    await api("/rest/v1/paniers?user_id=eq." + monUserId(), { methode: "DELETE" });
+    if (lignes.length) {
+      await api("/rest/v1/paniers", { corps: {
+        societe_id: clientActif.id, user_id: monUserId(), lignes } });
+    }
+  } catch (e) { /* le panier local reste la référence */ }
 }
 
 function basculer(id, ouvert) {
@@ -4214,6 +4236,7 @@ const monUserId = () => JSON.parse(atob(sessionCourante().access_token.split("."
 
 async function sauverPanier() {
   const lignes = [...panier.values()].map(l => ({ref: l.produit.reference, taille: l.taille, qte: l.qte}));
+  for (const ref of enAttente.keys()) lignes.push({ ref, taille: "", qte: 0 });
   const b = document.getElementById("btn-sauver");
   try {
     const societe = await api("/rest/v1/societes?select=id");
@@ -4241,17 +4264,24 @@ async function restaurerPanier() {
       memoriser(complement);
     }
     for (const l of lignes) {
-      const p = produitConnu(l.ref);
-      if (!p) continue;
-      // taille vide = référence ajoutée sans quantité, à remplir dans le panier
-      if (!l.taille) { enAttente.set(l.ref, p); continue; }
-      const t = p.tailles.find(t => t.taille === l.taille);
-      if (t && (t.stock > 0 || t.precommande)) panier.set(l.ref + "|" + l.taille, {produit: p, taille: l.taille,
-        qte: t.precommande ? l.qte : Math.min(l.qte, t.stock), prix: prixDe(t)});
+      // une ligne fautive ne doit pas emporter tout le panier
+      try {
+        const p = produitConnu(l.ref);
+        if (!p) continue;
+        // taille vide = référence ajoutée sans quantité, à remplir dans le panier
+        if (!l.taille) { enAttente.set(l.ref, p); continue; }
+        const t = p.tailles.find(t => t.taille === l.taille);
+        if (!t || (t.stock <= 0 && !t.precommande)) continue;
+        const prix = prixDe(t);
+        if (prix == null) continue;
+        panier.set(l.ref + "|" + l.taille, { produit: p, taille: l.taille,
+          qte: t.precommande ? l.qte : Math.min(l.qte, t.stock), prix });
+      } catch (e) { /* ligne ignorée */ }
     }
-    rendrePanier();
-    majBoutonsEpingle();
   } catch (e) { /* pas de panier enregistré */ }
+  panierRestaure = true;
+  rendrePanier();
+  majBoutonsEpingle();
 }
 
 async function validerCommande() {
