@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%230a0a0a%22/><text x=%2216%22 y=%2222%22 font-family=%22Helvetica%22 font-size=%2213%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>FK</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FKB2B — Votre mot de passe</title>
+<style>
+  :root {
+    --noir: #0a0a0a; --noir2: #141414; --noir3: #1d1d1d; --bord: #2a2a2a;
+    --blanc: #f5f5f5; --gris: #9a9a9a;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--noir); color: var(--blanc); font-family: "Helvetica Neue", Arial, sans-serif;
+    min-height: 100svh; display: grid; place-items: center; -webkit-font-smoothing: antialiased; overflow: hidden; }
+
+  .fond { position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(60% 50% at 50% 0%, #1a1a1a 0%, transparent 70%); }
+  .fond::after { content: "FK"; position: absolute; right: -4vw; bottom: -14vh; font-size: 46vh; font-weight: 800;
+    color: #101010; letter-spacing: -.05em; user-select: none; }
+
+  .carte { position: relative; width: min(400px, calc(100vw - 40px)); padding: 46px 40px 38px;
+    background: var(--noir2); border: 1px solid var(--bord); border-radius: 20px;
+    opacity: 1; transform: translateY(0);
+    transition: opacity 500ms var(--ease-out), transform 500ms var(--ease-out);
+    @starting-style { opacity: 0; transform: translateY(14px); }
+  }
+  .logo { font-size: 21px; font-weight: 700; letter-spacing: .38em; }
+  .logo span { color: var(--gris); font-weight: 300; }
+  .sous { color: var(--gris); font-size: 12.5px; letter-spacing: .14em; text-transform: uppercase; margin: 10px 0 34px; }
+
+  label { display: block; font-size: 11px; color: var(--gris); letter-spacing: .12em; text-transform: uppercase; margin: 0 0 7px; }
+  input { width: 100%; background: var(--noir3); border: 1px solid var(--bord); border-radius: 10px;
+    color: var(--blanc); padding: 13px 14px; font-size: 14px; margin-bottom: 18px;
+    transition: border-color 150ms ease; }
+  input:focus { outline: none; border-color: #555; }
+
+  button { width: 100%; margin-top: 8px; background: var(--blanc); color: var(--noir); border: 0; border-radius: 999px;
+    padding: 14px; font-size: 13px; font-weight: 700; letter-spacing: .1em; cursor: pointer;
+    transition: transform 160ms var(--ease-out); }
+  button:active { transform: scale(0.97); }
+
+  .note { margin-top: 26px; text-align: center; font-size: 11.5px; color: var(--gris); line-height: 1.7; }
+  .note b { color: #c9c4ba; font-weight: 600; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .carte { transition: opacity 200ms ease; @starting-style { transform: none; } }
+  }
+
+  .force { height: 4px; background: var(--noir3); border-radius: 999px; overflow: hidden; margin: -8px 0 18px; }
+  .force i { display: block; height: 100%; width: 0; background: #c0504d; transition: width 220ms ease, background 220ms ease; }
+  .force.moyen i { background: #d9a441; }
+  .force.bon i { background: #3fae5a; }
+</style>
+</head>
+<body>
+<div class="fond"></div>
+<form class="carte" id="formulaire">
+  <div class="logo">FKB2B</div>
+  <div class="sous" id="sous">Choisissez votre mot de passe</div>
+
+  <div id="champs">
+    <label for="mdp">Nouveau mot de passe</label>
+    <input id="mdp" type="password" autocomplete="new-password" placeholder="au moins 8 caractères" required minlength="8">
+    <div class="force" id="force"><i></i></div>
+    <label for="mdp2">Confirmation</label>
+    <input id="mdp2" type="password" autocomplete="new-password" placeholder="le même, pour être sûr" required minlength="8">
+    <button type="submit" id="btn">ENREGISTRER ET ENTRER</button>
+  </div>
+
+  <p class="note" id="message">Ce lien est personnel et à usage unique.</p>
+</form>
+<script src="config.js?v=1787666325"></script>
+<script>
+// Le lien reçu par e-mail ramène ici avec une session temporaire dans l'adresse
+// (#access_token=…&type=invite|recovery). On s'en sert le temps de poser le mot de passe.
+const msg = document.getElementById("message");
+const champs = document.getElementById("champs");
+let jetonTemporaire = null;
+
+(function lireLien() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  const q = new URLSearchParams(location.search);
+  const erreur = h.get("error_description") || q.get("error_description");
+  if (erreur) {
+    champs.style.display = "none";
+    msg.innerHTML = "<b>Ce lien n'est plus valable.</b> Demandez-en un nouveau depuis la page de connexion "
+      + "ou à votre interlocuteur Footkorner.";
+    return;
+  }
+  jetonTemporaire = h.get("access_token");
+  const type = h.get("type");
+  if (type === "recovery") document.getElementById("sous").textContent = "Nouveau mot de passe";
+  if (!jetonTemporaire) {
+    // pas de jeton : la page a été ouverte directement
+    champs.style.display = "none";
+    msg.innerHTML = "<b>Ouvrez le lien reçu par e-mail.</b> Cette page ne s'utilise qu'à partir de celui-ci.";
+  }
+  const refresh = h.get("refresh_token");
+  if (jetonTemporaire) history.replaceState(null, "", location.pathname);
+  window.REFRESH_TEMPORAIRE = refresh;
+})();
+
+const barre = document.getElementById("force");
+document.getElementById("mdp").addEventListener("input", (e) => {
+  const v = e.target.value;
+  let score = 0;
+  if (v.length >= 8) score++;
+  if (v.length >= 12) score++;
+  if (/[A-Z]/.test(v) && /[a-z]/.test(v)) score++;
+  if (/[0-9]/.test(v) || /[^A-Za-z0-9]/.test(v)) score++;
+  barre.className = "force" + (score >= 4 ? " bon" : score >= 2 ? " moyen" : "");
+  barre.firstElementChild.style.width = Math.min(score * 25, 100) + "%";
+});
+
+document.getElementById("formulaire").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById("btn");
+  const mdp = document.getElementById("mdp").value, mdp2 = document.getElementById("mdp2").value;
+  if (mdp !== mdp2) { msg.innerHTML = "<b>Les deux mots de passe diffèrent.</b>"; return; }
+  if (mdp.length < 8) { msg.innerHTML = "<b>Huit caractères minimum.</b>"; return; }
+  btn.disabled = true; btn.textContent = "ENREGISTREMENT…";
+  try {
+    const rep = await fetch(FKB2B.url + "/auth/v1/user", {
+      method: "PUT",
+      headers: { "apikey": FKB2B.cle, "Authorization": "Bearer " + jetonTemporaire,
+                 "Content-Type": "application/json" },
+      body: JSON.stringify({ password: mdp }),
+    });
+    if (!rep.ok) throw new Error((await rep.text()).slice(0, 200));
+    const utilisateur = await rep.json();
+    // la session temporaire devient la session du portail
+    localStorage.setItem("fkb2b-session", JSON.stringify({
+      access_token: jetonTemporaire, refresh_token: window.REFRESH_TEMPORAIRE,
+      expire_a: Math.floor(Date.now() / 1000) + 3600, email: utilisateur.email,
+    }));
+    location.href = "index.html";
+  } catch (err) {
+    msg.innerHTML = "<b>Enregistrement impossible.</b> Le lien a peut-être expiré — demandez-en un nouveau.";
+    btn.disabled = false; btn.textContent = "ENREGISTRER ET ENTRER";
+  }
+});
+</script>
+</body>
+</html>

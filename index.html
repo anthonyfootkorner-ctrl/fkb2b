@@ -997,7 +997,8 @@
                placeholder="ajouter un magasin (compte)…">
         <datalist id="liste-societes"></datalist>
         <button class="puce-claire" id="nu-ajouter-societe">+ magasin</button>
-        <button class="btn-noir" id="nu-creer">CRÉER LE COMPTE</button>
+        <button class="btn-noir" id="nu-inviter">INVITER PAR E-MAIL</button>
+        <button class="puce-claire" id="nu-creer">Créer sans e-mail (mot de passe provisoire)</button>
       </div>
       <div id="nu-chips" class="chips"></div>
       <div class="compte-produits" id="nu-etat" style="margin-top:10px"></div>
@@ -1166,10 +1167,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787653085"></script>
-<script src="imports.js?v=1787653085"></script>
-<script src="merch-shopify.js?v=1787653085"></script>
-<script src="moteur-merch.js?v=1787653085"></script>
+<script src="config.js?v=1787666325"></script>
+<script src="imports.js?v=1787666325"></script>
+<script src="merch-shopify.js?v=1787666325"></script>
+<script src="moteur-merch.js?v=1787666325"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -3155,6 +3156,39 @@ async function rendreUtilisateurs() {
       inp.value = ""; etat.textContent = "";
       document.getElementById("nu-chips").innerHTML = chipsHTML(societesChoisies, true, "retirerSocieteCreation");
     };
+    // Invitation : la personne reçoit un lien et choisit son mot de passe elle-même.
+    document.getElementById("nu-inviter").onclick = async () => {
+      const etat = document.getElementById("nu-etat");
+      const email = document.getElementById("nu-email").value.trim();
+      if (!email) { etat.textContent = "e-mail requis"; return; }
+      const roleChoisi = document.getElementById("nu-role").value;
+      if (!["merch", "admin", "admin_commercial", "admin_adv"].includes(roleChoisi) && !societesChoisies.length) {
+        etat.textContent = "ajoutez au moins un magasin"; return;
+      }
+      if (roleChoisi === "admin" && !confirm(
+        `Inviter ${email} comme ADMINISTRATEUR ?\n\n`
+        + "Il verra toutes les commandes de tous les magasins, tous les prix, "
+        + "et pourra déposer des imports, créer des comptes et envoyer des e-mails de commande.")) {
+        etat.textContent = "invitation annulée"; return;
+      }
+      etat.textContent = "envoi de l'invitation…";
+      try {
+        await apiFonction("inviter_utilisateur", {
+          email, nom: document.getElementById("nu-nom").value.trim() || null,
+          role: roleChoisi, comptes_societes: societesChoisies,
+          redirection: location.href.replace(/index\.html.*$/, "").replace(/#.*$/, "") + "motdepasse.html",
+        });
+        etat.innerHTML = `Invitation envoyée à <b>${echapperHTML(email)}</b> ✓
+          <br>Elle choisira son mot de passe elle-même. Le lien expire après 24 heures.`;
+        document.getElementById("nu-email").value = ""; document.getElementById("nu-nom").value = "";
+        societesChoisies.length = 0;
+        document.getElementById("nu-chips").innerHTML = "";
+        rendreUtilisateurs();
+      } catch (e) {
+        etat.textContent = "échec : " + String(e.donnees?.erreur || e.message).slice(0, 200);
+      }
+    };
+
     document.getElementById("nu-creer").onclick = async () => {
       const etat = document.getElementById("nu-etat");
       const email = document.getElementById("nu-email").value.trim();

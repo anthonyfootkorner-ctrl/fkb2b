@@ -60,10 +60,31 @@
   <input id="mdp" type="password" autocomplete="current-password" placeholder="••••••••" required>
   <button type="submit" id="btn">SE CONNECTER</button>
   <p class="note" id="message">Accès réservé aux clients autorisés.</p>
+  <p class="note" style="margin-top:14px">
+    <a href="#" id="oubli" style="color:var(--gris); text-decoration:underline">Mot de passe oublié ?</a></p>
 </form>
-<script src="config.js?v=1787653085"></script>
+<script src="config.js?v=1787666325"></script>
 <script>
 if (sessionCourante()) location.href = "index.html";
+
+// Mot de passe oublié : Supabase envoie un lien qui ramène sur motdepasse.html.
+document.getElementById("oubli").addEventListener("click", async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById("message");
+  const email = document.getElementById("email").value.trim();
+  if (!email) {
+    msg.innerHTML = "<b>Saisissez d'abord votre e-mail</b>, puis recliquez sur le lien.";
+    document.getElementById("email").focus();
+    return;
+  }
+  msg.textContent = "Envoi du lien…";
+  try {
+    await api("/auth/v1/recover", { corps: {
+      email, redirect_to: location.href.replace(/login\.html.*$/, "motdepasse.html") } });
+  } catch (err) { /* on ne dit jamais si l'adresse existe */ }
+  msg.innerHTML = "<b>Si un compte existe pour cette adresse</b>, un lien vient d'être envoyé. "
+    + "Pensez à regarder dans les indésirables.";
+});
 
 document.getElementById("formulaire").addEventListener("submit", async (e) => {
   e.preventDefault();
