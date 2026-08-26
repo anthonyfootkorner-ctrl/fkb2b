@@ -816,6 +816,7 @@
       <div class="compte-produits">Choisissez un périmètre, partez d'un tri automatique si besoin, puis glissez-déposez et enregistrez. Chaque périmètre garde son propre ordre.</div>
       <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; align-items:center">
         <select id="merch-contexte" style="background:#fff; color:var(--encre); border:1px solid #d8d8d5; border-radius:8px; padding:9px 12px; font-size:13px"></select>
+        <select id="merch-affinage" title="Range la vue telle que le client la voit : FK > ACCESSOIRES a son propre ordre" style="background:#fff; color:var(--encre); border:1px solid #d8d8d5; border-radius:8px; padding:9px 12px; font-size:13px"></select>
         <input class="qte-claire" id="merch-figer" type="number" min="0" placeholder="figer N premiers" style="width:130px; text-align:left" title="Les N premiers produits ne bougent pas lors des tris">
         <button class="puce-claire" id="btn-tri-stock">Tri : stock disponible ↓</button>
         <button class="puce-claire" id="btn-tri-recent">Tri : du plus récent au plus ancien</button>
@@ -1733,9 +1734,14 @@ function totalDuPerimetre() {
 
 function rendreCollection() {
   const { axe, valeur } = collectionCourante;
-  // ordre merchandising du périmètre affiché (repli : ordre catalogue)
+  // Ordre merchandising du périmètre affiché, croisement compris (FK > ACCESSOIRES) :
+  // ordonner() hérite ensuite des périmètres plus larges pour le reste.
+  const principal = (axe === "marque" ? "MARQUE:" : "FAMILLE:") + valeur;
+  const second = filtreSecondaire
+    ? (axe === "marque" ? "FAMILLE:" : "MARQUE:") + filtreSecondaire : null;
   const contexte = axe === "TOUT" ? "TOUT"
-    : (axe === "marque" ? "MARQUE:" : "FAMILLE:") + valeur;
+    : !second ? principal
+    : principal.startsWith("MARQUE:") ? `${principal}|${second}` : `${second}|${principal}`;
 
   // l'axe secondaire est celui qu'on n'a pas pris pour naviguer
   const axeFiltre = axe === "marque" ? "famille" : "marque";
@@ -2040,12 +2046,19 @@ async function chargerMerch() {
   } catch (e) { MERCH = {}; }
 }
 
-// Applique l'ordre merchandising d'un contexte (repli : ordre du catalogue = stock).
+// Applique l'ordre merchandising du périmètre, en héritant des périmètres plus larges
+// pour les produits qu'on n'y a pas rangés (repli final : ordre du catalogue = stock).
 function ordonner(produits, contexte) {
-  const pos = MERCH[contexte];
-  if (!pos) return produits;
-  return [...produits].sort((a, b) =>
-    (pos[a.reference] ?? 1e9) - (pos[b.reference] ?? 1e9));
+  const paliers = cascadeMerch(contexte).map(c => MERCH[c]).filter(Boolean);
+  if (!paliers.length) return produits;
+  const rang = ref => {
+    for (let i = 0; i < paliers.length; i++) {
+      const p = paliers[i][ref];
+      if (p != null) return i * 1e5 + p;
+    }
+    return 1e9;
+  };
+  return [...produits].sort((a, b) => rang(a.reference) - rang(b.reference));
 }
 
 // Récence approximative d'une saison Fastmag ('26 Q3', 'PE22', '24/25'…) : année puis trimestre.
@@ -2057,11 +2070,55 @@ function cleRecence(saison) {
   return annee * 10 + (q ? +q[1] : 0);
 }
 
-function contexteMerch() { return document.getElementById("merch-contexte").value; }
+// Le périmètre rangé peut croiser une marque et une catégorie (FK > ACCESSOIRES).
+// Forme canonique « MARQUE:x|FAMILLE:y » : un seul rangement sert les deux navigations.
+function contexteMerch() {
+  const principal = document.getElementById("merch-contexte").value;
+  const second = document.getElementById("merch-affinage").value;
+  if (!second) return principal;
+  return principal.startsWith("MARQUE:") ? `${principal}|${second}` : `${second}|${principal}`;
+}
+
+// « FK > ACCESSOIRES », pour les messages
+function nomPerimetre(ctx) {
+  return ctx === "TOUT" ? "tout le site"
+    : ctx.split("|").map(c => c.split(":")[1]).join(" > ");
+}
+
+// Du périmètre exact au plus large : croisement, catégorie, marque, tout le site.
+// Le site applique la même cascade côté serveur (fonction catalogue).
+function cascadeMerch(ctx) {
+  if (!ctx || ctx === "TOUT") return ["TOUT"];
+  if (!ctx.includes("|")) return [ctx, "TOUT"];
+  const [marque, famille] = ctx.split("|");
+  return [ctx, famille, marque, "TOUT"];
+}
 function produitsDuContexte(ctx) {
   if (ctx === "TOUT") return DATA.produits;
-  const [type, val] = ctx.split(":");
-  return DATA.produits.filter(p => type === "MARQUE" ? p.marque === val : p.famille === val);
+  return ctx.split("|").reduce((liste, part) => {
+    const [type, val] = part.split(":");
+    return liste.filter(p => type === "MARQUE" ? p.marque === val : p.famille === val);
+  }, DATA.produits);
+}
+
+// L'affinage propose l'autre axe du périmètre choisi : sur une marque, ses catégories.
+function remplirAffinageMerch() {
+  const principal = document.getElementById("merch-contexte").value;
+  const aff = document.getElementById("merch-affinage");
+  if (aff.dataset.pour === principal) return;
+  aff.dataset.pour = principal;
+  if (principal === "TOUT") {
+    aff.innerHTML = `<option value="">Pas d'affinage</option>`;
+    aff.disabled = true;
+    return;
+  }
+  const [type, val] = principal.split(":");
+  const cible = type === "MARQUE" ? "famille" : "marque";
+  const valeurs = [...new Set(produitsDuContexte(principal).map(p => p[cible]).filter(Boolean))].sort();
+  const prefixe = type === "MARQUE" ? "FAMILLE:" : "MARQUE:";
+  aff.disabled = false;
+  aff.innerHTML = `<option value="">${type === "MARQUE" ? "Toutes les catégories" : "Toutes les marques"}</option>`
+    + valeurs.map(v => `<option value="${prefixe}${echapperHTML(v)}">${echapperHTML(v)}</option>`).join("");
 }
 
 async function rendreMerch() {
@@ -2074,6 +2131,7 @@ async function rendreMerch() {
       <optgroup label="Catégories">${familles.map(f => `<option value="FAMILLE:${f}">${f}</option>`).join("")}</optgroup>
       <optgroup label="Marques">${marques.map(m => `<option value="MARQUE:${m}">${m}</option>`).join("")}</optgroup>`;
   }
+  remplirAffinageMerch();
   const ctx = contexteMerch();
   const produits = ordonner(produitsDuContexte(ctx), ctx);
   const grille = document.getElementById("grille-merch");
@@ -2179,6 +2237,7 @@ async function rendreMerch() {
   if (!merchInitialise) {
     merchInitialise = true;
     sel.onchange = rendreMerch;
+    document.getElementById("merch-affinage").onchange = rendreMerch;
     document.getElementById("btn-auto-b2b").onclick = classementAutoB2B;
     document.getElementById("btn-rapport-b2b").onclick = telechargerRapport;
     document.getElementById("btn-tri-stock").onclick = () =>
@@ -2198,7 +2257,7 @@ async function rendreMerch() {
         await chargerMerch();
         if (ctx === "TOUT") { DATA.produits = await api("/rest/v1/rpc/catalogue", { corps: { limite: 300 } }); DATA.produits.forEach(trierTailles); }
         travailNonEnregistre = false;
-        etat.textContent = `ordre enregistré ✓ (${positions.length} produits — ${ctx === "TOUT" ? "tout le site" : ctx.split(":")[1]})`;
+        etat.textContent = `ordre enregistré ✓ (${positions.length} produits — ${nomPerimetre(ctx)})`;
       } catch (e) {
         etat.textContent = "échec : " + (e.donnees?.message || e.message);
       }
