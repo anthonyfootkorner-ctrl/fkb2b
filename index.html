@@ -614,6 +614,18 @@
   .cgv label { cursor: pointer; }
   .nom-commande { display: block; font-size: 11px; color: var(--gris); letter-spacing: .06em;
     text-transform: uppercase; margin: 0 0 14px; }
+  /* Multi-magasins : sur quel magasin la commande part, rappelé au moment de valider. */
+  .recap-magasin { display: block; font-size: 11px; color: var(--gris); letter-spacing: .06em;
+    text-transform: uppercase; margin: 0 0 16px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--bord); }
+  .recap-magasin select { display: block; width: 100%; margin-top: 7px; background: var(--noir3);
+    border: 1px solid var(--bord); border-radius: 8px; color: var(--blanc); font-size: 13px;
+    padding: 10px 12px; font-family: inherit; letter-spacing: normal; text-transform: none; }
+  .recap-magasin select:focus { outline: 0; border-color: #3d3d3d; }
+  .recap-magasin b { display: block; margin-top: 7px; color: var(--blanc); font-size: 14px;
+    letter-spacing: normal; text-transform: none; font-weight: 600; }
+  .recap-magasin .tarif { display: block; margin-top: 6px; font-size: 10.5px;
+    text-transform: none; letter-spacing: normal; }
   .nom-commande input { display: block; width: 100%; margin-top: 7px; background: var(--noir3);
     border: 1px solid var(--bord); border-radius: 8px; color: var(--blanc); font-size: 13px;
     padding: 10px 12px; font-family: inherit; letter-spacing: normal; text-transform: none; }
@@ -1160,6 +1172,7 @@
   <!-- Étape 2 : le récapitulatif ne s'affiche qu'une fois les quantités saisies. -->
   <div class="panier-corps recap" id="panier-recap" style="display:none">
     <button class="retour-panier" onclick="etapePanier(1)">← Modifier le panier</button>
+    <div id="recap-magasin"></div>
     <div id="recap-lignes"></div>
     <label class="nom-commande" for="nom-commande">Nom de la commande
       <input id="nom-commande" maxlength="40" placeholder="ex. Réassort rentrée" autocomplete="off">
@@ -4246,8 +4259,47 @@ function etapePanier(n) {
   majBoutonCommande();
 }
 
+/* Sur quel magasin la commande part. Un client multi-magasins choisit au moment de
+   valider : c'est là qu'on sait vraiment pour qui on commande, et le sélecteur du
+   bandeau, tout en haut, est hors du champ de vision quand le tiroir est ouvert. */
+function rendreMagasinRecap() {
+  const zone = document.getElementById("recap-magasin");
+  if (!zone) return;
+  const nom = clientActif?.nom || clientActif?.compte || "Magasin";
+  const tarif = clientActif?.famille_tarifaire ? `Tarif ${clientActif.famille_tarifaire}.` : "";
+  if (MES_SOCIETES.length <= 1) {
+    zone.innerHTML = `<div class="recap-magasin"><span>Commande pour</span>
+      <b>${echapperHTML(nom)}</b>
+      <span class="tarif">${echapperHTML(tarif)}</span></div>`;
+    return;
+  }
+  zone.innerHTML = `<label class="recap-magasin" for="recap-magasin-sel">
+      <span>Commande pour le magasin</span>
+      <select id="recap-magasin-sel">${MES_SOCIETES.map(s => `<option value="${s.id}"${
+        s.id === clientActif.id ? " selected" : ""}>${echapperHTML(s.nom || s.compte || "Magasin")}${
+        s.famille_tarifaire ? ` · tarif ${echapperHTML(s.famille_tarifaire)}` : ""}</option>`).join("")}</select>
+      <span class="tarif">Les prix, l'adresse de livraison et le fichier Fastmag suivent ce magasin.</span>
+    </label>`;
+  document.getElementById("recap-magasin-sel").onchange = e => changerMagasinDepuisRecap(e.target.value);
+}
+
+// Changer de magasin re-tarife le panier et peut en retirer des lignes : on le dit,
+// et on renvoie au panier si plus rien n'est commandable pour le magasin choisi.
+async function changerMagasinDepuisRecap(id) {
+  const sel = document.getElementById("recap-magasin-sel");
+  if (sel) sel.disabled = true;
+  try {
+    await changerSociete(id);
+  } finally {
+    if (ETAPE_PANIER === 2) {
+      if (panier.size) rendreRecapPanier(); else etapePanier(1);
+    }
+  }
+}
+
 // Le détail de ce qui part : une ligne par référence, pièces et montant.
 function rendreRecapPanier() {
+  rendreMagasinRecap();
   const parRef = new Map();
   for (const l of panier.values()) {
     const g = parRef.get(l.produit.reference) || { produit: l.produit, pieces: 0, total: 0 };
