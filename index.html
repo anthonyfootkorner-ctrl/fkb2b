@@ -624,7 +624,7 @@
   .recap-magasin select:focus { outline: 0; border-color: #3d3d3d; }
   .recap-magasin b { display: block; margin-top: 7px; color: var(--blanc); font-size: 14px;
     letter-spacing: normal; text-transform: none; font-weight: 600; }
-  .recap-magasin .tarif { display: block; margin-top: 6px; font-size: 10.5px;
+  .recap-magasin .note-mag { display: block; margin-top: 6px; font-size: 10.5px;
     text-transform: none; letter-spacing: normal; }
   .nom-commande input { display: block; width: 100%; margin-top: 7px; background: var(--noir3);
     border: 1px solid var(--bord); border-radius: 8px; color: var(--blanc); font-size: 13px;
@@ -1257,7 +1257,6 @@ function cleTaille(taille) {
   return 800;                                    // inconnu : avant TU, après le reste
 }
 const trierTailles = p => p.tailles.sort((a, b) => cleTaille(a.taille) - cleTaille(b.taille));
-const famille = () => clientActif ? clientActif.famille_tarifaire : "";
 const prixDe = t => t.prix.CLIENT;   // les prix arrivent déjà filtrés par la famille de la société (RLS)
 const prixMini = p => Math.min(...p.tailles.filter(t => t.prix?.CLIENT != null).map(prixDe));
 
@@ -1389,7 +1388,7 @@ function rendreSelecteurSociete() {
   // Un seul magasin : pas de menu, juste le rappel du compte actif.
   if (MES_SOCIETES.length <= 1) {
     zone.className = "magasin-fixe";
-    zone.textContent = `${nomCourt(clientActif)}${clientActif.famille_tarifaire ? " · tarif " + clientActif.famille_tarifaire : ""}`;
+    zone.textContent = nomCourt(clientActif);
     return;
   }
 
@@ -1418,13 +1417,13 @@ function rendreSelecteurSociete() {
   const rendreListe = () => {
     const q = (filtre?.value || "").trim().toLowerCase();
     const vus = MES_SOCIETES.filter(s => !q ||
-      `${s.nom || ""} ${s.compte || ""} ${s.famille_tarifaire || ""}`.toLowerCase().includes(q));
+      `${s.nom || ""} ${s.compte || ""}`.toLowerCase().includes(q));
     document.getElementById("magasin-liste").innerHTML = vus.length
       ? vus.map(s => `<button class="magasin-opt ${s.id === clientActif.id ? "actif" : ""}" data-id="${s.id}"
             role="option" aria-selected="${s.id === clientActif.id}">
           <span class="col">
             <span class="nom">${echapperHTML(nomCourt(s))}</span>
-            <span class="meta">tarif ${echapperHTML(s.famille_tarifaire || "?")}${s.id_fastmag ? " · Fastmag " + echapperHTML(s.id_fastmag) : " · sans ID Fastmag"}</span>
+            <span class="meta">${s.id_fastmag ? "Fastmag " + echapperHTML(s.id_fastmag) : "sans ID Fastmag"}</span>
           </span>
           <span class="coche">✓</span>
         </button>`).join("")
@@ -1453,8 +1452,8 @@ function rendreSelecteurSociete() {
 function majEtiquetteMagasin() {
   const el = document.getElementById("magasin-nom");
   if (!el) return;
-  el.textContent = `${clientActif.nom || clientActif.compte || "Magasin"}`
-    + (clientActif.famille_tarifaire ? ` · ${clientActif.famille_tarifaire}` : "");
+  // Le nom de la grille tarifaire ne regarde pas le client : il voit ses prix, pas leur famille.
+  el.textContent = clientActif.nom || clientActif.compte || "Magasin";
 }
 
 function echapperHTML(s) {
@@ -1771,8 +1770,7 @@ function rendreCollection() {
   const reste = Math.max(total - collectionChargee.length, 0);
   document.getElementById("col-compte").textContent =
     `${produits.length} référence${produits.length > 1 ? "s" : ""} affichée${produits.length > 1 ? "s" : ""}`
-    + (reste || filtreSecondaire || texteRecherche ? ` sur ${total} en stock` : " en stock")
-    + (famille() ? ` · tarif ${famille()}` : "");
+    + (reste || filtreSecondaire || texteRecherche ? ` sur ${total} en stock` : " en stock");
 
   // Pastilles d'affinage : comptées sur le périmètre RÉEL, pas sur la tranche chargée
   // (sinon « NIKE 49 » alors que le catalogue en a 919), et cliquables côté serveur.
@@ -1872,7 +1870,7 @@ async function rendreProduit(ref) {
         <div class="marque">${p.marque || ""}</div>
         <h1>${p.designation || p.reference}</h1>
         <div class="refline">${p.reference} · ${p.couleur || ""} ${p.coloris ? "· " + p.coloris : ""} · Saison ${p.saison || "—"}</div>
-        <div class="prixgros">dès ${eur(prixMini(p))} HT<span>tarif ${famille()}</span></div>
+        <div class="prixgros">dès ${eur(prixMini(p))} HT<span>votre tarif</span></div>
 
         <div class="legende">
           ${p.precommande ? `<span><i class="pastille bleu"></i><b>Précommande</b> — quantité libre, livraison à réception</span>` : ""}
@@ -3502,8 +3500,7 @@ function rendreGrillePreco() {
     ? PRECO_PRODUITS.filter(p => p.marque === PRECO_MARQUE) : PRECO_PRODUITS;
   document.getElementById("preco-sous-titre").textContent =
     `${produits.length} référence${produits.length > 1 ? "s" : ""} proposée${produits.length > 1 ? "s" : ""}`
-    + " · livraison à la date annoncée, ces produits ne sont pas en stock"
-    + (famille() ? ` · tarif ${famille()}` : "");
+    + " · livraison à la date annoncée, ces produits ne sont pas en stock";
 
   const marques = [...new Set(PRECO_PRODUITS.map(p => p.marque).filter(Boolean))].sort();
   document.getElementById("preco-filtres").innerHTML = marques.length > 1
@@ -4102,7 +4099,7 @@ function ouvrirDuplication(id) {
   if (zone.innerHTML) { zone.innerHTML = ""; return; }
   const choix = MES_SOCIETES.length > 1
     ? `<select id="dupli-mag-${id}">${MES_SOCIETES.map(x =>
-        `<option value="${x.id}" ${x.id === clientActif.id ? "selected" : ""}>${echapperHTML(x.nom)} — ${echapperHTML(x.famille_tarifaire || "?")}</option>`).join("")}</select>`
+        `<option value="${x.id}" ${x.id === clientActif.id ? "selected" : ""}>${echapperHTML(x.nom)}</option>`).join("")}</select>`
     : "";
   zone.innerHTML = `
     <span class="dupli-lib">Dupliquer ${MES_SOCIETES.length > 1 ? "vers" : "dans le panier"}</span>
@@ -4266,19 +4263,16 @@ function rendreMagasinRecap() {
   const zone = document.getElementById("recap-magasin");
   if (!zone) return;
   const nom = clientActif?.nom || clientActif?.compte || "Magasin";
-  const tarif = clientActif?.famille_tarifaire ? `Tarif ${clientActif.famille_tarifaire}.` : "";
   if (MES_SOCIETES.length <= 1) {
     zone.innerHTML = `<div class="recap-magasin"><span>Commande pour</span>
-      <b>${echapperHTML(nom)}</b>
-      <span class="tarif">${echapperHTML(tarif)}</span></div>`;
+      <b>${echapperHTML(nom)}</b></div>`;
     return;
   }
   zone.innerHTML = `<label class="recap-magasin" for="recap-magasin-sel">
       <span>Commande pour le magasin</span>
       <select id="recap-magasin-sel">${MES_SOCIETES.map(s => `<option value="${s.id}"${
-        s.id === clientActif.id ? " selected" : ""}>${echapperHTML(s.nom || s.compte || "Magasin")}${
-        s.famille_tarifaire ? ` · tarif ${echapperHTML(s.famille_tarifaire)}` : ""}</option>`).join("")}</select>
-      <span class="tarif">Les prix, l'adresse de livraison et le fichier Fastmag suivent ce magasin.</span>
+        s.id === clientActif.id ? " selected" : ""}>${echapperHTML(s.nom || s.compte || "Magasin")}</option>`).join("")}</select>
+      <span class="note-mag">Les prix, l'adresse de livraison et le fichier Fastmag suivent ce magasin.</span>
     </label>`;
   document.getElementById("recap-magasin-sel").onchange = e => changerMagasinDepuisRecap(e.target.value);
 }
