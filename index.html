@@ -595,6 +595,10 @@
   .recap-ligne { display: flex; gap: 12px; align-items: baseline; font-size: 12.5px; color: var(--gris);
     padding: 7px 0; border-bottom: 1px solid #1e1e1e; }
   .recap-ligne:last-child { border-bottom: 0; }
+  .recap-ligne.total { margin-top: 4px; }
+  .recap-ligne.total .n, .recap-ligne.total .m { color: var(--blanc); }
+  .recap-ligne.remise .n, .recap-ligne.remise .m { color: #d9a441; }
+  .recap-ligne.net { font-size: 14px; font-weight: 600; }
   .recap-ligne .n { color: var(--blanc); flex: 1; }
   .recap-ligne .q { white-space: nowrap; }
   .recap-ligne .m { color: var(--blanc); white-space: nowrap; }
@@ -1239,6 +1243,10 @@ const panier = new Map();    // clé "ref|taille" -> {produit, taille, qte, prix
 const enAttente = new Map(); // reference -> produit
 const selection = new Map(); // saisie en cours sur la fiche ouverte : taille -> qte (rien n'entre au panier avant « Ajouter »)
 
+// Remise commerciale du compte (0 si aucune). Affichage seulement : le serveur
+// relit la sienne à la validation, il ne fait jamais confiance à cette valeur.
+const remiseCompte = () => Number(clientActif?.remise) || 0;
+const pct = n => (Math.round(n * 100) / 100).toString().replace(".", ",");
 const eur = n => n.toLocaleString("fr-FR", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €";
 
 // Ordre canonique des tailles : lettres (XS<S<M<L<XL<XXL…), puis pointures, puis âges, TU en fin.
@@ -1268,7 +1276,7 @@ async function init() {
   let profil;
   try {
     [MES_SOCIETES, profil] = await Promise.all([
-      api("/rest/v1/societes?select=id,compte,id_fastmag,nom,famille_tarifaire&order=compte"),
+      api("/rest/v1/societes?select=id,compte,id_fastmag,nom,famille_tarifaire,remise&order=compte"),
       api("/rest/v1/profils?select=role&limit=1").then(r => r[0]).catch(() => null),
     ]);
   } catch (err) {
@@ -3708,7 +3716,7 @@ async function rendreCommandesAdmin(file) {
   const liste = document.getElementById("cmd-liste");
   if (!COMMANDES_ADMIN.length) liste.innerHTML = `<div class="compte-produits">Chargement…</div>`;
   const [commandes, societes] = await Promise.all([
-    api("/rest/v1/commandes?select=id,numero,nom,statut,nb_pieces,total_ht,cree_le,societe_id,envoye_le,envoi_erreur,commentaire,approuvee_le,integree_le&order=cree_le.desc&limit=500").catch(() => []),
+    api("/rest/v1/commandes?select=id,numero,nom,statut,nb_pieces,total_ht,total_net,remise_pct,cree_le,societe_id,envoye_le,envoi_erreur,commentaire,approuvee_le,integree_le&order=cree_le.desc&limit=500").catch(() => []),
     api("/rest/v1/societes?select=id,nom,compte").catch(() => []),
   ]);
   const nomSociete = {};
@@ -3747,7 +3755,7 @@ function filtrerCommandesAdmin() {
   // pas dans le chiffre d'affaires, mais restent dans le nombre de commandes.
   const retenues = vues.filter(c => c.statut !== "annulee");
   const pieces = retenues.reduce((t, c) => t + (c.nb_pieces || 0), 0);
-  const montant = retenues.reduce((t, c) => t + Number(c.total_ht || 0), 0);
+  const montant = retenues.reduce((t, c) => t + Number(c.total_net ?? c.total_ht ?? 0), 0);
   const annulees = vues.length - retenues.length;
   const chiffre = (valeur, libelle) =>
     `<div class="recap-chiffre"><b>${valeur}</b><span>${libelle}</span></div>`;
@@ -3899,7 +3907,9 @@ function rangCommandeAdmin(c) {
       ${coche}
       <span class="cmd-num">${echapperHTML(c.numero)}</span>
       ${c.nom ? `<span class="cmd-nom">« ${echapperHTML(c.nom)} »</span>` : ""}
-      <span class="cmd-montant">${eur(Number(c.total_ht))} HT</span>
+      <span class="cmd-montant">${eur(Number(c.total_net ?? c.total_ht))} HT${
+        Number(c.remise_pct) > 0 ? `<small style="color:#d9a441; font-weight:400"> · remise ${
+          pct(Number(c.remise_pct))} %</small>` : ""}</span>
     </div>
     <div class="cmd-meta"><b>${echapperHTML(c.societe)}</b> · ${c.nb_pieces} pièce${c.nb_pieces > 1 ? "s" : ""}
       · ${jour} à ${heure}${jalons ? ` · ${jalons}` : ""}</div>
@@ -3969,8 +3979,14 @@ async function telechargerRecapCommande(id) {
       ...lignes.map(l => [c.numero, quand, c.societe, c.nom || "", c.statut, l.reference,
         l.couleur || "", l.taille, l.designation || "", l.quantite,
         virgule(l.prix), virgule(l.quantite * Number(l.prix))].map(csv).join(";")),
-      ["", "", "", "", "", "", "", "", "TOTAL", c.nb_pieces, "",
+      ["", "", "", "", "", "", "", "", "TOTAL BRUT", c.nb_pieces, "",
        virgule(Number(c.total_ht))].map(csv).join(";"),
+      ...(Number(c.remise_pct) > 0 ? [
+        ["", "", "", "", "", "", "", "", `REMISE ${pct(Number(c.remise_pct))} %`, "", "",
+         virgule(-Number(c.total_ht) * Number(c.remise_pct) / 100)].map(csv).join(";"),
+        ["", "", "", "", "", "", "", "", "NET HT", "", "",
+         virgule(Number(c.total_net ?? c.total_ht))].map(csv).join(";"),
+      ] : []),
     ].join("\r\n");
     // BOM : sans lui, Excel casse les accents ; les / du numéro ne passent pas dans un nom de fichier
     const lien = document.createElement("a");
@@ -4032,11 +4048,13 @@ async function rendreCompte() {
   const c = clientActif;
   document.getElementById("bloc-societe").innerHTML = `
     <div class="rang"><b>${c.nom}</b><span class="fin">Compte ${c.compte} · ID Fastmag ${c.id_fastmag ?? "—"}</span></div>
-    <div class="rang">Famille tarifaire<span class="fin">${c.famille_tarifaire ?? "—"}</span></div>
+    ${remiseCompte() > 0
+      ? `<div class="rang">Remise commerciale<span class="fin">${pct(remiseCompte())} % sur vos commandes</span></div>`
+      : ""}
     <div class="rang">Conditions de règlement<span class="fin">Sur facture — définies dans Fastmag</span></div>`;
 
   const [commandes, paniersSauves] = await Promise.all([
-    api("/rest/v1/commandes?select=id,numero,nom,statut,nb_pieces,total_ht,cree_le,societe_id&order=cree_le.desc&limit=15").catch(() => []),
+    api("/rest/v1/commandes?select=id,numero,nom,statut,nb_pieces,total_ht,total_net,remise_pct,cree_le,societe_id&order=cree_le.desc&limit=15").catch(() => []),
     api("/rest/v1/paniers?select=lignes,modifie_le&order=modifie_le.desc&limit=3").catch(() => []),
   ]);
 
@@ -4050,7 +4068,8 @@ async function rendreCompte() {
           ${cm.nom ? `<span class="nom-cmd">« ${echapperHTML(cm.nom)} »</span>` : ""}
           <span class="etiquette ${cls}">${lib}</span>
           ${MES_SOCIETES.length > 1 && mag ? `<span class="mag-cmd">${echapperHTML(mag.nom)}</span>` : ""}
-          <span class="fin">${d} · ${cm.nb_pieces} pièces · ${eur(Number(cm.total_ht))} HT</span>
+          <span class="fin">${d} · ${cm.nb_pieces} pièces · ${eur(Number(cm.total_net ?? cm.total_ht))} HT${
+            Number(cm.remise_pct) > 0 ? ` (remise ${pct(Number(cm.remise_pct))} % déduite)` : ""}</span>
           <button class="puce" style="margin-left:12px" onclick="ouvrirDuplication('${cm.id}')">Dupliquer</button>
           <div class="dupli" id="dupli-${cm.id}"></div>
         </div>`;
@@ -4219,9 +4238,23 @@ function rendrePanier() {
   document.getElementById("badge").textContent = pieces;
   document.getElementById("t-pieces").textContent = `${pieces} pièce${pieces > 1 ? "s" : ""}`;
   document.getElementById("t-refs").textContent = `${refs.size} référence${refs.size > 1 ? "s" : ""}`;
-  document.getElementById("t-ht").textContent = eur(ht);
+  majTotalPied(ht);
   majBoutonCommande();
   sauvegardeAutoPanier();
+}
+
+/* Le pied affiche le montant brut pendant les achats, et le net à payer une fois
+   sur l'écran de validation : c'est le montant que le client va effectivement régler. */
+function majTotalPied(ht) {
+  if (ht === undefined) {
+    ht = 0;
+    for (const l of panier.values()) ht += l.qte * l.prix;
+  }
+  const r = remiseCompte();
+  const net = r > 0 && ETAPE_PANIER === 2;
+  const libelle = document.querySelector("#panier .totaux.grand span");
+  if (libelle) libelle.textContent = net ? "NET HT" : "TOTAL HT";
+  document.getElementById("t-ht").textContent = eur(net ? ht * (1 - r / 100) : ht);
 }
 
 // La commande n'est ouverte qu'avec un panier non vide ET les CGV cochées.
@@ -4253,6 +4286,7 @@ function etapePanier(n) {
   document.getElementById("btn-export").style.display = n === 2 ? "" : "none";
   document.querySelector("#panier .panier-tete h2").textContent = n === 1 ? "PANIER" : "VALIDATION";
   if (n === 2) rendreRecapPanier();
+  majTotalPied();
   majBoutonCommande();
 }
 
@@ -4300,12 +4334,22 @@ function rendreRecapPanier() {
     g.pieces += l.qte; g.total += l.qte * l.prix;
     parRef.set(l.produit.reference, g);
   }
+  const brut = [...parRef.values()].reduce((s, g) => s + g.total, 0);
+  const r = remiseCompte();
   document.getElementById("recap-lignes").innerHTML = [...parRef.values()].map(g => `
     <div class="recap-ligne">
       <span class="n">${echapperHTML(g.produit.designation || g.produit.reference)}</span>
       <span class="q">${g.pieces} pc</span>
       <span class="m">${eur(g.total)}</span>
-    </div>`).join("");
+    </div>`).join("")
+    // Une remise négociée se voit ici, pas seulement dans le total : le client doit
+    // pouvoir vérifier le calcul, pas constater un montant plus bas sans explication.
+    + (r > 0 ? `
+    <div class="recap-ligne total"><span class="n">Sous-total HT</span><span class="m">${eur(brut)}</span></div>
+    <div class="recap-ligne remise"><span class="n">Remise ${pct(r)} %</span>
+      <span class="m">− ${eur(brut * r / 100)}</span></div>
+    <div class="recap-ligne total net"><span class="n">Net HT</span>
+      <span class="m">${eur(brut * (1 - r / 100))}</span></div>` : "");
 }
 
 // Au clic sur « continuer » : on refuse tant qu'une référence reste sans quantité.
@@ -4473,7 +4517,7 @@ function majTotauxPanier() {
   document.getElementById("badge").textContent = pieces;
   document.getElementById("t-pieces").textContent = `${pieces} pièce${pieces > 1 ? "s" : ""}`;
   document.getElementById("t-refs").textContent = `${refs.size} référence${refs.size > 1 ? "s" : ""}`;
-  document.getElementById("t-ht").textContent = eur(ht);
+  majTotalPied(ht);
   majBoutonCommande();
   sauvegardeAutoPanier();
 }
@@ -4606,7 +4650,8 @@ async function validerCommande() {
     etapePanier(1);
     document.getElementById("panier-corps").innerHTML = `<div class="vide">Commande <b>${r.numero}</b> transmise ✓<br>
       ${r.nom ? `<span style="font-size:12px">« ${echapperHTML(r.nom)} »</span>` : ""}<br>
-      <span style="font-size:12px">${r.nb_pieces} pièces — ${eur(Number(r.total_ht))} HT<br>
+      <span style="font-size:12px">${r.nb_pieces} pièces — ${eur(Number(r.total_net ?? r.total_ht))} HT${
+        Number(r.remise_pct) > 0 ? ` (remise ${pct(Number(r.remise_pct))} % déduite)` : ""}<br>
       Enregistrée côté serveur : le stock est réservé.<br>
       ${motEnvoi}</span></div>`;
   } catch (e) {

@@ -435,12 +435,16 @@ function mapperVersTables(analyse) {
     }
     case "clients": {
       const parCompte = new Map();
+      // La colonne Remise n'existe que sur les exports récents : sans elle on ne
+      // touche pas au champ, sinon un vieux fichier remettrait toutes les remises à 0.
+      const avecRemise = L.some(l => "Remise" in l);
       for (const l of L) {
         if (!l.CompteClient) continue;
         const c = parCompte.get(l.CompteClient) || { compte: l.CompteClient };
         c.id_fastmag = c.id_fastmag || (l.Client || null);
         c.nom = c.nom || (l.Nom || null);
         c.famille_tarifaire = c.famille_tarifaire || (l.TarifVente || null);
+        if (avecRemise && c.remise === undefined) c.remise = pourcentFr(l.Remise);
         parCompte.set(l.CompteClient, c);
       }
       return [{ table: "societes", rows: [...parCompte.values()]
@@ -448,6 +452,12 @@ function mapperVersTables(analyse) {
     }
   }
   return [];
+}
+
+// « 10,00 » (décimale française) en pourcentage utilisable. Hors bornes ou illisible : 0.
+function pourcentFr(v) {
+  const n = parseFloat(String(v ?? "").replace(",", ".").trim());
+  return Number.isFinite(n) && n > 0 && n < 100 ? Math.round(n * 100) / 100 : 0;
 }
 
 async function executerImport(analyse, surProgres) {
