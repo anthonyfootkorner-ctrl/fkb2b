@@ -1205,10 +1205,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787754097"></script>
-<script src="imports.js?v=1787754097"></script>
-<script src="merch-shopify.js?v=1787754097"></script>
-<script src="moteur-merch.js?v=1787754097"></script>
+<script src="config.js?v=1787754500"></script>
+<script src="imports.js?v=1787754500"></script>
+<script src="merch-shopify.js?v=1787754500"></script>
+<script src="moteur-merch.js?v=1787754500"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1243,6 +1243,22 @@ const panier = new Map();    // clé "ref|taille" -> {produit, taille, qte, prix
 const enAttente = new Map(); // reference -> produit
 const selection = new Map(); // saisie en cours sur la fiche ouverte : taille -> qte (rien n'entre au panier avant « Ajouter »)
 
+/* Comment nommer un magasin dans les sélecteurs. Fastmag donne la même raison
+   sociale à des magasins différents (« 100% DES MARQUES » à Elne et à Saint-Brice) :
+   la ville les sépare. Sans ville renseignée, on retombe sur la raison sociale, et
+   si deux magasins partagent encore l'étiquette, on ajoute de quoi les départager. */
+function etiquetteMagasin(s, liste) {
+  liste = liste || MES_SOCIETES;
+  const base = (s.ville || "").trim() || s.nom || s.compte || "Magasin";
+  const cle = x => ((x.ville || "").trim() || x.nom || x.compte || "Magasin");
+  if (liste.filter(x => cle(x) === base).length < 2) return base;
+  const nom = (s.nom || "").trim();
+  if (nom && nom !== base && liste.filter(x => cle(x) === base && (x.nom || "").trim() === nom).length < 2) {
+    return `${base} · ${nom}`;
+  }
+  return `${base} · ${s.compte}`;
+}
+
 // Remise commerciale du compte (0 si aucune). Affichage seulement : le serveur
 // relit la sienne à la validation, il ne fait jamais confiance à cette valeur.
 const remiseCompte = () => Number(clientActif?.remise) || 0;
@@ -1276,7 +1292,7 @@ async function init() {
   let profil;
   try {
     [MES_SOCIETES, profil] = await Promise.all([
-      api("/rest/v1/societes?select=id,compte,id_fastmag,nom,famille_tarifaire,remise&order=compte"),
+      api("/rest/v1/societes?select=id,compte,id_fastmag,nom,ville,famille_tarifaire,remise&order=compte"),
       api("/rest/v1/profils?select=role&limit=1").then(r => r[0]).catch(() => null),
     ]);
   } catch (err) {
@@ -1396,7 +1412,7 @@ function rendreSelecteurSociete() {
   // Un seul magasin : pas de menu, juste le rappel du compte actif.
   if (MES_SOCIETES.length <= 1) {
     zone.className = "magasin-fixe";
-    zone.textContent = nomCourt(clientActif);
+    zone.textContent = etiquetteMagasin(clientActif);
     return;
   }
 
@@ -1425,13 +1441,14 @@ function rendreSelecteurSociete() {
   const rendreListe = () => {
     const q = (filtre?.value || "").trim().toLowerCase();
     const vus = MES_SOCIETES.filter(s => !q ||
-      `${s.nom || ""} ${s.compte || ""}`.toLowerCase().includes(q));
+      `${s.ville || ""} ${s.nom || ""} ${s.compte || ""}`.toLowerCase().includes(q));
     document.getElementById("magasin-liste").innerHTML = vus.length
       ? vus.map(s => `<button class="magasin-opt ${s.id === clientActif.id ? "actif" : ""}" data-id="${s.id}"
             role="option" aria-selected="${s.id === clientActif.id}">
           <span class="col">
-            <span class="nom">${echapperHTML(nomCourt(s))}</span>
-            <span class="meta">${s.id_fastmag ? "Fastmag " + echapperHTML(s.id_fastmag) : "sans ID Fastmag"}</span>
+            <span class="nom">${echapperHTML(etiquetteMagasin(s))}</span>
+            <span class="meta">${echapperHTML(s.nom || s.compte || "")}${
+              s.id_fastmag ? " · Fastmag " + echapperHTML(s.id_fastmag) : ""}</span>
           </span>
           <span class="coche">✓</span>
         </button>`).join("")
@@ -1461,7 +1478,7 @@ function majEtiquetteMagasin() {
   const el = document.getElementById("magasin-nom");
   if (!el) return;
   // Le nom de la grille tarifaire ne regarde pas le client : il voit ses prix, pas leur famille.
-  el.textContent = clientActif.nom || clientActif.compte || "Magasin";
+  el.textContent = etiquetteMagasin(clientActif);
 }
 
 function echapperHTML(s) {
@@ -1513,7 +1530,7 @@ async function changerSociete(id) {
   router();
   const alertes = [retirees && `${retirees} ligne${retirees > 1 ? "s" : ""} retirée${retirees > 1 ? "s" : ""} (indisponible)`,
                    ajustees && `${ajustees} quantité${ajustees > 1 ? "s" : ""} ajustée${ajustees > 1 ? "s" : ""}`].filter(Boolean);
-  signalerMagasin(`Magasin actif : ${clientActif.nom || clientActif.compte}`
+  signalerMagasin(`Magasin actif : ${etiquetteMagasin(clientActif)}`
     + (alertes.length ? ` — panier : ${alertes.join(", ")}` : ""));
 }
 
@@ -4067,7 +4084,7 @@ async function rendreCompte() {
           <b>${echapperHTML(cm.numero)}</b>
           ${cm.nom ? `<span class="nom-cmd">« ${echapperHTML(cm.nom)} »</span>` : ""}
           <span class="etiquette ${cls}">${lib}</span>
-          ${MES_SOCIETES.length > 1 && mag ? `<span class="mag-cmd">${echapperHTML(mag.nom)}</span>` : ""}
+          ${MES_SOCIETES.length > 1 && mag ? `<span class="mag-cmd">${echapperHTML(etiquetteMagasin(mag))}</span>` : ""}
           <span class="fin">${d} · ${cm.nb_pieces} pièces · ${eur(Number(cm.total_net ?? cm.total_ht))} HT${
             Number(cm.remise_pct) > 0 ? ` (remise ${pct(Number(cm.remise_pct))} % déduite)` : ""}</span>
           <button class="puce" style="margin-left:12px" onclick="ouvrirDuplication('${cm.id}')">Dupliquer</button>
@@ -4118,7 +4135,7 @@ function ouvrirDuplication(id) {
   if (zone.innerHTML) { zone.innerHTML = ""; return; }
   const choix = MES_SOCIETES.length > 1
     ? `<select id="dupli-mag-${id}">${MES_SOCIETES.map(x =>
-        `<option value="${x.id}" ${x.id === clientActif.id ? "selected" : ""}>${echapperHTML(x.nom)}</option>`).join("")}</select>`
+        `<option value="${x.id}" ${x.id === clientActif.id ? "selected" : ""}>${echapperHTML(etiquetteMagasin(x))}</option>`).join("")}</select>`
     : "";
   zone.innerHTML = `
     <span class="dupli-lib">Dupliquer ${MES_SOCIETES.length > 1 ? "vers" : "dans le panier"}</span>
@@ -4296,7 +4313,7 @@ function etapePanier(n) {
 function rendreMagasinRecap() {
   const zone = document.getElementById("recap-magasin");
   if (!zone) return;
-  const nom = clientActif?.nom || clientActif?.compte || "Magasin";
+  const nom = clientActif ? etiquetteMagasin(clientActif) : "Magasin";
   if (MES_SOCIETES.length <= 1) {
     zone.innerHTML = `<div class="recap-magasin"><span>Commande pour</span>
       <b>${echapperHTML(nom)}</b></div>`;
@@ -4305,7 +4322,7 @@ function rendreMagasinRecap() {
   zone.innerHTML = `<label class="recap-magasin" for="recap-magasin-sel">
       <span>Commande pour le magasin</span>
       <select id="recap-magasin-sel">${MES_SOCIETES.map(s => `<option value="${s.id}"${
-        s.id === clientActif.id ? " selected" : ""}>${echapperHTML(s.nom || s.compte || "Magasin")}</option>`).join("")}</select>
+        s.id === clientActif.id ? " selected" : ""}>${echapperHTML(etiquetteMagasin(s))}</option>`).join("")}</select>
       <span class="note-mag">Les prix, l'adresse de livraison et le fichier Fastmag suivent ce magasin.</span>
     </label>`;
   document.getElementById("recap-magasin-sel").onchange = e => changerMagasinDepuisRecap(e.target.value);

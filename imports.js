@@ -444,6 +444,8 @@ function mapperVersTables(analyse) {
         c.id_fastmag = c.id_fastmag || (l.Client || null);
         c.nom = c.nom || (l.Nom || null);
         c.famille_tarifaire = c.famille_tarifaire || (l.TarifVente || null);
+        // la ville sépare les magasins qui portent la même raison sociale
+        c.ville = c.ville || (l.Ville?.trim() || null);
         if (avecRemise && c.remise === undefined) c.remise = pourcentFr(l.Remise);
         parCompte.set(l.CompteClient, c);
       }
