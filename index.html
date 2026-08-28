@@ -792,7 +792,7 @@
     <div class="titre-section"><h2>RAYONS</h2><span>par univers</span></div>
     <div class="tuiles" id="tuiles-rayons"></div>
 
-    <div class="titre-section"><h2>PRÉCOMMANDES</h2><span>les collections à venir</span></div>
+    <div class="titre-section" id="titre-preco"><h2>PRÉCOMMANDES</h2><span>les collections à venir</span></div>
     <div class="preco-teaser" id="preco-accueil">
       <div class="saison">Été 27</div>
       <h3>NIKE <b>SU27</b></h3>
@@ -1666,6 +1666,18 @@ function rendreAccueil() {
     };
     heroImg.src = "hero.jpg";
   });
+
+  /* Annonce de campagne : les SP2000 n'ont droit qu'à la marque FK, une campagne Nike
+     ne les concerne pas. Le critère est la grille tarifaire et non le catalogue du jour :
+     le stock B2B ne contient pas de Nike en ce moment, ce qui masquerait l'annonce à
+     tout le monde. Quand la campagne existera en base, les accès magasin par magasin
+     (campagne_acces) remplaceront ce test. */
+  const GRILLES_SANS_MARQUES_EXTERNES = ["SP2000"];
+  const droitPreco = !GRILLES_SANS_MARQUES_EXTERNES.includes(clientActif?.famille_tarifaire || "");
+  for (const id of ["titre-preco", "preco-accueil"]) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = droitPreco ? "" : "none";
+  }
 
   const rayons = [...new Set(DATA.produits.map(p => p.famille).filter(Boolean))].slice(0, 8);
   document.getElementById("tuiles-rayons").innerHTML = rayons.map(r => {
