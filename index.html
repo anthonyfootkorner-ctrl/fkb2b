@@ -4000,7 +4000,7 @@ async function telechargerFastmagGroupe() {
   etat.textContent = "assemblage du fichier…";
   try {
     const r = await api("/functions/v1/envoyer-commande", { corps: { commande_ids: ids } });
-    telechargerLatin1(r.fichier, r.contenu);
+    const liste = await telechargerFichiersFastmag(r);
     const ecartees = [
       (r.non_approuvees || []).length
         ? `${r.non_approuvees.length} pas encore approuvée(s) : ${r.non_approuvees.join(", ")}`
@@ -4009,7 +4009,8 @@ async function telechargerFastmagGroupe() {
         ? `${r.sans_fastmag.length} sans ID Fastmag : ${r.sans_fastmag.join(", ")}`
         : "",
     ].filter(Boolean).join(" · ");
-    etat.textContent = `${r.commandes} commande(s), ${r.lignes} ligne(s) dans un seul fichier ✓`
+    etat.textContent = `${r.commandes} commande(s), ${r.lignes} ligne(s) — ${
+      liste.length > 1 ? `${liste.length} fichiers (${liste.map(f => f.origine).join(" et ")})` : "un seul fichier"} ✓`
       + (ecartees ? ` — écartées : ${ecartees}` : "");
   } catch (e) {
     etat.textContent = "échec : " + String(e.donnees?.erreur || e.message).slice(0, 220);
@@ -4172,6 +4173,18 @@ async function telechargerRecapCommande(id) {
 }
 
 // Fastmag lit de l'ISO-8859-1 : tout caractère hors table devient « ? », comme dans le mail.
+/* Une commande servie depuis les deux stocks donne deux fichiers, à importer chacun
+   dans son magasin Fastmag. Les navigateurs bloquent les téléchargements en rafale :
+   on les espace. */
+async function telechargerFichiersFastmag(r) {
+  const liste = r.fichiers?.length ? r.fichiers : [{ nom: r.fichier, contenu: r.contenu }];
+  for (const [i, f] of liste.entries()) {
+    if (i) await new Promise(t => setTimeout(t, 700));
+    telechargerLatin1(f.nom, f.contenu);
+  }
+  return liste;
+}
+
 function telechargerLatin1(nom, texte) {
   const octets = new Uint8Array(texte.length);
   for (let i = 0; i < texte.length; i++) {
@@ -4190,8 +4203,10 @@ async function telechargerFichierCommande(id) {
   etat.textContent = "reconstruction du fichier…";
   try {
     const r = await api("/functions/v1/envoyer-commande", { corps: { commande_id: id, sans_envoi: true } });
-    telechargerLatin1(r.fichier, r.contenu);
-    etat.textContent = "fichier téléchargé ✓";
+    const liste = await telechargerFichiersFastmag(r);
+    etat.textContent = liste.length > 1
+      ? `${liste.length} fichiers téléchargés ✓ — un par magasin : ${liste.map(f => f.origine).join(" et ")}`
+      : "fichier téléchargé ✓";
   } catch (e) {
     etat.textContent = "échec : " + String(e.donnees?.erreur || e.message).slice(0, 200);
   }
