@@ -33,6 +33,14 @@ const MODELES_IMPORT = {
     remplacement_complet: true,
     remplacement_libelle: "remplace le stock web Duhamel — le catalogue B2B n'est pas touché",
   },
+  comptes: {
+    // Classeur de création de comptes : une ligne = un accès au portail.
+    // Les magasins sont donnés par leur code compte Fastmag, séparés par des virgules.
+    libelle: "Comptes du portail (création en masse)",
+    sep: "\t", encodage: "utf-8",
+    signature: ["E-mail (identifiant)", "Mot de passe", "Codes Fastmag"],
+    sans_apercu: true,
+  },
   ventes: {
     libelle: "Ventes quotidiennes (journal VENTE)",
     sep: ",", encodage: "utf-8",
@@ -465,10 +473,49 @@ function pourcentFr(v) {
   return Number.isFinite(n) && n > 0 && n < 100 ? Math.round(n * 100) / 100 : 0;
 }
 
+/* Création des comptes en masse. Chaque ligne est traitée séparément : une adresse
+   déjà prise ou un magasin inconnu n'interrompt pas le reste, et le compte rendu dit
+   ce qui est passé. Le mot de passe vient du fichier ; à défaut le serveur en génère un. */
+async function executerComptes(analyse, surProgres) {
+  const lignes = analyse.lignes.filter(l => (l["E-mail (identifiant)"] || "").includes("@"));
+  if (!lignes.length) throw new Error("aucune adresse e-mail exploitable dans ce fichier");
+
+  const resultats = [];
+  let faits = 0;
+  for (const l of lignes) {
+    const email = (l["E-mail (identifiant)"] || "").trim().toLowerCase();
+    const codes = (l["Codes Fastmag"] || "").split(",").map(x => x.trim()).filter(Boolean);
+    const role = (l["Rôle"] || "responsable").trim() || "responsable";
+    try {
+      if (!codes.length) throw new Error("aucun magasin");
+      const r = await apiFonction("creer_utilisateur", {
+        email, nom: (l["Magasins"] || "").slice(0, 60) || null, role,
+        mot_de_passe: (l["Mot de passe"] || "").trim() || undefined,
+        comptes_societes: codes,
+      });
+      resultats.push({ email, statut: "créé", magasins: codes.join(" "),
+                       mot_de_passe: (l["Mot de passe"] || "").trim() || r.mot_de_passe || "" });
+    } catch (e) {
+      const m = String(e?.donnees?.erreur || e?.message || e);
+      resultats.push({ email, statut: /already|exist|registered/i.test(m) ? "déjà existant" : "échec",
+                       magasins: codes.join(" "), detail: m.slice(0, 120) });
+    }
+    surProgres(`comptes : ${++faits}/${lignes.length}…`);
+  }
+  analyse.resultatsComptes = resultats;
+  const crees = resultats.filter(r => r.statut === "créé").length;
+  await apiFonction("journal", { entree: {
+    fichier: analyse.fichier, modele: analyse.modele, empreinte: analyse.empreinte,
+    lignes_lues: lignes.length, crees, maj: 0, inchanges: 0,
+    quarantaine: resultats.length - crees, statut: "OK" } });
+  return crees;
+}
+
 async function executerImport(analyse, surProgres) {
   // Le stock B2B passe par ses propres fonctions : il ne doit toucher que ses lignes
   // (le stock Duhamel reste en base pour le merch) et il solde les commandes en attente.
   if (analyse.modele === "stock_b2b") return executerStockB2B(analyse, surProgres);
+  if (analyse.modele === "comptes") return executerComptes(analyse, surProgres);
 
   const plans = mapperVersTables(analyse);
   let total = 0;

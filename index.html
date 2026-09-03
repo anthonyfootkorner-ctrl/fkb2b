@@ -1207,10 +1207,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787921000"></script>
-<script src="imports.js?v=1787921000"></script>
-<script src="merch-shopify.js?v=1787921000"></script>
-<script src="moteur-merch.js?v=1787921000"></script>
+<script src="config.js?v=1787922400"></script>
+<script src="imports.js?v=1787922400"></script>
+<script src="merch-shopify.js?v=1787922400"></script>
+<script src="moteur-merch.js?v=1787922400"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1652,7 +1652,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1787921000";
+    v.src = "hero.mp4?v=1787922400";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -2652,12 +2652,15 @@ async function traiterFichier(fichier) {
   // anti-rejeu : ce fichier exact a-t-il déjà été importé ?
   const deja = await api(`/rest/v1/journal_imports?empreinte=eq.${a.empreinte}&select=horodatage`).catch(() => []);
   const plans = mapperVersTables(a);
-  const nbEcrire = plans.reduce((s, p) => s + p.rows.length, 0);
+  const nbComptes = a.modele === "comptes"
+    ? a.lignes.filter(l => (l["E-mail (identifiant)"] || "").includes("@")).length : 0;
+  const nbEcrire = a.modele === "comptes"
+    ? nbComptes : plans.reduce((s, p) => s + p.rows.length, 0);
   zone.innerHTML = `
     <h3 class="titre-bloc">Simulation — ${a.libelle}</h3>
     <div class="chips">
       <span class="chip grise">${a.lues} lignes lues</span>
-      <span class="chip grise">${nbEcrire} à écrire</span>
+      <span class="chip grise">${nbEcrire} ${a.modele === "comptes" ? "comptes à créer" : "à écrire"}</span>
       <span class="chip grise">${a.quarantaine.length} en quarantaine</span>
       <span class="chip grise">${a.stats.trim} nettoyages</span>
       ${a.stats.doublons ? `<span class="chip">${a.stats.doublons} doublons fusionnés (prix le plus bas retenu)</span>` : ""}
@@ -2712,7 +2715,10 @@ async function traiterFichier(fichier) {
       const total = a.modele === "stock_b2b" && destinationImport() === "preco"
         ? await executerPrecommande(a, msg => progres.textContent = msg)
         : await executerImport(a, msg => progres.textContent = msg);
-      progres.innerHTML = `<b>Import terminé ✓</b> — ${total} lignes écrites.`;
+      progres.innerHTML = a.resultatsComptes
+        ? `<b>Terminé ✓</b> — ${total} compte${total > 1 ? "s" : ""} créé${total > 1 ? "s" : ""}.`
+        : `<b>Import terminé ✓</b> — ${total} lignes écrites.`;
+      if (a.resultatsComptes) rendreBilanComptes(a.resultatsComptes);
       await Promise.all([rendreJournalImports(), rendreEtatStockB2B(), rendreCampagnesPreco()]);
       // un dépôt de stock ou de tarifs peut laisser des produits sans prix : on regarde aussitôt
       if (["stock_b2b", "tarifs"].includes(a.modele)) verifierSansTarif(true);
@@ -2724,6 +2730,44 @@ async function traiterFichier(fichier) {
       btn.disabled = false;
     }
   };
+}
+
+/* Bilan d'une création de comptes en masse : ce qui est passé, ce qui a été refusé,
+   et le fichier à distribuer — les mots de passe ne sont visibles qu'ici. */
+let BILAN_COMPTES = [];
+function rendreBilanComptes(resultats) {
+  BILAN_COMPTES = resultats;
+  const crees = resultats.filter(r => r.statut === "créé");
+  const deja  = resultats.filter(r => r.statut === "déjà existant");
+  const rates = resultats.filter(r => r.statut === "échec");
+  const zone = document.getElementById("rapport-import");
+  zone.insertAdjacentHTML("beforeend", `
+    <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--hairline)">
+      <div class="titre-bloc" style="margin-bottom:10px">Comptes traités</div>
+      <div class="chips">
+        <span class="chip grise">${crees.length} créé${crees.length > 1 ? "s" : ""}</span>
+        ${deja.length ? `<span class="chip">${deja.length} déjà existant${deja.length > 1 ? "s" : ""}</span>` : ""}
+        ${rates.length ? `<span class="chip">${rates.length} en échec</span>` : ""}
+      </div>
+      ${rates.length ? `<div class="cmd-note erreur" style="margin-top:12px">
+        ${rates.slice(0, 6).map(r => `<div>${echapperHTML(r.email)} — ${echapperHTML(r.detail || "")}</div>`).join("")}
+        ${rates.length > 6 ? `<div>… et ${rates.length - 6} autre(s), dans le fichier ci-dessous.</div>` : ""}
+      </div>` : ""}
+      <div style="margin-top:12px"><button class="puce-claire" onclick="telechargerBilanComptes()">
+        Télécharger les accès créés (Excel)</button></div>
+    </div>`);
+}
+
+function telechargerBilanComptes() {
+  const csv = v => `"${String(v ?? "").replaceAll('"', '""')}"`;
+  const sortie = [["E-mail", "Mot de passe", "Magasins", "Statut", "Détail"].map(csv).join(";")]
+    .concat(BILAN_COMPTES.map(r => [r.email, r.mot_de_passe || "", r.magasins || "",
+                                    r.statut, r.detail || ""].map(csv).join(";")))
+    .join("\r\n");
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(new Blob(["\ufeff" + sortie], { type: "text/csv;charset=utf-8" }));
+  lien.download = `ACCES_B2B_${new Date().toISOString().slice(0, 10)}.csv`;
+  lien.click(); URL.revokeObjectURL(lien.href);
 }
 
 /* ---------------- merch Shopify (admin) : réordonner les collections du site public ---------------- */
