@@ -1207,10 +1207,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787924200"></script>
-<script src="imports.js?v=1787924200"></script>
-<script src="merch-shopify.js?v=1787924200"></script>
-<script src="moteur-merch.js?v=1787924200"></script>
+<script src="config.js?v=1788439800"></script>
+<script src="imports.js?v=1788439800"></script>
+<script src="merch-shopify.js?v=1788439800"></script>
+<script src="moteur-merch.js?v=1788439800"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1316,7 +1316,7 @@ async function init() {
     montrer("bo-merch", estAdmin || estMerch);
     montrer("bo-merch-shopify", estAdmin || estMerch);
     montrer("bo-imports", estAdmin);
-    montrer("bo-utilisateurs", estAdmin);
+    montrer("bo-utilisateurs", estAdmin || MON_ROLE === "admin_commercial");
   }
   if (estMerch) {
     clientActif = { nom: "Merchandiser", famille_tarifaire: "", id_fastmag: null, compte: "MERCH" };
@@ -1652,7 +1652,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1787924200";
+    v.src = "hero.mp4?v=1788439800";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3344,6 +3344,15 @@ function retirerSocieteCreation(compte) {
 }
 
 async function rendreUtilisateurs() {
+  /* L'administration commerciale ouvre des accès magasin, pas des comptes internes :
+     les rôles qu'elle n'a pas le droit de créer disparaissent du choix. Le serveur
+     refuse de toute façon — ceci évite seulement de proposer un geste voué à l'échec. */
+  if (MON_ROLE === "admin_commercial") {
+    const sel = document.getElementById("nu-role");
+    for (const o of [...sel.options]) {
+      if (!["responsable", "acheteur"].includes(o.value)) o.remove();
+    }
+  }
   // référentiel sociétés pour la saisie (l'admin les voit toutes)
   document.getElementById("liste-societes").innerHTML =
     MES_SOCIETES.map(s => `<option value="${echapperHTML(s.compte)}">${echapperHTML(reperMagasin(s))}</option>`).join("");
