@@ -1207,10 +1207,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1787923600"></script>
-<script src="imports.js?v=1787923600"></script>
-<script src="merch-shopify.js?v=1787923600"></script>
-<script src="moteur-merch.js?v=1787923600"></script>
+<script src="config.js?v=1787924200"></script>
+<script src="imports.js?v=1787924200"></script>
+<script src="merch-shopify.js?v=1787924200"></script>
+<script src="moteur-merch.js?v=1787924200"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1652,7 +1652,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1787923600";
+    v.src = "hero.mp4?v=1787924200";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -2531,8 +2531,7 @@ async function ouvrirAccesCampagne(campagne) {
       ${(societes || []).map(x => `<div style="display:flex; align-items:center; gap:10px; padding:3px 0">
         <label class="cmd-coche" style="flex:1">
           <input type="checkbox" data-compte="${echapperHTML(x.compte)}" ${choisis.has(x.compte) ? "checked" : ""}>
-          <span>${echapperHTML(x.nom || x.compte)} <span style="color:var(--encre2)">· ${
-            echapperHTML(reperMagasin(x).split(" · ").slice(1).join(" · "))}</span></span>
+          <span>${echapperHTML(reperMagasin(x))} <span style="color:var(--encre2)">· ${echapperHTML(x.compte)}</span></span>
         </label>
         <input class="qte-claire" style="width:120px" type="number" min="0" step="100"
                data-budget="${echapperHTML(x.compte)}" placeholder="budget €"
@@ -3327,16 +3326,14 @@ const societesChoisies = [];   // comptes en cours d'ajout dans le formulaire de
    affiche donc toujours l'identifiant Fastmag et le code compte à côté. */
 function reperMagasin(s) {
   if (!s) return "";
-  return [s.nom || s.compte, (s.ville || "").trim() || null,
-          s.id_fastmag ? "Fastmag " + s.id_fastmag : "sans ID Fastmag", s.compte]
-    .filter(Boolean).join(" · ");
+  const nom = s.nom || s.compte || "Magasin";
+  return s.id_fastmag ? `${s.id_fastmag}) ${nom}` : `${nom} (sans n° Fastmag)`;
 }
 
 function chipsHTML(comptes, editable, prefixe) {
   return comptes.map(c => {
     const s = MES_SOCIETES.find(x => x.compte === c);
-    return `<span class="chip">${echapperHTML(s ? s.nom : c)}
-      <small>${echapperHTML(c)}${s?.id_fastmag ? " · Fastmag " + echapperHTML(s.id_fastmag) : ""}</small>
+    return `<span class="chip" title="${echapperHTML(c)}">${echapperHTML(s ? reperMagasin(s) : c)}
       ${editable ? `<button onclick="${prefixe}('${c}')">×</button>` : ""}</span>`;
   }).join("") || `<span class="chip grise">aucun magasin</span>`;
 }
@@ -3349,8 +3346,7 @@ function retirerSocieteCreation(compte) {
 async function rendreUtilisateurs() {
   // référentiel sociétés pour la saisie (l'admin les voit toutes)
   document.getElementById("liste-societes").innerHTML =
-    MES_SOCIETES.map(s => `<option value="${echapperHTML(s.compte)}">${echapperHTML(reperMagasin(s))}${
-      s.famille_tarifaire ? " — " + echapperHTML(s.famille_tarifaire) : ""}</option>`).join("");
+    MES_SOCIETES.map(s => `<option value="${echapperHTML(s.compte)}">${echapperHTML(reperMagasin(s))}</option>`).join("");
   initialiserExclusions();
 
   const liste = await api("/rest/v1/rpc/admin_utilisateurs", { corps: {} });
