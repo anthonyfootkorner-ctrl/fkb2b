@@ -446,6 +446,9 @@ function mapperVersTables(analyse) {
         c.famille_tarifaire = c.famille_tarifaire || (l.TarifVente || null);
         // la ville sépare les magasins qui portent la même raison sociale
         c.ville = c.ville || (l.Ville?.trim() || null);
+        // Un magasin fermé chez Fastmag n'a plus rien à faire dans le portail :
+        // il disparaît des sélecteurs et ne peut plus recevoir de commande.
+        if ("Actif" in l && c.actif === undefined) c.actif = String(l.Actif).trim() !== "0";
         if (avecRemise && c.remise === undefined) c.remise = pourcentFr(l.Remise);
         parCompte.set(l.CompteClient, c);
       }
