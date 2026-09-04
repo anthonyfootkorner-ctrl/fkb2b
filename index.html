@@ -238,6 +238,19 @@
   .derniere-visite { font-size: 11.5px; color: var(--encre2); white-space: nowrap; }
   .puce-claire.danger { border-color: #e3b9b7; color: #a33; }
   .puce-claire.danger:hover { background: #fbeded; border-color: #c0504d; }
+  .table-stock { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
+  .table-stock th { text-align: left; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--encre2); border-bottom: 1px solid var(--hairline); padding: 0 10px 8px 0; font-weight: 600; }
+  .table-stock td { padding: 9px 10px 9px 0; border-bottom: 1px solid #f0eeeb; vertical-align: middle; }
+  .table-stock .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .table-stock .ref { font-weight: 600; }
+  .table-stock .des { color: var(--encre2); font-size: 12px; }
+  .table-stock input { width: 78px; text-align: right; border: 1px solid #d8d8d5; border-radius: 7px;
+    padding: 6px 8px; font-family: inherit; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .table-stock .zero { border: 0; background: none; color: #c0504d; font-size: 11.5px;
+    cursor: pointer; font-family: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .table-stock tr.modifiee td { background: #fdf6ea; }
+
   .cherche-mag { position: relative; }
   .resultats-mag { position: absolute; z-index: 40; left: 0; right: 0; top: calc(100% + 4px);
     background: #fff; border: 1px solid #d8d8d5; border-radius: 10px; overflow: auto;
@@ -934,6 +947,20 @@
     </div>
 
     <div class="bloc-clair" style="margin: 0 22px 26px">
+      <h3 class="titre-bloc">Stock B2B — consulter et corriger</h3>
+      <div class="compte-produits" style="margin-bottom:12px">Pour un écart d'inventaire ou une
+        pièce retirée : corrigez la quantité ici, sans refaire un import. Chaque correction est
+        tracée. Le disponible tient compte des commandes en cours.</div>
+      <div class="formu">
+        <input class="qte-claire" style="width:300px; text-align:left" id="stock-q"
+               placeholder="référence, désignation ou gencod…" autocomplete="off">
+        <button class="puce-claire" id="btn-stock-chercher">Chercher</button>
+        <span class="compte-produits" id="stock-etat"></span>
+      </div>
+      <div id="stock-resultats" style="margin-top:14px; overflow-x:auto"></div>
+    </div>
+
+    <div class="bloc-clair" style="margin: 0 22px 26px">
       <h3 class="titre-bloc">Produits en stock sans tarif</h3>
       <div class="compte-produits" style="margin-bottom:12px">Ces références sont en rayon mais
         invisibles au catalogue, faute de prix. Comparaison sur les quatre grilles suivies —
@@ -1227,10 +1254,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1788462000"></script>
-<script src="imports.js?v=1788462000"></script>
-<script src="merch-shopify.js?v=1788462000"></script>
-<script src="moteur-merch.js?v=1788462000"></script>
+<script src="config.js?v=1788463500"></script>
+<script src="imports.js?v=1788463500"></script>
+<script src="merch-shopify.js?v=1788463500"></script>
+<script src="moteur-merch.js?v=1788463500"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1672,7 +1699,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1788462000";
+    v.src = "hero.mp4?v=1788463500";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -2354,6 +2381,9 @@ async function rendreImports() {
   if (importsInitialise) return;
   importsInitialise = true;
   document.getElementById("btn-sans-tarif").onclick = () => verifierSansTarif(false);
+  document.getElementById("btn-stock-chercher").onclick = chercherStock;
+  document.getElementById("stock-q").addEventListener("keydown",
+    e => { if (e.key === "Enter") chercherStock(); });
   const zone = document.getElementById("zone-depot");
   const champ = document.getElementById("fichier-import");
   champ.onchange = () => champ.files[0] && traiterFichier(champ.files[0]);
@@ -2363,6 +2393,83 @@ async function rendreImports() {
     e.preventDefault(); zone.style.borderColor = "#ccc";
     if (e.dataTransfer.files[0]) traiterFichier(e.dataTransfer.files[0]);
   };
+}
+
+/* Consultation et correction du stock vendable. On montre les deux emplacements côte à
+   côte et ce que les commandes en cours ont déjà pris : corriger une quantité sans voir
+   le réservé mènerait à promettre des pièces déjà vendues. */
+async function chercherStock() {
+  const zone = document.getElementById("stock-resultats");
+  const etat = document.getElementById("stock-etat");
+  const texte = document.getElementById("stock-q").value.trim();
+  etat.textContent = "recherche…";
+  let lignes;
+  try {
+    lignes = await api("/rest/v1/rpc/stock_b2b_recherche",
+      { corps: { p_texte: texte || null, p_limite: 120 } });
+  } catch (e) {
+    etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 140);
+    return;
+  }
+  if (!lignes?.length) {
+    etat.textContent = texte ? "aucune ligne de stock pour cette recherche" : "stock vide";
+    zone.innerHTML = ""; return;
+  }
+  etat.textContent = `${lignes.length} ligne${lignes.length > 1 ? "s" : ""}`
+    + (lignes.length === 120 ? " (les 120 premières)" : "");
+  zone.innerHTML = `<table class="table-stock">
+    <thead><tr>
+      <th>Référence</th><th>Taille</th>
+      <th class="num">Central</th><th class="num">Web</th>
+      <th class="num">Réservé</th><th class="num">Disponible</th><th></th>
+    </tr></thead>
+    <tbody>${lignes.map((l, i) => {
+      const dispo = l.precommande ? "∞" : Math.max(l.physique - l.reserve, 0);
+      return `<tr id="stk-${i}">
+        <td><span class="ref">${echapperHTML(l.reference)}</span>
+          <div class="des">${echapperHTML(l.designation || "")}</div></td>
+        <td>${echapperHTML(l.taille)}</td>
+        <td class="num"><input type="number" min="0" value="${l.central}"
+              data-part="CENTRAL" data-i="${i}"></td>
+        <td class="num"><input type="number" min="0" value="${l.web}"
+              data-part="WEB" data-i="${i}"></td>
+        <td class="num">${l.reserve || "—"}</td>
+        <td class="num"><b>${dispo}</b></td>
+        <td class="num"><button class="zero" data-zero="${i}">tout à 0</button>
+          <span class="compte-produits" id="stk-etat-${i}"></span></td>
+      </tr>`;
+    }).join("")}</tbody></table>`;
+
+  const ajuster = async (l, magasin, quantite, i) => {
+    const info = document.getElementById(`stk-etat-${i}`);
+    info.textContent = "…";
+    try {
+      await api("/rest/v1/rpc/stock_b2b_ajuster", { corps: {
+        p_reference: l.reference, p_taille: l.taille, p_magasin: magasin,
+        p_quantite: quantite, p_motif: "correction back-office" } });
+      document.getElementById(`stk-${i}`).classList.add("modifiee");
+      info.textContent = "enregistré ✓";
+    } catch (e) {
+      info.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 90);
+    }
+  };
+
+  // On enregistre à la sortie du champ : pas à chaque frappe, sinon « 50 » passerait par 5.
+  zone.querySelectorAll("input[data-part]").forEach(inp => {
+    inp.addEventListener("change", () => {
+      const l = lignes[+inp.dataset.i];
+      ajuster(l, inp.dataset.part, Math.max(parseInt(inp.value, 10) || 0, 0), +inp.dataset.i);
+    });
+  });
+  zone.querySelectorAll("button[data-zero]").forEach(b => {
+    b.onclick = async () => {
+      const i = +b.dataset.zero, l = lignes[i];
+      if (!confirm(`Mettre à zéro ${l.reference} taille ${l.taille} ?\n\n`
+        + `Central ${l.central} et web ${l.web} passeront à 0 : la référence ne sera plus commandable.`)) return;
+      for (const part of ["CENTRAL", "WEB"]) await ajuster(l, part, 0, i);
+      document.getElementById(`stk-${i}`).querySelectorAll("input").forEach(x => x.value = 0);
+    };
+  });
 }
 
 // Le catalogue ne lit que le stock B2B : s'il est vide, tout s'affiche à 0 sans que rien
