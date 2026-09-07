@@ -1256,10 +1256,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1788464200"></script>
-<script src="imports.js?v=1788464200"></script>
-<script src="merch-shopify.js?v=1788464200"></script>
-<script src="moteur-merch.js?v=1788464200"></script>
+<script src="config.js?v=1788465000"></script>
+<script src="imports.js?v=1788465000"></script>
+<script src="merch-shopify.js?v=1788465000"></script>
+<script src="moteur-merch.js?v=1788465000"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1701,7 +1701,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1788464200";
+    v.src = "hero.mp4?v=1788465000";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3952,6 +3952,8 @@ async function rendreBackOffice() {
       <div class="bo-liste">
         <div class="bo-rang"><span class="nom">Stock B2B</span>
           <span class="val" style="margin-left:auto">${nb(t.stock_b2b.references)} réf · ${nb(t.stock_b2b.pieces)} pièces</span></div>
+        <div class="bo-rang"><span class="nom" style="padding-left:14px; color:var(--gris)">dont central / web</span>
+          <span class="val" style="margin-left:auto">${nb(t.stock_b2b.central ?? 0)} / ${nb(t.stock_b2b.web ?? 0)}</span></div>
         <div class="bo-rang"><span class="nom">Déposé le</span>
           <span class="val" style="margin-left:auto">${dateCourte(t.depots.stock_b2b)}</span></div>
         <div class="bo-rang"><span class="nom">Stock web (Duhamel)</span>
