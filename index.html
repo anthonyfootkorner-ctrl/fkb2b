@@ -1399,10 +1399,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789078810"></script>
-<script src="imports.js?v=1789078810"></script>
-<script src="merch-shopify.js?v=1789078810"></script>
-<script src="moteur-merch.js?v=1789078810"></script>
+<script src="config.js?v=1789078859"></script>
+<script src="imports.js?v=1789078859"></script>
+<script src="merch-shopify.js?v=1789078859"></script>
+<script src="moteur-merch.js?v=1789078859"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1858,7 +1858,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789078810";
+    v.src = "hero.mp4?v=1789078859";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3937,10 +3937,12 @@ async function rendreCampagnesClient() {
 let PRECO_COURANTE = null, PRECO_PRODUITS = [], PRECO_MARQUE = null, PRECO_RAYON = null, PRECO_CATEGORIE = null, PRECO_RECHERCHE = "";
 let PRECO_INFOS = {};   // la fiche de la campagne (visuel, date limite), pour la vitrine
 let PRECO_VUE = "vitrine";   // « vitrine » : les gros blocs seuls ; « grille » : les produits
-/* Le fournisseur range ses chaussures dans « Sportswear », « Running », « Jordan »… avec le
-   textile. Pour l'acheteur, une chaussure est d'abord une chaussure : tout ce qui est de
-   famille FOOTWEAR forme son propre bloc, les catégories fournisseur ne gardent que le reste. */
-const categorieDe = p => (p.famille || "").toUpperCase() === "FOOTWEAR" ? "Footwear" : (p.categorie || "");
+/* Le fournisseur range chaussures et accessoires dans « Sportswear », « Running », « Jordan »…
+   avec le textile. Pour l'acheteur, une chaussure est d'abord une chaussure et une casquette
+   un accessoire : ces deux familles Fastmag forment leurs propres blocs, les catégories
+   fournisseur ne gardent que le textile. */
+const BLOCS_PAR_FAMILLE = { FOOTWEAR: "Footwear", ACCESSOIRES: "Accessoires" };
+const categorieDe = p => BLOCS_PAR_FAMILLE[(p.famille || "").toUpperCase()] || p.categorie || "";
 
 async function rendreCataloguePreco(campagne) {
   PRECO_COURANTE = campagne;
