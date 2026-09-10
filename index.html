@@ -315,38 +315,8 @@
     .table-panier input { width: 46px; }
   }
 
-  .preco-panneau { background: #fff; border: 1px solid var(--hairline); border-radius: 14px;
-    padding: 18px 20px 20px; box-shadow: 0 12px 30px -18px rgba(0,0,0,.25); }
-  .preco-panneau .tete { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
-  .preco-panneau h3 { font-size: 15px; font-weight: 700; letter-spacing: .02em; margin: 0; }
-  .preco-panneau .ref { font-size: 12px; color: var(--encre2); }
-  .preco-panneau .fermer { margin-left: auto; border: 0; background: none; cursor: pointer;
-    color: var(--encre2); font-size: 13px; font-family: inherit; }
-  .table-preco { border-collapse: collapse; margin-top: 14px; font-size: 13px; }
-  .table-preco th { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
-    color: var(--encre2); font-weight: 600; padding: 0 10px 8px; border-bottom: 1px solid var(--hairline);
-    white-space: nowrap; }
-  .table-preco td { padding: 7px 10px; border-bottom: 1px solid #f2f0ed; text-align: center; }
-  .table-preco td.taille { text-align: left; font-weight: 600; white-space: nowrap; }
-  .table-preco input { width: 68px; text-align: center; border: 1px solid #d8d8d5; border-radius: 7px;
-    padding: 7px 6px; font-family: inherit; font-size: 13px; font-variant-numeric: tabular-nums; }
-  .table-preco input:focus { outline: 0; border-color: #111; }
-  .table-preco .absent { color: #c9c4be; font-size: 12px; }
-  .table-preco tfoot td { font-weight: 700; border-bottom: 0; padding-top: 10px;
-    font-variant-numeric: tabular-nums; }
-  .table-preco tfoot .lib { text-align: left; font-weight: 600; color: var(--encre2);
-    font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
-  .preco-total { display: flex; gap: 20px; align-items: baseline; flex-wrap: wrap; margin-top: 16px; }
-  .preco-total b { font-size: 17px; }
-  .preco-total .sous { font-size: 12px; color: var(--encre2); }
   .carte.choisie { outline: 2px solid #111; outline-offset: -2px; }
   /* Plein écran : une grande grille de tailles se lit mal dans une colonne. */
-  .preco-panneau.agrandi { position: fixed; inset: 16px; z-index: 120; overflow: auto;
-    box-shadow: 0 30px 80px -30px rgba(0,0,0,.5); }
-  .preco-voile { position: fixed; inset: 0; background: rgba(10,10,10,.35); z-index: 119; }
-  .preco-aide { font-size: 12px; color: var(--encre2); margin-top: 10px; }
-  .preco-aide kbd { font-family: inherit; background: #f1efec; border: 1px solid #ddd9d4;
-    border-radius: 5px; padding: 1px 5px; font-size: 11px; }
   .puce-claire.danger { border-color: #e2b8b7; color: #a8403d; }
   .puce-claire.danger:hover { background: #fbedec; border-color: #c0504d; }
 
@@ -1362,10 +1332,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789076761"></script>
-<script src="imports.js?v=1789076761"></script>
-<script src="merch-shopify.js?v=1789076761"></script>
-<script src="moteur-merch.js?v=1789076761"></script>
+<script src="config.js?v=1789077069"></script>
+<script src="imports.js?v=1789077069"></script>
+<script src="merch-shopify.js?v=1789077069"></script>
+<script src="moteur-merch.js?v=1789077069"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1821,7 +1791,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789076761";
+    v.src = "hero.mp4?v=1789077069";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4148,6 +4118,11 @@ async function rendrePanierPreco(campagne) {
   window.scrollTo({ top: 0 });
 }
 
+function basculerDepuisFiche(reference) {
+  basculerPanierPreco(reference);
+  rendreProduitPreco(PRECO_COURANTE, reference);
+}
+
 function retirerDuPanierPreco(reference) {
   PRECO_PANIER.delete(reference);
   memoriserPanierPreco();
@@ -4325,7 +4300,14 @@ async function rendreProduitPreco(campagne, reference) {
         <div class="legende">
           <span><i class="pastille bleu"></i><b>Précommande</b> — quantité libre, livraison à la date choisie</span>
         </div>
-        ${grillePrecoHTML(p)}
+        <div class="repartition" style="margin-top:26px; gap:12px">
+          <button class="${PRECO_PANIER.has(p.reference) ? "puce-claire actif" : "btn-noir"}" style="margin-left:0"
+                  onclick="basculerDepuisFiche(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">${
+            PRECO_PANIER.has(p.reference) ? "✓ DANS MA SÉLECTION — RETIRER" : "AJOUTER À MA SÉLECTION"}</button>
+          <button class="puce-claire"
+                  onclick="location.hash='#/preco-panier/${encodeURIComponent(campagne)}'">
+            Ouvrir la grille de saisie${PRECO_PANIER.size ? ` (${PRECO_PANIER.size})` : ""}</button>
+        </div>
         ${p.description ? `<div class="desc">
           <h3>Descriptif</h3>
           <div class="desc-corps replie" id="desc-corps">${nettoyerHTML(p.description)}</div>
@@ -4342,132 +4324,10 @@ async function rendreProduitPreco(campagne, reference) {
         `<img loading="lazy" src="${u}" alt="" class="${i === 0 ? "actif" : ""}"
            onclick="choisirVisuel(this)">`).join("")}</div>` : ""}`;
   if (p.description) preparerDescription();
-  brancherGrillePreco();
   window.scrollTo({ top: 0 });
 }
 
-/* Grille tailles × fenêtres de livraison. Une campagne annonce ses dates ; un produit
-   n'est pas forcément offert sur toutes, ni sur toutes ses tailles. Les cases sans
-   offre sont barrées plutôt que masquées : l'acheteur voit ce qui n'est pas proposé,
-   au lieu de croire à un oubli. */
-function grillePrecoHTML(p) {
-  const colonnes = PRECO_LIVRAISONS.length ? PRECO_LIVRAISONS
-    : [...new Set((p.tailles || []).flatMap(t => (t.offres || []).map(o => o.livraison)))].sort();
-  const offre = (t, d) => (t.offres || []).find(o => (o.livraison || "") === (d || ""));
-  const valeurDe = (taille, d) => PRECO_SAISIE[cleSaisie(p.reference, taille, d)] || "";
-  return `
-    <div id="preco-saisie">
-      <div style="overflow-x:auto">
-      <table class="table-preco">
-        <thead><tr><th style="text-align:left">Taille</th>
-          ${colonnes.map(d => `<th>${jourCourt(d)}</th>`).join("")}
-          <th>Total</th></tr></thead>
-        <tbody>
-          ${(p.tailles || []).map((t, i) => `<tr>
-            <td class="taille">${echapperHTML(t.taille)}</td>
-            ${colonnes.map((d, j) => {
-              const o = offre(t, d);
-              if (!o) return `<td class="absent" title="non proposé sur cette livraison">—</td>`;
-              return `<td><input type="number" min="0" inputmode="numeric" value="${valeurDe(t.taille, d)}"
-                data-l="${i}" data-c="${j}" data-taille="${echapperHTML(t.taille)}"
-                data-livraison="${d || ""}"></td>`;
-            }).join("")}
-            <td class="num" id="preco-total-l${i}">0</td>
-          </tr>`).join("")}
-        </tbody>
-        <tfoot><tr><td class="lib">Total</td>
-          ${colonnes.map((d, j) => `<td id="preco-total-c${j}">0</td>`).join("")}
-          <td id="preco-total-g">0</td></tr></tfoot>
-      </table>
-      </div>
-      <p class="preco-aide">Collez directement une grille depuis Excel : cliquez la première case,
-        puis <kbd>⌘V</kbd>. Les cases non proposées sont ignorées.</p>
-      <div class="preco-total">
-        <span><b id="preco-pieces">0</b> <span class="sous">pièces</span></span>
-        <span><b id="preco-montant">0,00 €</b> <span class="sous">HT</span></span>
-        <button class="btn-noir" style="margin-left:auto" onclick="enregistrerSaisiePreco()"
-                id="btn-preco">AJOUTER À MA PRÉCOMMANDE</button>
-        <span class="compte-produits" id="preco-etat"></span>
-      </div>
-    </div>`;
-}
 
-function brancherGrillePreco() {
-  const champs = [...document.querySelectorAll("#preco-saisie input[data-l]")];
-  champs.forEach(inp => {
-    inp.addEventListener("input", majTotauxPreco);
-    // Coller un bloc Excel remplit la grille à partir de la case cliquée.
-    inp.addEventListener("paste", e => {
-      const texte = (e.clipboardData || window.clipboardData).getData("text");
-      if (!texte || !/[\t\n]/.test(texte)) return;   // une seule valeur : collage normal
-      e.preventDefault();
-      const l0 = +inp.dataset.l, c0 = +inp.dataset.c;
-      texte.replace(/\r/g, "").split("\n").forEach((ligne, dl) => {
-        if (!ligne.trim()) return;
-        ligne.split("\t").forEach((val, dc) => {
-          const cible = champs.find(x => +x.dataset.l === l0 + dl && +x.dataset.c === c0 + dc);
-          if (!cible) return;                          // hors grille ou case non proposée
-          const n = parseInt(String(val).replace(/[^0-9-]/g, ""), 10);
-          cible.value = Number.isFinite(n) && n > 0 ? n : "";
-        });
-      });
-      majTotauxPreco();
-    });
-  });
-  majTotauxPreco();
-}
-
-function majTotauxPreco() {
-  const zone = document.getElementById("preco-saisie");
-  const p = PRECO_PRODUITS.find(x => x.reference === PRECO_OUVERT);
-  if (!p) return;
-  const champs = [...zone.querySelectorAll("input[data-l]")];
-  const parLigne = {}, parColonne = {};
-  let pieces = 0;
-  for (const inp of champs) {
-    const q = Math.max(parseInt(inp.value, 10) || 0, 0);
-    parLigne[inp.dataset.l] = (parLigne[inp.dataset.l] || 0) + q;
-    parColonne[inp.dataset.c] = (parColonne[inp.dataset.c] || 0) + q;
-    pieces += q;
-  }
-  for (const [i, v] of Object.entries(parLigne)) {
-    const el = document.getElementById(`preco-total-l${i}`); if (el) el.textContent = v || "—";
-  }
-  for (const [j, v] of Object.entries(parColonne)) {
-    const el = document.getElementById(`preco-total-c${j}`); if (el) el.textContent = v || "—";
-  }
-  const prix = prixMini(p) || 0;
-  document.getElementById("preco-total-g").textContent = pieces || "—";
-  document.getElementById("preco-pieces").textContent = pieces;
-  document.getElementById("preco-montant").textContent = eur(pieces * prix);
-}
-
-async function enregistrerSaisiePreco() {
-  const zone = document.getElementById("preco-saisie");
-  const etat = document.getElementById("preco-etat");
-  const p = PRECO_PRODUITS.find(x => x.reference === PRECO_OUVERT);
-  if (!p) return;
-  const lignes = [...zone.querySelectorAll("input[data-l]")].map(inp => ({
-    taille: inp.dataset.taille, livraison: inp.dataset.livraison || null,
-    quantite: Math.max(parseInt(inp.value, 10) || 0, 0),
-  }));
-  etat.textContent = "enregistrement…";
-  try {
-    const r = await api("/rest/v1/rpc/enregistrer_precommande", { corps: {
-      p_campagne: PRECO_COURANTE, p_societe: clientActif?.id ?? null,
-      p_reference: p.reference, p_lignes: lignes } });
-    for (const l of lignes) {
-      const c = cleSaisie(p.reference, l.taille, l.livraison);
-      if (l.quantite > 0) PRECO_SAISIE[c] = l.quantite; else delete PRECO_SAISIE[c];
-    }
-    etat.textContent = `${r.pieces} pièce${r.pieces > 1 ? "s" : ""} dans votre précommande`;
-    const btn = document.getElementById("btn-preco");
-    if (btn) { btn.textContent = "AJOUTÉ ✓"; setTimeout(() => btn.textContent = "AJOUTER À MA PRÉCOMMANDE", 1600); }
-    rendreGrillePreco();
-  } catch (e) {
-    etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 160);
-  }
-}
 
 async function rendreCalendrier() {
   const zone = document.getElementById("calendrier-contenu");
