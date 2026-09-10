@@ -252,6 +252,69 @@
   .table-stock tr.modifiee td { background: #fdf6ea; }
 
   /* Saisie d'une précommande : tailles en lignes, fenêtres de livraison en colonnes. */
+  /* Sélection puis saisie en grille : le planner fournisseur, repris tel quel. */
+  .preco-plus { position: absolute; top: 10px; right: 10px; z-index: 2; width: 30px; height: 30px;
+    border-radius: 50%; border: 1px solid var(--hairline); background: #fff; color: var(--encre);
+    font-size: 16px; line-height: 1; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; transition: background 120ms ease, color 120ms ease; }
+  .preco-plus:hover { background: var(--encre); color: #fff; }
+  .preco-plus.dedans { background: #2e9e4f; border-color: #2e9e4f; color: #fff; }
+  .carte .media { position: relative; }
+
+  .preco-barre { position: sticky; bottom: 0; z-index: 30; display: flex; align-items: center;
+    gap: 16px; flex-wrap: wrap; margin: 0 22px 22px; padding: 14px 18px; border-radius: 12px;
+    background: var(--encre); color: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+  .preco-barre b { font-size: 16px; }
+  .preco-barre .sous { color: #bdbdbd; font-size: 12px; }
+
+  .panier-tete { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+    padding: 0 22px 14px; }
+  .cadre-panier { margin: 0 22px 22px; border: 1px solid var(--hairline); border-radius: 12px;
+    background: #fff; color: var(--encre); overflow: auto; max-height: calc(100svh - 260px); }
+  .table-panier { border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  .table-panier th { position: sticky; top: 0; z-index: 3; background: #f7f6f4;
+    font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--encre2);
+    font-weight: 600; padding: 10px 8px; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+  .table-panier td { padding: 6px 8px; border-bottom: 1px solid #f2f0ed; text-align: center;
+    background: #fff; white-space: nowrap; }
+  .table-panier th.fige, .table-panier td.fige { position: sticky; left: 0; z-index: 4;
+    text-align: left; border-right: 1px solid var(--hairline); }
+  .table-panier th.fige { z-index: 5; }
+  .table-panier th.fige2, .table-panier td.fige2 { position: sticky; left: 262px; z-index: 4;
+    border-right: 1px solid var(--hairline); }
+  .table-panier th.fige2 { z-index: 5; }
+  .table-panier td.fige { width: 262px; min-width: 262px; }
+  .pp-produit { display: flex; align-items: center; gap: 10px; }
+  .pp-vignette { width: 38px; height: 38px; border-radius: 6px; background: var(--tuile);
+    object-fit: contain; flex: none; }
+  .pp-nom { font-weight: 600; line-height: 1.2; max-width: 190px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .pp-ref { font-size: 11px; color: var(--encre2); }
+  .pp-crd { display: inline-block; padding: 4px 9px; border-radius: 6px; color: #fff;
+    font-size: 11.5px; font-weight: 600; letter-spacing: .02em; }
+  .pp-crd.d0 { background: #2b7ab5; } .pp-crd.d1 { background: #8faa2b; }
+  .pp-crd.d2 { background: #e8871e; } .pp-crd.d3 { background: #7a5ea8; }
+  .table-panier input { width: 54px; text-align: center; border: 1px solid #e2e0dc;
+    border-radius: 6px; padding: 6px 4px; font-size: 13px; background: #fbfbfa; }
+  .table-panier input:focus { outline: none; border-color: var(--encre); background: #fff; }
+  .table-panier td.absent { color: #d8d8d5; background: #faf9f8; }
+  .table-panier td.total { font-weight: 700; }
+  .table-panier tr.produit-debut td { border-top: 1px solid var(--hairline); }
+  .pp-retirer { border: 0; background: none; color: var(--encre2); cursor: pointer; font-size: 15px;
+    padding: 0 2px; }
+  .pp-retirer:hover { color: #c0392b; }
+  /* Sur un téléphone, deux colonnes figées mangeraient tout l'écran : la colonne produit
+     se resserre (sans vignette) et la livraison défile avec les tailles. */
+  @media (max-width: 700px) {
+    .table-panier td.fige { width: 150px; min-width: 150px; }
+    .table-panier th.fige2, .table-panier td.fige2 { position: static; }
+    .pp-vignette { display: none; }
+    .pp-nom { max-width: 96px; font-size: 12px; }
+    .pp-ref { font-size: 10.5px; }
+    .cadre-panier { margin: 0 12px 16px; max-height: calc(100svh - 300px); }
+    .table-panier input { width: 46px; }
+  }
+
   .preco-panneau { background: #fff; border: 1px solid var(--hairline); border-radius: 14px;
     padding: 18px 20px 20px; box-shadow: 0 12px 30px -18px rgba(0,0,0,.25); }
   .preco-panneau .tete { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
@@ -576,6 +639,11 @@
     padding: 12px 26px; font-weight: 700; font-size: 12.5px; letter-spacing: .08em; cursor: pointer;
     transition: transform 160ms var(--ease-out), opacity 150ms ease; }
   .btn-noir:active { transform: scale(0.97); }
+  .btn-blanc { background: #fff; color: var(--encre); border: 0; border-radius: 999px;
+    padding: 12px 26px; font-weight: 700; font-size: 12.5px; letter-spacing: .08em; cursor: pointer;
+    transition: transform 160ms var(--ease-out), opacity 150ms ease; }
+  .btn-blanc:active { transform: scale(0.97); }
+  .btn-blanc:disabled { opacity: .5; cursor: default; }
 
   /* ---------- panier (inchangé, sombre) ---------- */
   .voile { position: fixed; inset: 0; background: rgba(0,0,0,.72); z-index: 90; opacity: 0; pointer-events: none; transition: opacity 200ms ease; }
@@ -1040,9 +1108,11 @@
     </div>
     <div class="col-filtres" id="preco-filtres" style="padding: 0 22px 16px; display:flex; gap:8px; flex-wrap:wrap"></div>
     <div class="grille-col" id="preco-grille" style="margin: 0 22px 60px"></div>
+    <div class="preco-barre" id="preco-barre" hidden></div>
   </section>
 
   <section class="vue page-claire" id="vue-preco-produit"></section>
+  <section class="vue page-claire" id="vue-preco-panier"></section>
 
   <section class="vue page-claire" id="vue-calendrier">
     <div class="col-tete">
@@ -1292,10 +1362,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789076028"></script>
-<script src="imports.js?v=1789076028"></script>
-<script src="merch-shopify.js?v=1789076028"></script>
-<script src="moteur-merch.js?v=1789076028"></script>
+<script src="config.js?v=1789076761"></script>
+<script src="imports.js?v=1789076761"></script>
+<script src="merch-shopify.js?v=1789076761"></script>
+<script src="moteur-merch.js?v=1789076761"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1685,6 +1755,9 @@ function router() {
   } else if (route === "precommande") {
     document.getElementById("vue-precommande").classList.add("active");
     rendreCataloguePreco(decodeURIComponent(args.join("/")));
+  } else if (route === "preco-panier") {
+    document.getElementById("vue-preco-panier").classList.add("active");
+    rendrePanierPreco(decodeURIComponent(args.join("/")));
   } else if (route === "preco-produit") {
     document.getElementById("vue-preco-produit").classList.add("active");
     rendreProduitPreco(decodeURIComponent(args[0] || ""), decodeURIComponent(args[1] || ""));
@@ -1748,7 +1821,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789076028";
+    v.src = "hero.mp4?v=1789076761";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3845,6 +3918,7 @@ async function rendreCataloguePreco(campagne) {
   PRECO_RAYON = null;
   PRECO_OUVERT = null;
   await chargerSaisiePreco(campagne);
+  chargerPanierPreco();
   rendreGrillePreco();
 }
 
@@ -3882,6 +3956,8 @@ function rendreGrillePreco() {
   }
   document.getElementById("preco-filtres").innerHTML = barre;
 
+  rendreBarrePreco();
+
   document.getElementById("preco-grille").innerHTML = produits.map(p => {
     const saisi = Object.entries(PRECO_SAISIE)
       .filter(([c]) => c.startsWith(p.reference + "|"))
@@ -3889,6 +3965,10 @@ function rendreGrillePreco() {
     return `<div class="carte${p.reference === PRECO_OUVERT ? " choisie" : ""}"
          onclick="ouvrirSaisiePreco(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">
       <div class="media ${p.photo ? "" : "sans"}">
+        <button class="preco-plus${PRECO_PANIER.has(p.reference) ? " dedans" : ""}"
+                title="${PRECO_PANIER.has(p.reference) ? "retirer de ma sélection" : "ajouter à ma sélection"}"
+                onclick="basculerPanierPreco(${JSON.stringify(p.reference).replaceAll('"', "&quot;")}, event)"
+        >${PRECO_PANIER.has(p.reference) ? "✓" : "+"}</button>
         ${p.photo ? `<div class="visuel"><img loading="lazy" src="${p.photo}" alt=""></div>`
                   : blocSansVisuel(p)}
       </div>
@@ -3907,6 +3987,282 @@ function rendreGrillePreco() {
 
 function affinerPreco(marque) { PRECO_MARQUE = marque; rendreGrillePreco(); }
 function affinerPrecoRayon(rayon) { PRECO_RAYON = rayon; rendreGrillePreco(); }
+
+/* ---------------- panier de précommande ----------------
+   Anthony travaille ses précommandes sur le planner du fournisseur : une ligne par
+   produit ET par date de livraison, les tailles en colonnes, la CRD en couleur. On
+   reprend cette grille telle quelle. La sélection se fait d'un clic depuis les cartes,
+   la saisie se fait ensuite d'une traite sur une seule page.
+   Le panier du catalogue n'est pas touché : il est indexé référence + taille sans
+   date, et sa validation contrôle le stock puis fabrique un fichier Fastmag — ce qui
+   n'a aucun sens pour une livraison à un an. */
+let PRECO_PANIER = new Set();
+
+const clePanierPreco = () => `preco-panier|${PRECO_COURANTE}|${clientActif?.id || ""}`;
+
+function chargerPanierPreco() {
+  PRECO_PANIER = new Set();
+  try {
+    const v = JSON.parse(localStorage.getItem(clePanierPreco()) || "[]");
+    if (Array.isArray(v)) v.forEach(r => PRECO_PANIER.add(r));
+  } catch (e) { /* sélection illisible : on repart de ce qui est déjà saisi */ }
+  // ce qui est déjà saisi en base appartient au panier, quel que soit le poste utilisé
+  for (const c of Object.keys(PRECO_SAISIE)) PRECO_PANIER.add(c.split("|")[0]);
+}
+
+function memoriserPanierPreco() {
+  try { localStorage.setItem(clePanierPreco(), JSON.stringify([...PRECO_PANIER])); }
+  catch (e) { /* stockage refusé : la sélection ne vivra que le temps de la visite */ }
+}
+
+function basculerPanierPreco(reference, ev) {
+  ev?.stopPropagation();
+  if (PRECO_PANIER.has(reference)) PRECO_PANIER.delete(reference);
+  else PRECO_PANIER.add(reference);
+  memoriserPanierPreco();
+  rendreGrillePreco();
+}
+
+function piecesSaisies(reference) {
+  return Object.entries(PRECO_SAISIE)
+    .filter(([c]) => c.startsWith(reference + "|"))
+    .reduce((s, [, q]) => s + q, 0);
+}
+
+function rendreBarrePreco() {
+  const barre = document.getElementById("preco-barre");
+  const n = PRECO_PANIER.size;
+  barre.hidden = !n;
+  if (!n) return;
+  const pieces = [...PRECO_PANIER].reduce((s, r) => s + piecesSaisies(r), 0);
+  barre.innerHTML = `
+    <span><b>${n}</b> <span class="sous">produit${n > 1 ? "s" : ""} sélectionné${n > 1 ? "s" : ""}</span></span>
+    <span><b>${pieces}</b> <span class="sous">pièce${pieces > 1 ? "s" : ""} saisie${pieces > 1 ? "s" : ""}</span></span>
+    <button class="btn-blanc" style="margin-left:auto"
+            onclick="location.hash='#/preco-panier/${encodeURIComponent(PRECO_COURANTE)}'">
+      OUVRIR LA GRILLE DE SAISIE</button>`;
+}
+
+/* La grille : lignes = produit × livraison, colonnes = toutes les tailles proposées
+   parmi les produits retenus. Une case sans offre est grisée plutôt que masquée,
+   sinon l'acheteur croit à un oubli. */
+async function rendrePanierPreco(campagne) {
+  const vue = document.getElementById("vue-preco-panier");
+  if (PRECO_COURANTE !== campagne || !PRECO_PRODUITS.length) {
+    vue.innerHTML = `<div class="col-tete"><div class="compte-produits">Chargement…</div></div>`;
+    await rendreCataloguePreco(campagne);
+  }
+  const retour = `#/precommande/${encodeURIComponent(campagne)}`;
+  const produits = PRECO_PRODUITS.filter(p => PRECO_PANIER.has(p.reference));
+  // la courbe de vente du réseau, pour répartir un total sur les tailles
+  PRECO_COURBE = {};
+  if (produits.length) {
+    try {
+      PRECO_COURBE = await api("/rest/v1/rpc/courbe_tailles",
+        { corps: { p_references: produits.map(p => p.reference) } }) || {};
+    } catch (e) { /* sans courbe, la répartition se fera à parts égales */ }
+  }
+  if (!produits.length) {
+    vue.innerHTML = `
+      <div class="col-tete">
+        <span class="fil" onclick="location.hash='${retour}'">&larr; ${echapperHTML(campagne)}</span>
+        <h1>MA PRÉCOMMANDE</h1>
+        <div class="compte-produits">Votre sélection est vide. Ajoutez des produits depuis la campagne
+          avec le bouton <b>+</b> en haut de chaque visuel.</div>
+      </div>`;
+    return;
+  }
+
+  const dates = PRECO_LIVRAISONS.length ? PRECO_LIVRAISONS
+    : [...new Set(produits.flatMap(p => (p.tailles || [])
+        .flatMap(t => (t.offres || []).map(o => o.livraison))))].sort();
+  const colonnes = [...new Set(produits.flatMap(p => (p.tailles || [])
+      .filter(t => (t.offres || []).length).map(t => t.taille)))]
+    .sort((a, b) => cleTaille(a) - cleTaille(b));
+
+  const offre = (p, taille, d) => (p.tailles.find(t => t.taille === taille)?.offres || [])
+    .find(o => (o.livraison || "") === (d || ""));
+
+  let l = -1;
+  const lignes = produits.flatMap(p => {
+    const siennes = dates.filter(d => colonnes.some(t => offre(p, t, d)));
+    return siennes.map((d, rang) => {
+      l++;
+      return `<tr data-ref="${echapperHTML(p.reference)}"${rang === 0 ? ' class="produit-debut"' : ""}>
+        <td class="fige">${rang === 0 ? `<div class="pp-produit">
+            ${p.photo ? `<img class="pp-vignette" loading="lazy" src="${p.photo}" alt="">`
+                      : `<span class="pp-vignette"></span>`}
+            <span>
+              <div class="pp-nom" title="${echapperHTML(p.designation || p.reference)}">${
+                echapperHTML(p.designation || p.reference)}</div>
+              <div class="pp-ref">${echapperHTML(p.reference)} · ${eur(prixMini(p))} HT</div>
+            </span>
+            <button class="pp-retirer" title="retirer de ma sélection"
+                    onclick="retirerDuPanierPreco(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">✕</button>
+          </div>` : ""}</td>
+        <td class="fige2"><span class="pp-crd d${dates.indexOf(d) % 4}">${jourCourt(d)}</span></td>
+        <td class="total"><input class="pp-total" data-total-l="${l}"
+            data-ref="${echapperHTML(p.reference)}" inputmode="numeric" placeholder="—"
+            title="Saisissez un total : il se répartit sur les tailles selon la courbe de vente du réseau"></td>
+        ${colonnes.map((t, c) => {
+          const o = offre(p, t, d);
+          if (!o) return `<td class="absent" title="taille non proposée sur cette livraison">·</td>`;
+          const v = PRECO_SAISIE[cleSaisie(p.reference, t, d)] || "";
+          return `<td><input type="number" min="0" inputmode="numeric" value="${v}"
+            data-l="${l}" data-c="${c}" data-ref="${echapperHTML(p.reference)}"
+            data-taille="${echapperHTML(t)}" data-livraison="${d || ""}"></td>`;
+        }).join("")}
+      </tr>`;
+    });
+  }).join("");
+
+  vue.innerHTML = `
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='${retour}'">&larr; ${echapperHTML(campagne)}</span>
+      <h1>MA PRÉCOMMANDE</h1>
+      <div class="compte-produits">${produits.length} produit${produits.length > 1 ? "s" : ""}
+        · ${dates.length} date${dates.length > 1 ? "s" : ""} de livraison
+        · ${colonnes.length} taille${colonnes.length > 1 ? "s" : ""}.
+        Tapez un <b>total</b> sur une ligne : il se répartit sur les tailles selon la courbe de vente du réseau.
+        Ou collez une grille depuis Excel : cliquez la première case puis <kbd>⌘V</kbd>.</div>
+    </div>
+    <div class="cadre-panier">
+      <table class="table-panier">
+        <thead><tr>
+          <th class="fige">Produit</th><th class="fige2">Livraison</th>
+          <th title="Saisissez un total : il se répartit automatiquement sur les tailles">Total ⤳</th>
+          ${colonnes.map(t => `<th>${echapperHTML(t)}</th>`).join("")}
+        </tr></thead>
+        <tbody>${lignes}</tbody>
+      </table>
+    </div>
+    <div class="preco-barre" style="position:sticky">
+      <span><b id="pp-pieces">0</b> <span class="sous">pièces</span></span>
+      <span><b id="pp-montant">0,00 €</b> <span class="sous">HT</span></span>
+      <span class="sous" id="pp-etat"></span>
+      <button class="btn-blanc" style="margin-left:auto" id="pp-enregistrer"
+              onclick="enregistrerPanierPreco()">ENREGISTRER MA PRÉCOMMANDE</button>
+    </div>`;
+
+  brancherGrillePanier();
+  window.scrollTo({ top: 0 });
+}
+
+function retirerDuPanierPreco(reference) {
+  PRECO_PANIER.delete(reference);
+  memoriserPanierPreco();
+  rendrePanierPreco(PRECO_COURANTE);
+}
+
+let PRECO_COURBE = {};   // référence → { taille: pièces vendues } (courbe du réseau)
+
+/* Un total tapé sur une ligne se répartit sur ses tailles au prorata de ce que le
+   réseau vend réellement dans cette famille, plus forts restes d'abord — la même
+   règle que repartir() côté catalogue. Sans courbe connue, à parts égales. */
+function repartirLignePanier(inp) {
+  const total = Math.max(parseInt(inp.value, 10) || 0, 0);
+  const cases = [...document.querySelectorAll(`.table-panier input[data-l="${inp.dataset.totalL}"]`)];
+  if (!cases.length) return;
+  const poids = PRECO_COURBE[inp.dataset.ref] || {};
+  let w = cases.map(c => Number(poids[c.dataset.taille]) || 0);
+  if (!w.some(x => x > 0)) w = cases.map(() => 1);
+  const somme = w.reduce((a, b) => a + b, 0);
+  const exact = w.map(x => total * x / somme);
+  const base = exact.map(Math.floor);
+  let reste = total - base.reduce((a, b) => a + b, 0);
+  for (const o of exact.map((e, i) => ({ i, r: e - base[i] })).sort((a, b) => b.r - a.r)) {
+    if (reste <= 0) break;
+    base[o.i]++; reste--;
+  }
+  cases.forEach((c, i) => c.value = base[i] || "");
+  majTotauxPanier();
+}
+
+function brancherGrillePanier() {
+  for (const t of document.querySelectorAll(".table-panier input.pp-total")) {
+    t.addEventListener("change", () => repartirLignePanier(t));
+  }
+  const champs = [...document.querySelectorAll(".table-panier input[data-l]")];
+  champs.forEach(inp => {
+    inp.addEventListener("input", majTotauxPanier);
+    inp.addEventListener("paste", e => {
+      const texte = (e.clipboardData || window.clipboardData).getData("text");
+      if (!texte || !/[\t\n]/.test(texte)) return;   // une seule valeur : collage normal
+      e.preventDefault();
+      const l0 = +inp.dataset.l, c0 = +inp.dataset.c;
+      texte.replace(/\r/g, "").split("\n").forEach((ligne, dl) => {
+        if (!ligne.trim()) return;
+        ligne.split("\t").forEach((val, dc) => {
+          const cible = champs.find(x => +x.dataset.l === l0 + dl && +x.dataset.c === c0 + dc);
+          if (!cible) return;                          // hors grille ou case non proposée
+          const n = parseInt(String(val).replace(/[^0-9-]/g, ""), 10);
+          cible.value = Number.isFinite(n) && n > 0 ? n : "";
+        });
+      });
+      majTotauxPanier();
+    });
+  });
+  majTotauxPanier();
+}
+
+function majTotauxPanier() {
+  const prix = {};
+  for (const p of PRECO_PRODUITS) prix[p.reference] = prixMini(p) || 0;
+  const parLigne = {};
+  let pieces = 0, montant = 0;
+  for (const inp of document.querySelectorAll(".table-panier input[data-l]")) {
+    const q = Math.max(parseInt(inp.value, 10) || 0, 0);
+    parLigne[inp.dataset.l] = (parLigne[inp.dataset.l] || 0) + q;
+    pieces += q;
+    montant += q * (prix[inp.dataset.ref] || 0);
+  }
+  for (const el of document.querySelectorAll("[data-total-l]")) {
+    const v = parLigne[el.dataset.totalL] || 0;
+    if (el.tagName === "INPUT") { if (document.activeElement !== el) el.value = v || ""; }
+    else el.textContent = v || "—";
+  }
+  const p = document.getElementById("pp-pieces"), m = document.getElementById("pp-montant");
+  if (p) p.textContent = pieces;
+  if (m) m.textContent = eur(montant);
+}
+
+/* On n'envoie que les produits dont la grille a bougé : une campagne peut compter
+   des centaines de références, et chaque référence est un aller-retour serveur. */
+async function enregistrerPanierPreco() {
+  const bouton = document.getElementById("pp-enregistrer");
+  const etat = document.getElementById("pp-etat");
+  const parRef = {};
+  for (const inp of document.querySelectorAll(".table-panier input[data-l]")) {
+    (parRef[inp.dataset.ref] ??= []).push({
+      taille: inp.dataset.taille, livraison: inp.dataset.livraison || null,
+      quantite: Math.max(parseInt(inp.value, 10) || 0, 0),
+    });
+  }
+  const aEnvoyer = Object.entries(parRef).filter(([ref, lignes]) =>
+    lignes.some(l => (PRECO_SAISIE[cleSaisie(ref, l.taille, l.livraison)] || 0) !== l.quantite));
+  if (!aEnvoyer.length) { etat.textContent = "rien de nouveau à enregistrer"; return; }
+
+  bouton.disabled = true;
+  let fait = 0, pieces = 0;
+  try {
+    for (const [ref, lignes] of aEnvoyer) {
+      etat.textContent = `enregistrement… ${++fait}/${aEnvoyer.length}`;
+      const r = await api("/rest/v1/rpc/enregistrer_precommande", { corps: {
+        p_campagne: PRECO_COURANTE, p_societe: clientActif?.id ?? null,
+        p_reference: ref, p_lignes: lignes } });
+      pieces += r.pieces || 0;
+      for (const l of lignes) {
+        const c = cleSaisie(ref, l.taille, l.livraison);
+        if (l.quantite > 0) PRECO_SAISIE[c] = l.quantite; else delete PRECO_SAISIE[c];
+      }
+    }
+    etat.textContent = `enregistré ✓ — ${aEnvoyer.length} produit${aEnvoyer.length > 1 ? "s" : ""} mis à jour`;
+  } catch (e) {
+    etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 160);
+  } finally {
+    bouton.disabled = false;
+  }
+}
 
 /* ---------------- saisie d'une précommande : tailles × fenêtres de livraison ----------------
    Une campagne annonce ses dates ; un produit n'est pas forcément offert sur toutes,
