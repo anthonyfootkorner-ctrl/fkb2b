@@ -261,6 +261,9 @@
   .preco-plus.dedans { background: #2e9e4f; border-color: #2e9e4f; color: #fff; }
   .carte .media { position: relative; }
 
+  .vol-vignette { position: fixed; z-index: 100; pointer-events: none; border-radius: 10px;
+    background: var(--tuile); overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.25); will-change: transform; }
+  .vol-vignette img { width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
   .preco-barre { position: sticky; bottom: 0; z-index: 30; display: flex; align-items: center;
     gap: 16px; flex-wrap: wrap; margin: 0 22px 22px; padding: 14px 18px; border-radius: 12px;
     background: var(--encre); color: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
@@ -280,6 +283,12 @@
   .table-panier th.fige, .table-panier td.fige { position: sticky; left: 0; z-index: 4;
     text-align: left; border-right: 1px solid var(--hairline); }
   .table-panier th.fige { z-index: 5; }
+  .table-panier tr.pp-section th { top: 0; background: var(--encre); color: #fff; font-size: 11px;
+    letter-spacing: .14em; padding: 9px 12px; border-bottom: 0; }
+  .table-panier tr.pp-section th .sous { color: #bdbdbd; font-weight: 400; letter-spacing: .04em;
+    text-transform: none; margin-left: 6px; }
+  .table-panier thead tr:nth-child(2) th { top: 33px; }
+  .table-panier + .table-panier { margin-top: 18px; }
   .table-panier th.fige2, .table-panier td.fige2 { position: sticky; left: 262px; z-index: 4;
     border-right: 1px solid var(--hairline); }
   .table-panier th.fige2 { z-index: 5; }
@@ -298,6 +307,24 @@
     border-radius: 6px; padding: 6px 4px; font-size: 13px; background: #fbfbfa; }
   .table-panier input:focus { outline: none; border-color: var(--encre); background: #fff; }
   .table-panier td.absent { color: #d8d8d5; background: #faf9f8; }
+  .table-panier th.th-total { background: #e3eefb; color: #1b5fa8; }
+  .table-panier td.montant { color: #b5b5b0; font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
+  .table-panier td.montant.actif { color: var(--encre); font-weight: 700; }
+  .table-panier th.th-montant { text-align: right; }
+  .table-panier th.pp-section-montant { text-align: right; font-weight: 600; letter-spacing: .02em;
+    text-transform: none; font-size: 12px; }
+  .table-panier td.total { background: #eef4fb; }
+  .table-panier input.pp-total { width: 64px; border: 2px solid #2b7ab5; background: #fff;
+    font-weight: 700; color: #1b5fa8; }
+  .table-panier input.pp-total::placeholder { color: #8fb3d9; font-weight: 400; font-size: 11px; }
+  .table-panier input.pp-total:focus { box-shadow: 0 0 0 3px rgba(43,122,181,.25); }
+  @keyframes pp-allume { 0% { background: #2b7ab5; color: #fff; border-color: #2b7ab5; }
+    60% { background: #dbe9f8; color: var(--encre); } 100% { background: #fbfbfa; border-color: #e2e0dc; } }
+  .table-panier input.rempli { animation: pp-allume 1.4s ease-out; }
+  .pp-aide { display: flex; gap: 14px; align-items: flex-start; margin: 0 22px 14px; padding: 14px 18px;
+    border-radius: 12px; background: #e3eefb; color: #1b3a5c; font-size: 13px; line-height: 1.45; }
+  .pp-aide-ico { font-size: 26px; line-height: 1; color: #1b5fa8; flex: none; }
+  @media (max-width: 700px) { .pp-aide { margin: 0 12px 12px; font-size: 12px; } }
   .table-panier td.total { font-weight: 700; }
   .table-panier tr.produit-debut td { border-top: 1px solid var(--hairline); }
   .pp-retirer { border: 0; background: none; color: var(--encre2); cursor: pointer; font-size: 15px;
@@ -1332,10 +1359,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789077069"></script>
-<script src="imports.js?v=1789077069"></script>
-<script src="merch-shopify.js?v=1789077069"></script>
-<script src="moteur-merch.js?v=1789077069"></script>
+<script src="config.js?v=1789077394"></script>
+<script src="imports.js?v=1789077394"></script>
+<script src="merch-shopify.js?v=1789077394"></script>
+<script src="moteur-merch.js?v=1789077394"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1791,7 +1818,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789077069";
+    v.src = "hero.mp4?v=1789077394";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3987,10 +4014,51 @@ function memoriserPanierPreco() {
 
 function basculerPanierPreco(reference, ev) {
   ev?.stopPropagation();
-  if (PRECO_PANIER.has(reference)) PRECO_PANIER.delete(reference);
-  else PRECO_PANIER.add(reference);
+  const ajout = !PRECO_PANIER.has(reference);
+  // la carte est redessinée juste après : on relève la vignette maintenant
+  const source = ajout ? sourceAnimation(ev?.currentTarget?.closest(".media")) : null;
+  if (ajout) PRECO_PANIER.add(reference); else PRECO_PANIER.delete(reference);
   memoriserPanierPreco();
   rendreGrillePreco();
+  if (ajout) animerVersGrille(source, document.querySelector("#preco-barre .btn-blanc"));
+}
+
+/* Un produit ajouté « part » visiblement vers la grille : sa vignette se détache et file
+   vers la barre de sélection, qui accuse réception d'un rebond. Sans ce geste, un +
+   qui devient ✓ ne dit pas où le produit est allé. */
+function sourceAnimation(el) {
+  if (!el) return null;
+  const img = el.querySelector("img");
+  const r = (img || el).getBoundingClientRect();
+  if (!r.width || !r.height) return null;
+  return { x: r.left, y: r.top, w: r.width, h: r.height, src: img?.currentSrc || img?.src || null };
+}
+
+function animerVersGrille(source, cible) {
+  if (!source || !cible || !cible.animate) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const b = cible.getBoundingClientRect();
+  if (!b.width) return;
+  const el = document.createElement("div");
+  el.className = "vol-vignette";
+  el.style.cssText = `left:${source.x}px; top:${source.y}px; width:${source.w}px; height:${source.h}px;`;
+  if (source.src) el.innerHTML = `<img src="${source.src}" alt="">`;
+  document.body.appendChild(el);
+  const dx = (b.left + b.width / 2) - (source.x + source.w / 2);
+  const dy = (b.top + b.height / 2) - (source.y + source.h / 2);
+  const vol = el.animate([
+    { transform: "translate(0,0) scale(1)", opacity: 1 },
+    { transform: `translate(${dx * .55}px, ${dy * .45}px) scale(.5)`, opacity: .95, offset: .6 },
+    { transform: `translate(${dx}px, ${dy}px) scale(.12)`, opacity: 0 },
+  ], { duration: 700, easing: "cubic-bezier(.2,.75,.25,1)" });
+  vol.onfinish = () => {
+    el.remove();
+    cible.animate([{ transform: "scale(1)" }, { transform: "scale(1.08)" }, { transform: "scale(1)" }],
+                  { duration: 320, easing: "ease-out" });
+  };
+  // onglet passé en arrière-plan, animation annulée : la vignette ne doit jamais rester
+  vol.oncancel = () => el.remove();
+  setTimeout(() => el.remove(), 1500);
 }
 
 function piecesSaisies(reference) {
@@ -4046,44 +4114,75 @@ async function rendrePanierPreco(campagne) {
   const dates = PRECO_LIVRAISONS.length ? PRECO_LIVRAISONS
     : [...new Set(produits.flatMap(p => (p.tailles || [])
         .flatMap(t => (t.offres || []).map(o => o.livraison))))].sort();
-  const colonnes = [...new Set(produits.flatMap(p => (p.tailles || [])
-      .filter(t => (t.offres || []).length).map(t => t.taille)))]
-    .sort((a, b) => cleTaille(a) - cleTaille(b));
-
   const offre = (p, taille, d) => (p.tailles.find(t => t.taille === taille)?.offres || [])
     .find(o => (o.livraison || "") === (d || ""));
 
+  /* Une grille par rayon : les pointures d'un côté, les lettres de l'autre, les tailles
+     enfant à part. Une seule grille mélangeait 21 colonnes et personne ne s'y retrouvait.
+     L'ordre des rayons suit la façon de travailler du réseau : homme, chaussures, puis
+     le reste ; les rayons inconnus se rangent après, par ordre alphabétique. */
+  const ORDRE_RAYONS = ["SPORTSWEAR", "FOOTWEAR", "FOOTBALL", "ACCESSOIRES", "KIDS", "YOUTH"];
+  const rangRayon = r => { const i = ORDRE_RAYONS.indexOf(r); return i < 0 ? 99 : i; };
+  const parRayon = {};
+  for (const p of produits) (parRayon[p.rayon || "AUTRES"] ??= []).push(p);
+  const rayons = Object.keys(parRayon)
+    .sort((x, y) => rangRayon(x) - rangRayon(y) || x.localeCompare(y));
+
   let l = -1;
-  const lignes = produits.flatMap(p => {
-    const siennes = dates.filter(d => colonnes.some(t => offre(p, t, d)));
-    return siennes.map((d, rang) => {
-      l++;
-      return `<tr data-ref="${echapperHTML(p.reference)}"${rang === 0 ? ' class="produit-debut"' : ""}>
-        <td class="fige">${rang === 0 ? `<div class="pp-produit">
-            ${p.photo ? `<img class="pp-vignette" loading="lazy" src="${p.photo}" alt="">`
-                      : `<span class="pp-vignette"></span>`}
-            <span>
-              <div class="pp-nom" title="${echapperHTML(p.designation || p.reference)}">${
-                echapperHTML(p.designation || p.reference)}</div>
-              <div class="pp-ref">${echapperHTML(p.reference)} · ${eur(prixMini(p))} HT</div>
-            </span>
-            <button class="pp-retirer" title="retirer de ma sélection"
-                    onclick="retirerDuPanierPreco(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">✕</button>
-          </div>` : ""}</td>
-        <td class="fige2"><span class="pp-crd d${dates.indexOf(d) % 4}">${jourCourt(d)}</span></td>
-        <td class="total"><input class="pp-total" data-total-l="${l}"
-            data-ref="${echapperHTML(p.reference)}" inputmode="numeric" placeholder="—"
-            title="Saisissez un total : il se répartit sur les tailles selon la courbe de vente du réseau"></td>
-        ${colonnes.map((t, c) => {
-          const o = offre(p, t, d);
-          if (!o) return `<td class="absent" title="taille non proposée sur cette livraison">·</td>`;
-          const v = PRECO_SAISIE[cleSaisie(p.reference, t, d)] || "";
-          return `<td><input type="number" min="0" inputmode="numeric" value="${v}"
-            data-l="${l}" data-c="${c}" data-ref="${echapperHTML(p.reference)}"
-            data-taille="${echapperHTML(t)}" data-livraison="${d || ""}"></td>`;
-        }).join("")}
-      </tr>`;
-    });
+  const sections = rayons.map(rayon => {
+    const groupe = parRayon[rayon]
+      .sort((x, y) => (x.designation || "").localeCompare(y.designation || "") || x.reference.localeCompare(y.reference));
+    const colonnes = [...new Set(groupe.flatMap(p => (p.tailles || [])
+        .filter(t => (t.offres || []).length).map(t => t.taille)))]
+      .sort((x, y) => cleTaille(x) - cleTaille(y));
+
+    const lignes = groupe.flatMap(p => {
+      const siennes = dates.filter(d => colonnes.some(t => offre(p, t, d)));
+      return siennes.map((d, rang) => {
+        l++;
+        return `<tr data-ref="${echapperHTML(p.reference)}"${rang === 0 ? ' class="produit-debut"' : ""}>
+          <td class="fige">${rang === 0 ? `<div class="pp-produit">
+              ${p.photo ? `<img class="pp-vignette" loading="lazy" src="${p.photo}" alt="">`
+                        : `<span class="pp-vignette"></span>`}
+              <span>
+                <div class="pp-nom" title="${echapperHTML(p.designation || p.reference)}">${
+                  echapperHTML(p.designation || p.reference)}</div>
+                <div class="pp-ref">${echapperHTML(p.reference)} · ${eur(prixMini(p))} HT</div>
+              </span>
+              <button class="pp-retirer" title="retirer de ma sélection"
+                      onclick="retirerDuPanierPreco(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">✕</button>
+            </div>` : ""}</td>
+          <td class="fige2"><span class="pp-crd d${dates.indexOf(d) % 4}">${jourCourt(d)}</span></td>
+          <td class="total"><input class="pp-total" data-total-l="${l}"
+              data-ref="${echapperHTML(p.reference)}" inputmode="numeric" placeholder="total"
+              title="Saisissez un total : il se répartit sur les tailles selon la courbe de vente du réseau"></td>
+          <td class="montant" data-montant-l="${l}">—</td>
+          ${colonnes.map((t, c) => {
+            const o = offre(p, t, d);
+            if (!o) return `<td class="absent" title="taille non proposée sur cette livraison">·</td>`;
+            const v = PRECO_SAISIE[cleSaisie(p.reference, t, d)] || "";
+            return `<td><input type="number" min="0" inputmode="numeric" value="${v}"
+              data-l="${l}" data-c="${c}" data-ref="${echapperHTML(p.reference)}"
+              data-taille="${echapperHTML(t)}" data-livraison="${d || ""}"></td>`;
+          }).join("")}
+        </tr>`;
+      });
+    }).join("");
+
+    return `<table class="table-panier" data-section="${echapperHTML(rayon)}">
+      <thead>
+        <tr class="pp-section"><th class="fige">${echapperHTML(rayon)}
+            <span class="sous">· ${groupe.length} produit${groupe.length > 1 ? "s" : ""}</span></th>
+          <th class="fige2"></th><th colspan="${colonnes.length + 2}" class="pp-section-montant" data-section-montant>—</th></tr>
+        <tr>
+          <th class="fige">Produit</th><th class="fige2">Livraison</th>
+          <th class="th-total" title="Saisissez un total : il se répartit automatiquement sur les tailles">Total → auto</th>
+          <th class="th-montant">Montant HT</th>
+          ${colonnes.map(t => `<th>${echapperHTML(t)}</th>`).join("")}
+        </tr>
+      </thead>
+      <tbody>${lignes}</tbody>
+    </table>`;
   }).join("");
 
   vue.innerHTML = `
@@ -4091,21 +4190,18 @@ async function rendrePanierPreco(campagne) {
       <span class="fil" onclick="location.hash='${retour}'">&larr; ${echapperHTML(campagne)}</span>
       <h1>MA PRÉCOMMANDE</h1>
       <div class="compte-produits">${produits.length} produit${produits.length > 1 ? "s" : ""}
-        · ${dates.length} date${dates.length > 1 ? "s" : ""} de livraison
-        · ${colonnes.length} taille${colonnes.length > 1 ? "s" : ""}.
+        · ${rayons.length} rayon${rayons.length > 1 ? "s" : ""}
+        · ${dates.length} date${dates.length > 1 ? "s" : ""} de livraison.
         Tapez un <b>total</b> sur une ligne : il se répartit sur les tailles selon la courbe de vente du réseau.
         Ou collez une grille depuis Excel : cliquez la première case puis <kbd>⌘V</kbd>.</div>
     </div>
-    <div class="cadre-panier">
-      <table class="table-panier">
-        <thead><tr>
-          <th class="fige">Produit</th><th class="fige2">Livraison</th>
-          <th title="Saisissez un total : il se répartit automatiquement sur les tailles">Total ⤳</th>
-          ${colonnes.map(t => `<th>${echapperHTML(t)}</th>`).join("")}
-        </tr></thead>
-        <tbody>${lignes}</tbody>
-      </table>
+    <div class="pp-aide">
+      <span class="pp-aide-ico">⤳</span>
+      <div><b>Répartition automatique.</b> Tapez un total dans la colonne bleue <b>TOTAL</b> d'une ligne :
+        il se répartit aussitôt sur les tailles, au prorata de ce que le réseau vend réellement dans ce rayon.
+        Exemple : 100 chaussures → 42 : 19 · 44 : 19 · 43 : 16 · 42.5 : 12 … Vous corrigez ensuite case par case si besoin.</div>
     </div>
+    <div class="cadre-panier">${sections}</div>
     <div class="preco-barre" style="position:sticky">
       <span><b id="pp-pieces">0</b> <span class="sous">pièces</span></span>
       <span><b id="pp-montant">0,00 €</b> <span class="sous">HT</span></span>
@@ -4119,8 +4215,11 @@ async function rendrePanierPreco(campagne) {
 }
 
 function basculerDepuisFiche(reference) {
+  const ajout = !PRECO_PANIER.has(reference);
+  const source = ajout ? sourceAnimation(document.querySelector("#vue-preco-produit .prod-visuel")) : null;
   basculerPanierPreco(reference);
   rendreProduitPreco(PRECO_COURANTE, reference);
+  if (ajout) animerVersGrille(source, document.getElementById("btn-vers-grille"));
 }
 
 function retirerDuPanierPreco(reference) {
@@ -4149,8 +4248,18 @@ function repartirLignePanier(inp) {
     if (reste <= 0) break;
     base[o.i]++; reste--;
   }
-  cases.forEach((c, i) => c.value = base[i] || "");
+  cases.forEach((c, i) => {
+    c.value = base[i] || "";
+    c.classList.remove("rempli"); void c.offsetWidth;   // relance l'animation même sur une reprise
+    if (base[i]) c.classList.add("rempli");
+  });
   majTotauxPanier();
+  const etat = document.getElementById("pp-etat");
+  if (etat && total) {
+    const n = base.filter(Boolean).length;
+    const courbe = Object.keys(poids).length ? "selon la courbe de vente du réseau" : "à parts égales (rayon sans historique)";
+    etat.textContent = `⤳ ${total} pièce${total > 1 ? "s" : ""} réparti${total > 1 ? "es" : "e"} sur ${n} taille${n > 1 ? "s" : ""} ${courbe}`;
+  }
 }
 
 function brancherGrillePanier() {
@@ -4191,10 +4300,26 @@ function majTotauxPanier() {
     pieces += q;
     montant += q * (prix[inp.dataset.ref] || 0);
   }
+  const prixLigne = {};
+  for (const inp of document.querySelectorAll(".table-panier input[data-l]")) prixLigne[inp.dataset.l] = prix[inp.dataset.ref] || 0;
   for (const el of document.querySelectorAll("[data-total-l]")) {
     const v = parLigne[el.dataset.totalL] || 0;
     if (el.tagName === "INPUT") { if (document.activeElement !== el) el.value = v || ""; }
     else el.textContent = v || "—";
+  }
+  // le prix se complète au fil de la saisie, ligne par ligne puis par rayon
+  for (const el of document.querySelectorAll("[data-montant-l]")) {
+    const v = (parLigne[el.dataset.montantL] || 0) * (prixLigne[el.dataset.montantL] || 0);
+    el.textContent = v ? eur(v) : "—";
+    el.classList.toggle("actif", v > 0);
+  }
+  for (const table of document.querySelectorAll(".table-panier[data-section]")) {
+    let m = 0, q = 0;
+    for (const inp of table.querySelectorAll("input[data-l]")) {
+      const n = Math.max(parseInt(inp.value, 10) || 0, 0); q += n; m += n * (prix[inp.dataset.ref] || 0);
+    }
+    const cel = table.querySelector("[data-section-montant]");
+    if (cel) cel.textContent = q ? `${q} pièce${q > 1 ? "s" : ""} · ${eur(m)} HT` : "—";
   }
   const p = document.getElementById("pp-pieces"), m = document.getElementById("pp-montant");
   if (p) p.textContent = pieces;
@@ -4304,7 +4429,7 @@ async function rendreProduitPreco(campagne, reference) {
           <button class="${PRECO_PANIER.has(p.reference) ? "puce-claire actif" : "btn-noir"}" style="margin-left:0"
                   onclick="basculerDepuisFiche(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">${
             PRECO_PANIER.has(p.reference) ? "✓ DANS MA SÉLECTION — RETIRER" : "AJOUTER À MA SÉLECTION"}</button>
-          <button class="puce-claire"
+          <button class="puce-claire" id="btn-vers-grille"
                   onclick="location.hash='#/preco-panier/${encodeURIComponent(campagne)}'">
             Ouvrir la grille de saisie${PRECO_PANIER.size ? ` (${PRECO_PANIER.size})` : ""}</button>
         </div>
