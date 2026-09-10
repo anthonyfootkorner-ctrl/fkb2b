@@ -1256,10 +1256,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1788465000"></script>
-<script src="imports.js?v=1788465000"></script>
-<script src="merch-shopify.js?v=1788465000"></script>
-<script src="moteur-merch.js?v=1788465000"></script>
+<script src="config.js?v=1789042000"></script>
+<script src="imports.js?v=1789042000"></script>
+<script src="merch-shopify.js?v=1789042000"></script>
+<script src="moteur-merch.js?v=1789042000"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1310,6 +1310,14 @@ function etiquetteMagasin(s, liste) {
   return `${base} · ${s.compte}`;
 }
 
+/* Les précommandes sont réservées au réseau Footkorner : succursales et franchises.
+   Un Sport 2000 ou un Intersport achète sur stock, il n'a rien à faire dans une
+   campagne saisonnière. La règle porte sur le réseau Fastmag, pas sur la grille
+   tarifaire — « FRANCHISE » y désigne aussi des fournisseurs comme Adidas France. */
+const RESEAU_PRECOMMANDES = ["SUCC", "FRANCHISE"];
+const voitLesPrecommandes = () =>
+  RESEAU_PRECOMMANDES.includes((clientActif?.reseau || "").toUpperCase());
+
 // Remise commerciale du compte (0 si aucune). Affichage seulement : le serveur
 // relit la sienne à la validation, il ne fait jamais confiance à cette valeur.
 const remiseCompte = () => Number(clientActif?.remise) || 0;
@@ -1343,7 +1351,7 @@ async function init() {
   let profil;
   try {
     [MES_SOCIETES, profil] = await Promise.all([
-      api("/rest/v1/societes?select=id,compte,id_fastmag,nom,ville,famille_tarifaire,remise&actif=eq.true&order=compte"),
+      api("/rest/v1/societes?select=id,compte,id_fastmag,nom,ville,famille_tarifaire,remise,reseau&actif=eq.true&order=compte"),
       api("/rest/v1/profils?select=role&limit=1").then(r => r[0]).catch(() => null),
     ]);
   } catch (err) {
@@ -1701,7 +1709,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1788465000";
+    v.src = "hero.mp4?v=1789042000";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3724,7 +3732,11 @@ async function chargerMesCampagnes() {
   CAMPAGNES_MOI = await api("/rest/v1/rpc/mes_campagnes",
     { corps: { p_societe: clientActif?.id ?? null } }).catch(() => []);
   const lien = document.getElementById("lien-preco");
-  if (lien) lien.style.display = (CAMPAGNES_MOI || []).length ? "" : "none";
+  if (lien) {
+    // le staff y accède pour vérifier ce que voient les magasins
+    lien.style.display = (voitLesPrecommandes() || estStaff || (CAMPAGNES_MOI || []).length)
+      ? "" : "none";
+  }
   return CAMPAGNES_MOI;
 }
 

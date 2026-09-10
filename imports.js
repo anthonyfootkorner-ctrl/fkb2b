@@ -457,6 +457,8 @@ function mapperVersTables(analyse) {
         // Un magasin fermé chez Fastmag n'a plus rien à faire dans le portail :
         // il disparaît des sélecteurs et ne peut plus recevoir de commande.
         if ("Actif" in l && c.actif === undefined) c.actif = String(l.Actif).trim() !== "0";
+        // réseau d'appartenance : décide notamment de l'accès aux précommandes
+        c.reseau = c.reseau || (l.CodeAnalytique?.trim() || null);
         if (avecRemise && c.remise === undefined) c.remise = pourcentFr(l.Remise);
         parCompte.set(l.CompteClient, c);
       }
