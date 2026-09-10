@@ -337,6 +337,12 @@
     font-size: 11.5px; font-weight: 600; letter-spacing: .02em; }
   .pp-crd.d0 { background: #2b7ab5; } .pp-crd.d1 { background: #8faa2b; }
   .pp-crd.d2 { background: #e8871e; } .pp-crd.d3 { background: #7a5ea8; }
+  .pp-presse { display: block; margin-top: 5px; border: 1px solid #d8d8d5; background: #fff; color: var(--encre2);
+    border-radius: 999px; padding: 2px 9px; font-size: 10.5px; letter-spacing: .04em; cursor: pointer; }
+  .pp-presse:hover { border-color: var(--encre); color: var(--encre); }
+  .pp-presse.source { background: var(--encre); border-color: var(--encre); color: #fff; }
+  .pp-presse.cible { border-color: #2b7ab5; color: #1b5fa8; background: #eef4fb; font-weight: 600; }
+  .pp-presse.fait { background: #2e9e4f; border-color: #2e9e4f; color: #fff; }
   .table-panier input { width: 54px; text-align: center; border: 1px solid #e2e0dc;
     border-radius: 6px; padding: 6px 4px; font-size: 13px; background: #fbfbfa; }
   .table-panier input:focus { outline: none; border-color: var(--encre); background: #fff; }
@@ -1399,10 +1405,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789079155"></script>
-<script src="imports.js?v=1789079155"></script>
-<script src="merch-shopify.js?v=1789079155"></script>
-<script src="moteur-merch.js?v=1789079155"></script>
+<script src="config.js?v=1789079359"></script>
+<script src="imports.js?v=1789079359"></script>
+<script src="merch-shopify.js?v=1789079359"></script>
+<script src="moteur-merch.js?v=1789079359"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1858,7 +1864,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789079155";
+    v.src = "hero.mp4?v=1789079359";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4358,7 +4364,9 @@ async function rendrePanierPreco(campagne) {
               <button class="pp-retirer" title="retirer de ma sélection"
                       onclick="retirerDuPanierPreco(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">✕</button>
             </div>` : ""}</td>
-          <td class="fige2"><span class="pp-crd d${dates.indexOf(d) % 4}">${jourCourt(d)}</span></td>
+          <td class="fige2"><span class="pp-crd d${dates.indexOf(d) % 4}">${jourCourt(d)}</span>
+            <button class="pp-presse" data-presse-l="${l}" type="button"
+                    onclick="pressePreco(${l})">Copier</button></td>
           <td class="total"><input class="pp-total" data-total-l="${l}"
               data-ref="${echapperHTML(p.reference)}" inputmode="numeric" placeholder="total"
               title="Saisissez un total : il se répartit sur les tailles selon la courbe de vente du réseau"></td>
@@ -4417,6 +4425,7 @@ async function rendrePanierPreco(campagne) {
               onclick="enregistrerPanierPreco()">ENREGISTRER MA PRÉCOMMANDE</button>
     </div>`;
 
+  PRECO_PRESSE = null;
   brancherGrillePanier();
   window.scrollTo({ top: 0 });
 }
@@ -4427,6 +4436,49 @@ function basculerDepuisFiche(reference) {
   basculerPanierPreco(reference);
   rendreProduitPreco(PRECO_COURANTE, reference);
   if (ajout) animerVersGrille(source, document.getElementById("btn-vers-grille"));
+}
+
+/* Copier / coller une grille de tailles d'une ligne à l'autre — typiquement les coloris
+   d'un même modèle. Le collage se fait par nom de taille, pas par colonne : il marche
+   entre deux rayons dont les tailles coïncident, et ignore les cases non proposées. */
+let PRECO_PRESSE = null;   // { ligne, reference, tailles: { taille: quantité } }
+
+function pressePreco(l) {
+  const cases = [...document.querySelectorAll(`.table-panier input[data-l="${l}"]`)];
+  if (!cases.length) return;
+  if (PRECO_PRESSE && PRECO_PRESSE.ligne === l) { PRECO_PRESSE = null; majBoutonsPresse(); return; }
+  if (!PRECO_PRESSE) {
+    const tailles = {};
+    for (const c of cases) { const q = Math.max(parseInt(c.value, 10) || 0, 0); if (q) tailles[c.dataset.taille] = q; }
+    if (!Object.keys(tailles).length) return;   // rien à copier
+    PRECO_PRESSE = { ligne: l, reference: cases[0].dataset.ref, tailles };
+    majBoutonsPresse();
+    return;
+  }
+  // coller
+  let posees = 0;
+  for (const c of cases) {
+    const q = PRECO_PRESSE.tailles[c.dataset.taille];
+    c.value = q || "";
+    c.classList.remove("rempli"); void c.offsetWidth;
+    if (q) { c.classList.add("rempli"); posees++; }
+  }
+  majTotauxGrillePreco();
+  const btn = document.querySelector(`.pp-presse[data-presse-l="${l}"]`);
+  if (btn) { btn.textContent = posees ? `Collé ✓ ${posees}` : "Aucune taille commune"; btn.classList.add("fait");
+             setTimeout(majBoutonsPresse, 1400); }
+}
+
+function majBoutonsPresse() {
+  for (const b of document.querySelectorAll(".pp-presse")) {
+    const l = +b.dataset.presseL;
+    b.classList.remove("fait");
+    if (!PRECO_PRESSE) { b.textContent = "Copier"; b.classList.remove("source", "cible"); }
+    else if (PRECO_PRESSE.ligne === l) { b.textContent = "Copié ✓"; b.classList.add("source"); b.classList.remove("cible");
+      b.title = "Cliquer pour annuler la copie"; }
+    else { b.textContent = "Coller"; b.classList.add("cible"); b.classList.remove("source");
+      b.title = `Coller la grille de ${PRECO_PRESSE.reference}`; }
+  }
 }
 
 function retirerDuPanierPreco(reference) {
