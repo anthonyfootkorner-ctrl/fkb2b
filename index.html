@@ -1039,9 +1039,10 @@
       <div class="compte-produits" id="preco-sous-titre"></div>
     </div>
     <div class="col-filtres" id="preco-filtres" style="padding: 0 22px 16px; display:flex; gap:8px; flex-wrap:wrap"></div>
-    <div id="preco-saisie" style="margin: 0 22px 22px"></div>
     <div class="grille-col" id="preco-grille" style="margin: 0 22px 60px"></div>
   </section>
+
+  <section class="vue page-claire" id="vue-preco-produit"></section>
 
   <section class="vue page-claire" id="vue-calendrier">
     <div class="col-tete">
@@ -1291,10 +1292,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789074802"></script>
-<script src="imports.js?v=1789074802"></script>
-<script src="merch-shopify.js?v=1789074802"></script>
-<script src="moteur-merch.js?v=1789074802"></script>
+<script src="config.js?v=1789075601"></script>
+<script src="imports.js?v=1789075601"></script>
+<script src="merch-shopify.js?v=1789075601"></script>
+<script src="moteur-merch.js?v=1789075601"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1684,6 +1685,9 @@ function router() {
   } else if (route === "precommande") {
     document.getElementById("vue-precommande").classList.add("active");
     rendreCataloguePreco(decodeURIComponent(args.join("/")));
+  } else if (route === "preco-produit") {
+    document.getElementById("vue-preco-produit").classList.add("active");
+    rendreProduitPreco(decodeURIComponent(args[0] || ""), decodeURIComponent(args[1] || ""));
   } else if (route === "calendrier") {
     document.getElementById("vue-calendrier").classList.add("active");
     rendreCalendrier();
@@ -1744,7 +1748,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789074802";
+    v.src = "hero.mp4?v=1789075601";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3931,52 +3935,73 @@ async function chargerSaisiePreco(campagne) {
   }
 }
 
+/* La précommande a d'abord été un panneau dépliant sous la grille. À l'usage c'était
+   un cul-de-sac : ni photo, ni description, ni le geste « ajouter au panier » que
+   l'acheteur connaît du catalogue. On ouvre donc une vraie fiche produit, même mise
+   en page que le catalogue, la grille tailles × livraisons prenant simplement la
+   place du sélecteur de tailles. */
 function ouvrirSaisiePreco(reference) {
-  const p = PRECO_PRODUITS.find(x => x.reference === reference);
-  if (!p) return;
-  PRECO_OUVERT = reference;
-  rendreSaisiePreco();
-  document.getElementById("preco-saisie").scrollIntoView({ behavior: "smooth", block: "start" });
+  location.hash = `#/preco-produit/${encodeURIComponent(PRECO_COURANTE)}/${encodeURIComponent(reference)}`;
 }
 
-function fermerSaisiePreco() {
-  PRECO_OUVERT = null;
-  document.getElementById("preco-saisie").innerHTML = "";
-  document.querySelector(".preco-voile")?.remove();
-  rendreGrillePreco();
-}
-
-function rendreSaisiePreco(agrandi = false) {
-  const zone = document.getElementById("preco-saisie");
-  const p = PRECO_PRODUITS.find(x => x.reference === PRECO_OUVERT);
-  if (!p) { zone.innerHTML = ""; return; }
-
-  /* Agrandir re-dessine le tableau : sans cette reprise, une saisie non encore
-     enregistrée serait perdue en cours de route. */
-  const enCours = {};
-  for (const inp of zone.querySelectorAll("input[data-l]")) {
-    enCours[cleSaisie(p.reference, inp.dataset.taille, inp.dataset.livraison || null)] = inp.value;
+async function rendreProduitPreco(campagne, reference) {
+  const vue = document.getElementById("vue-preco-produit");
+  // arrivée directe (lien, rechargement) : la campagne n'est pas encore en mémoire
+  if (PRECO_COURANTE !== campagne || !PRECO_PRODUITS.length) {
+    vue.innerHTML = `<div class="col-tete"><div class="compte-produits">Chargement…</div></div>`;
+    await rendreCataloguePreco(campagne);
   }
-  const valeurDe = (taille, d) => {
-    const c = cleSaisie(p.reference, taille, d);
-    return c in enCours ? enCours[c] : (PRECO_SAISIE[c] || "");
-  };
+  const p = PRECO_PRODUITS.find(x => x.reference === reference);
+  if (!p) { location.hash = `#/precommande/${encodeURIComponent(campagne)}`; return; }
+  PRECO_OUVERT = reference;
 
-  // colonnes : les fenêtres de la campagne, à défaut celles du produit
+  const retour = `#/precommande/${encodeURIComponent(campagne)}`;
+  const galerie = Array.isArray(p.photos) && p.photos.length > 1 ? p.photos : null;
+  vue.innerHTML = `
+    <div class="prod">
+      <div class="prod-visuel">${p.photo ? `<img src="${p.photo}" alt="">` : blocSansVisuel(p)}</div>
+      <div class="prod-infos">
+        <span class="fil" onclick="location.hash='${retour}'">&larr; ${echapperHTML(campagne)}</span>
+        <div class="marque">${echapperHTML(p.marque || "")}</div>
+        <h1>${echapperHTML(p.designation || p.reference)}</h1>
+        <div class="refline">${echapperHTML(p.reference)}${p.couleur ? " · " + echapperHTML(p.couleur) : ""}${
+          p.coloris ? " · " + echapperHTML(p.coloris) : ""} · Saison ${echapperHTML(p.saison || "—")}</div>
+        <div class="prixgros">dès ${eur(prixMini(p))} HT<span>votre tarif</span></div>
+        <div class="legende">
+          <span><i class="pastille bleu"></i><b>Précommande</b> — quantité libre, livraison à la date choisie</span>
+        </div>
+        ${grillePrecoHTML(p)}
+        ${p.description ? `<div class="desc">
+          <h3>Descriptif</h3>
+          <div class="desc-corps replie" id="desc-corps">${nettoyerHTML(p.description)}</div>
+          <button class="puce-claire desc-plus" id="desc-plus" style="display:none"
+                  onclick="basculerDescription(this)">Lire la suite</button>
+        </div>` : ""}
+      </div>
+    </div>
+    ${galerie ? `
+      <div class="prod-galerie-tete">
+        <h3>Visuels</h3><span>${galerie.length} photos — cliquez pour l'afficher en grand</span>
+      </div>
+      <div class="prod-galerie">${galerie.map((u, i) =>
+        `<img loading="lazy" src="${u}" alt="" class="${i === 0 ? "actif" : ""}"
+           onclick="choisirVisuel(this)">`).join("")}</div>` : ""}`;
+  if (p.description) preparerDescription();
+  brancherGrillePreco();
+  window.scrollTo({ top: 0 });
+}
+
+/* Grille tailles × fenêtres de livraison. Une campagne annonce ses dates ; un produit
+   n'est pas forcément offert sur toutes, ni sur toutes ses tailles. Les cases sans
+   offre sont barrées plutôt que masquées : l'acheteur voit ce qui n'est pas proposé,
+   au lieu de croire à un oubli. */
+function grillePrecoHTML(p) {
   const colonnes = PRECO_LIVRAISONS.length ? PRECO_LIVRAISONS
     : [...new Set((p.tailles || []).flatMap(t => (t.offres || []).map(o => o.livraison)))].sort();
   const offre = (t, d) => (t.offres || []).find(o => (o.livraison || "") === (d || ""));
-
-  zone.innerHTML = `
-    <div class="preco-panneau${agrandi ? " agrandi" : ""}">
-      <div class="tete">
-        <h3>${echapperHTML(p.designation || p.reference)}</h3>
-        <span class="ref">${echapperHTML(p.marque || "")} · ${echapperHTML(p.reference)}
-          · ${eur(prixMini(p))} HT</span>
-        <button class="fermer" onclick="rendreSaisiePreco(${!agrandi})">${
-          agrandi ? "Réduire" : "Agrandir"}</button>
-        <button class="fermer" onclick="fermerSaisiePreco()">Fermer ✕</button>
-      </div>
+  const valeurDe = (taille, d) => PRECO_SAISIE[cleSaisie(p.reference, taille, d)] || "";
+  return `
+    <div id="preco-saisie">
       <div style="overflow-x:auto">
       <table class="table-preco">
         <thead><tr><th style="text-align:left">Taille</th>
@@ -3988,8 +4013,7 @@ function rendreSaisiePreco(agrandi = false) {
             ${colonnes.map((d, j) => {
               const o = offre(t, d);
               if (!o) return `<td class="absent" title="non proposé sur cette livraison">—</td>`;
-              const v = valeurDe(t.taille, d);
-              return `<td><input type="number" min="0" inputmode="numeric" value="${v}"
+              return `<td><input type="number" min="0" inputmode="numeric" value="${valeurDe(t.taille, d)}"
                 data-l="${i}" data-c="${j}" data-taille="${echapperHTML(t.taille)}"
                 data-livraison="${d || ""}"></td>`;
             }).join("")}
@@ -4006,21 +4030,15 @@ function rendreSaisiePreco(agrandi = false) {
       <div class="preco-total">
         <span><b id="preco-pieces">0</b> <span class="sous">pièces</span></span>
         <span><b id="preco-montant">0,00 €</b> <span class="sous">HT</span></span>
-        <button class="btn-noir" style="margin-left:auto" onclick="enregistrerSaisiePreco()">
-          ENREGISTRER</button>
+        <button class="btn-noir" style="margin-left:auto" onclick="enregistrerSaisiePreco()"
+                id="btn-preco">AJOUTER À MA PRÉCOMMANDE</button>
         <span class="compte-produits" id="preco-etat"></span>
       </div>
     </div>`;
+}
 
-  if (agrandi && !document.querySelector(".preco-voile")) {
-    const voile = document.createElement("div");
-    voile.className = "preco-voile";
-    voile.onclick = () => rendreSaisiePreco(false);
-    document.body.appendChild(voile);
-  }
-  if (!agrandi) document.querySelector(".preco-voile")?.remove();
-
-  const champs = [...zone.querySelectorAll("input[data-l]")];
+function brancherGrillePreco() {
+  const champs = [...document.querySelectorAll("#preco-saisie input[data-l]")];
   champs.forEach(inp => {
     inp.addEventListener("input", majTotauxPreco);
     // Coller un bloc Excel remplit la grille à partir de la case cliquée.
@@ -4087,7 +4105,9 @@ async function enregistrerSaisiePreco() {
       const c = cleSaisie(p.reference, l.taille, l.livraison);
       if (l.quantite > 0) PRECO_SAISIE[c] = l.quantite; else delete PRECO_SAISIE[c];
     }
-    etat.textContent = `enregistré ✓ — ${r.pieces} pièce${r.pieces > 1 ? "s" : ""}`;
+    etat.textContent = `${r.pieces} pièce${r.pieces > 1 ? "s" : ""} dans votre précommande`;
+    const btn = document.getElementById("btn-preco");
+    if (btn) { btn.textContent = "AJOUTÉ ✓"; setTimeout(() => btn.textContent = "AJOUTER À MA PRÉCOMMANDE", 1600); }
     rendreGrillePreco();
   } catch (e) {
     etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 160);
