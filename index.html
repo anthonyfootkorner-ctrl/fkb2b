@@ -253,6 +253,29 @@
 
   /* Saisie d'une précommande : tailles en lignes, fenêtres de livraison en colonnes. */
   /* Sélection puis saisie en grille : le planner fournisseur, repris tel quel. */
+  /* Vitrine de campagne : une tuile par catégorie fournisseur, dans l'esprit du planner
+     Nike. Sans visuels fournisseur, les tuiles sont typographiques, comme l'accueil. */
+  .preco-vitrine { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(210px, 1fr);
+    gap: 12px; margin: 0 22px 18px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 4px; }
+  .vitrine-tuile { position: relative; height: 250px; border-radius: 14px; overflow: hidden; cursor: pointer;
+    background: var(--tuile); color: var(--encre); scroll-snap-align: start; display: flex; flex-direction: column;
+    transition: transform 160ms var(--ease-out), box-shadow 160ms ease; }
+  .vitrine-tuile:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(0,0,0,.12); }
+  .vitrine-tuile.noir { background: var(--encre); color: #fff; }
+  .vitrine-tuile .corps { flex: 1; display: flex; flex-direction: column; justify-content: center;
+    align-items: center; text-align: center; padding: 18px; gap: 6px; }
+  .vitrine-tuile .grand { font-size: clamp(30px, 4vw, 44px); font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+  .vitrine-tuile .nom { font-size: clamp(20px, 2.4vw, 28px); font-weight: 700; letter-spacing: -.01em; line-height: 1.1; }
+  .vitrine-tuile .sous { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; opacity: .65; }
+  .vitrine-tuile .voir { background: #111; color: #fff; padding: 13px 16px; font-size: 13.5px; font-weight: 500;
+    display: flex; justify-content: space-between; align-items: center; }
+  .vitrine-tuile .voir span { opacity: .6; font-size: 12px; }
+  .vitrine-tuile.actif { outline: 3px solid var(--encre); outline-offset: -3px; }
+  .vitrine-tuile.actif .voir { background: #2e9e4f; }
+  .vitrine-tuile img.fond { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .9; }
+  .vitrine-tuile img.fond + .corps { position: relative; }
+  @media (max-width: 700px) { .preco-vitrine { margin: 0 12px 14px; grid-auto-columns: 72vw; }
+    .vitrine-tuile { height: 210px; } }
   .preco-recherche { width: min(460px, 100%); background: #fff; border: 1px solid #d8d8d5; border-radius: 10px;
     padding: 11px 14px; font-size: 14px; color: var(--encre); transition: border-color 150ms ease; }
   .preco-recherche:focus { outline: none; border-color: var(--encre); }
@@ -272,6 +295,10 @@
     gap: 16px; flex-wrap: wrap; margin: 0 22px 22px; padding: 14px 18px; border-radius: 12px;
     background: var(--encre); color: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
   .preco-barre b { font-size: 16px; }
+  .pp-rayons { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pp-chip { background: rgba(255,255,255,.12); border-radius: 999px; padding: 5px 11px; font-size: 12px;
+    letter-spacing: .04em; color: #ddd; }
+  .pp-chip b { color: #fff; font-size: 13px; margin-right: 4px; }
   .preco-barre .sous { color: #bdbdbd; font-size: 12px; }
 
   .panier-tete { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
@@ -1107,6 +1134,7 @@
       <h1 id="preco-titre"></h1>
       <div class="compte-produits" id="preco-sous-titre"></div>
     </div>
+    <div class="preco-vitrine" id="preco-vitrine"></div>
     <div style="padding: 0 22px 12px">
       <input id="preco-recherche" class="preco-recherche" type="search" autocomplete="off" spellcheck="false"
              placeholder="Rechercher une référence ou un nom — ex. 394053-005, initiator"
@@ -1368,10 +1396,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789077933"></script>
-<script src="imports.js?v=1789077933"></script>
-<script src="merch-shopify.js?v=1789077933"></script>
-<script src="moteur-merch.js?v=1789077933"></script>
+<script src="config.js?v=1789078286"></script>
+<script src="imports.js?v=1789078286"></script>
+<script src="merch-shopify.js?v=1789078286"></script>
+<script src="moteur-merch.js?v=1789078286"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1827,7 +1855,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789077933";
+    v.src = "hero.mp4?v=1789078286";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3983,6 +4011,7 @@ function rendreGrillePreco() {
   document.getElementById("preco-filtres").innerHTML = barre;
 
   rendreBarrePreco();
+  rendreVitrinePreco();
 
   document.getElementById("preco-grille").innerHTML = produits.map(p => {
     const saisi = Object.entries(PRECO_SAISIE)
@@ -4017,6 +4046,48 @@ function rendreGrillePreco() {
 function affinerPreco(marque) { PRECO_MARQUE = marque; rendreGrillePreco(); }
 function affinerPrecoRayon(rayon) { PRECO_RAYON = rayon; PRECO_CATEGORIE = null; rendreGrillePreco(); }
 function affinerPrecoCategorie(categorie) { PRECO_CATEGORIE = categorie; rendreGrillePreco(); }
+/* La vitrine : la campagne d'abord, puis une tuile par catégorie fournisseur, les plus
+   fournies en premier et « Autre » en dernier. Cliquer une tuile filtre la grille et y
+   descend ; un second clic revient à tout. Une photo de la catégorie, si un produit en a
+   une, sert de fond — sinon la tuile reste typographique. */
+function rendreVitrinePreco() {
+  const zone = document.getElementById("preco-vitrine");
+  if (!zone) return;
+  const compte = {};
+  for (const p of PRECO_PRODUITS) if (p.categorie) compte[p.categorie] = (compte[p.categorie] || 0) + 1;
+  const cats = Object.keys(compte).sort((a, b) =>
+    (a === "Autre") - (b === "Autre") || compte[b] - compte[a] || a.localeCompare(b));
+  if (cats.length < 2) { zone.innerHTML = ""; zone.hidden = true; return; }
+  zone.hidden = false;
+  const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
+  const photoDe = c => (PRECO_PRODUITS.find(p => p.categorie === c && p.photo) || {}).photo;
+  const saison = (PRECO_COURANTE || "").replace(/^NIKE\s+/i, "");
+  zone.innerHTML = `
+    <div class="vitrine-tuile noir${PRECO_CATEGORIE ? "" : " actif"}" onclick="choisirVitrine(null)">
+      <div class="corps">
+        <div class="sous">${echapperHTML(PRECO_COURANTE || "")}</div>
+        <div class="grand">${echapperHTML(saison)}</div>
+        <div class="sous">${PRECO_PRODUITS.length} références</div>
+      </div>
+      <div class="voir">Voir toute la campagne <span>${PRECO_PRODUITS.length}</span></div>
+    </div>`
+    + cats.map(c => {
+      const ph = photoDe(c);
+      return `<div class="vitrine-tuile${c === PRECO_CATEGORIE ? " actif" : ""}" onclick="choisirVitrine(${arg(c)})">
+        ${ph ? `<img class="fond" loading="lazy" src="${ph}" alt="">` : ""}
+        <div class="corps"><div class="nom">${echapperHTML(c)}</div></div>
+        <div class="voir">Voir ${echapperHTML(c)} <span>${compte[c]}</span></div>
+      </div>`;
+    }).join("");
+}
+
+function choisirVitrine(categorie) {
+  PRECO_RAYON = null;
+  PRECO_CATEGORIE = (categorie && categorie !== PRECO_CATEGORIE) ? categorie : null;
+  rendreGrillePreco();
+  document.getElementById("preco-recherche")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 let rechercheEnAttente = null;
 function rechercherPreco(valeur) {   // 483 cartes à redessiner : on laisse finir le mot
   PRECO_RECHERCHE = valeur;
@@ -4245,6 +4316,7 @@ async function rendrePanierPreco(campagne) {
     <div class="preco-barre" style="position:sticky">
       <span><b id="pp-pieces">0</b> <span class="sous">pièces</span></span>
       <span><b id="pp-montant">0,00 €</b> <span class="sous">HT</span></span>
+      <span class="pp-rayons" id="pp-rayons"></span>
       <span class="sous" id="pp-etat"></span>
       <button class="btn-blanc" style="margin-left:auto" id="pp-enregistrer"
               onclick="enregistrerPanierPreco()">ENREGISTRER MA PRÉCOMMANDE</button>
@@ -4294,12 +4366,6 @@ function repartirLignePanier(inp) {
     if (base[i]) c.classList.add("rempli");
   });
   majTotauxGrillePreco();
-  const etat = document.getElementById("pp-etat");
-  if (etat && total) {
-    const n = base.filter(Boolean).length;
-    const courbe = Object.keys(poids).length ? "selon la courbe de vente du réseau" : "à parts égales (rayon sans historique)";
-    etat.textContent = `⤳ ${total} pièce${total > 1 ? "s" : ""} réparti${total > 1 ? "es" : "e"} sur ${n} taille${n > 1 ? "s" : ""} ${courbe}`;
-  }
 }
 
 function brancherGrillePanier() {
@@ -4353,6 +4419,7 @@ function majTotauxGrillePreco() {
     el.textContent = v ? eur(v) : "—";
     el.classList.toggle("actif", v > 0);
   }
+  const parRayon = [];
   for (const table of document.querySelectorAll(".table-panier[data-section]")) {
     let m = 0, q = 0;
     for (const inp of table.querySelectorAll("input[data-l]")) {
@@ -4360,7 +4427,10 @@ function majTotauxGrillePreco() {
     }
     const cel = table.querySelector("[data-section-montant]");
     if (cel) cel.textContent = q ? `${q} pièce${q > 1 ? "s" : ""} · ${eur(m)} HT` : "—";
+    if (q) parRayon.push(`<span class="pp-chip"><b>${q}</b> ${echapperHTML(table.dataset.section)}</span>`);
   }
+  const zoneRayons = document.getElementById("pp-rayons");
+  if (zoneRayons) zoneRayons.innerHTML = parRayon.join("");
   const p = document.getElementById("pp-pieces"), m = document.getElementById("pp-montant");
   if (p) p.textContent = pieces;
   if (m) m.textContent = eur(montant);
