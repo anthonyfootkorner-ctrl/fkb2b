@@ -1368,10 +1368,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789077483"></script>
-<script src="imports.js?v=1789077483"></script>
-<script src="merch-shopify.js?v=1789077483"></script>
-<script src="moteur-merch.js?v=1789077483"></script>
+<script src="config.js?v=1789077933"></script>
+<script src="imports.js?v=1789077933"></script>
+<script src="merch-shopify.js?v=1789077933"></script>
+<script src="moteur-merch.js?v=1789077933"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1827,7 +1827,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789077483";
+    v.src = "hero.mp4?v=1789077933";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3903,7 +3903,7 @@ async function rendreCampagnesClient() {
     : `<div class="cmd-carte" style="color:var(--encre2)">Aucune campagne n'est ouverte à votre magasin pour le moment.</div>`;
 }
 
-let PRECO_COURANTE = null, PRECO_PRODUITS = [], PRECO_MARQUE = null, PRECO_RAYON = null, PRECO_RECHERCHE = "";
+let PRECO_COURANTE = null, PRECO_PRODUITS = [], PRECO_MARQUE = null, PRECO_RAYON = null, PRECO_CATEGORIE = null, PRECO_RECHERCHE = "";
 
 async function rendreCataloguePreco(campagne) {
   PRECO_COURANTE = campagne;
@@ -3922,6 +3922,7 @@ async function rendreCataloguePreco(campagne) {
   memoriser(PRECO_PRODUITS);
   PRECO_MARQUE = null;
   PRECO_RAYON = null;
+  PRECO_CATEGORIE = null;
   PRECO_RECHERCHE = "";
   const champ = document.getElementById("preco-recherche"); if (champ) champ.value = "";
   PRECO_OUVERT = null;
@@ -3936,10 +3937,11 @@ function rendreGrillePreco() {
   const produits = PRECO_PRODUITS.filter(p =>
     (!PRECO_MARQUE || p.marque === PRECO_MARQUE)
     && (!PRECO_RAYON || (p.rayon || "") === PRECO_RAYON)
+    && (!PRECO_CATEGORIE || (p.categorie || "") === PRECO_CATEGORIE)
     && (!q || compact(p.reference).includes(q) || compact(p.designation).includes(q)));
   document.getElementById("preco-sous-titre").textContent =
     `${produits.length} référence${produits.length > 1 ? "s" : ""} proposée${produits.length > 1 ? "s" : ""}`
-    + (PRECO_RAYON || q ? ` sur ${PRECO_PRODUITS.length}` : "")
+    + (PRECO_RAYON || PRECO_CATEGORIE || q ? ` sur ${PRECO_PRODUITS.length}` : "")
     + " · livraison à la date annoncée, ces produits ne sont pas en stock";
 
   /* Une campagne fournisseur arrive en un seul bloc de plusieurs centaines de références.
@@ -3959,6 +3961,19 @@ function rendreGrillePreco() {
     barre += puce(`Tous les rayons (${PRECO_PRODUITS.length})`, !PRECO_RAYON, "affinerPrecoRayon(null)")
       + rayons.map(r => puce(`${r} (${combien("rayon", r)})`, r === PRECO_RAYON,
                              `affinerPrecoRayon(${arg(r)})`)).join("");
+  }
+  /* Sous le rayon, la catégorie du fournisseur (Sportswear, Running, Training, Jordan…) :
+     c'est ainsi que l'acheteur pense le sportswear, Fastmag ne connaissant que des noms
+     de collections. Les compteurs suivent le rayon choisi. */
+  const dansRayon = PRECO_PRODUITS.filter(p => !PRECO_RAYON || (p.rayon || "") === PRECO_RAYON);
+  const combienCat = v => dansRayon.filter(p => (p.categorie || "") === v).length;
+  const categories = [...new Set(dansRayon.map(p => p.categorie).filter(Boolean))]
+    .sort((a, b) => combienCat(b) - combienCat(a) || a.localeCompare(b));
+  if (categories.length > 1) {
+    if (barre) barre += `<span style="flex-basis:100%; height:0"></span>`;
+    barre += puce(`Toutes les catégories (${dansRayon.length})`, !PRECO_CATEGORIE, "affinerPrecoCategorie(null)")
+      + categories.map(c => puce(`${c} (${combienCat(c)})`, c === PRECO_CATEGORIE,
+                                 `affinerPrecoCategorie(${arg(c)})`)).join("");
   }
   if (marques.length > 1) {
     if (barre) barre += `<span style="flex-basis:100%; height:0"></span>`;
@@ -3985,7 +4000,8 @@ function rendreGrillePreco() {
       </div>
       <div class="infos">
         <div class="nom">${echapperHTML(p.designation || p.reference)}</div>
-        <div class="sousnom">${echapperHTML(p.marque || "")} · ${echapperHTML(p.reference)}</div>
+        <div class="sousnom">${echapperHTML(p.marque || "")} · ${echapperHTML(p.reference)}${
+          p.categorie ? ` · ${echapperHTML(p.categorie)}` : ""}</div>
         <div class="prix">dès ${eur(prixMini(p))} HT</div>
         <div class="sousnom" style="margin-top:6px; color:${saisi ? "#2e9e4f" : "var(--encre2)"}">${
           saisi ? `${saisi} pièce${saisi > 1 ? "s" : ""} précommandée${saisi > 1 ? "s" : ""}`
@@ -3999,7 +4015,8 @@ function rendreGrillePreco() {
 }
 
 function affinerPreco(marque) { PRECO_MARQUE = marque; rendreGrillePreco(); }
-function affinerPrecoRayon(rayon) { PRECO_RAYON = rayon; rendreGrillePreco(); }
+function affinerPrecoRayon(rayon) { PRECO_RAYON = rayon; PRECO_CATEGORIE = null; rendreGrillePreco(); }
+function affinerPrecoCategorie(categorie) { PRECO_CATEGORIE = categorie; rendreGrillePreco(); }
 let rechercheEnAttente = null;
 function rechercherPreco(valeur) {   // 483 cartes à redessiner : on laisse finir le mot
   PRECO_RECHERCHE = valeur;
@@ -4153,7 +4170,8 @@ async function rendrePanierPreco(campagne) {
   let l = -1;
   const sections = rayons.map(rayon => {
     const groupe = parRayon[rayon]
-      .sort((x, y) => (x.designation || "").localeCompare(y.designation || "") || x.reference.localeCompare(y.reference));
+      .sort((x, y) => (x.categorie || "").localeCompare(y.categorie || "")
+        || (x.designation || "").localeCompare(y.designation || "") || x.reference.localeCompare(y.reference));
     const colonnes = [...new Set(groupe.flatMap(p => (p.tailles || [])
         .filter(t => (t.offres || []).length).map(t => t.taille)))]
       .sort((x, y) => cleTaille(x) - cleTaille(y));
@@ -4169,7 +4187,7 @@ async function rendrePanierPreco(campagne) {
               <span>
                 <div class="pp-nom" title="${echapperHTML(p.designation || p.reference)}">${
                   echapperHTML(p.designation || p.reference)}</div>
-                <div class="pp-ref">${echapperHTML(p.reference)} · ${eur(prixMini(p))} HT</div>
+                <div class="pp-ref">${echapperHTML(p.reference)}${p.categorie ? " · " + echapperHTML(p.categorie) : ""} · ${eur(prixMini(p))} HT</div>
               </span>
               <button class="pp-retirer" title="retirer de ma sélection"
                       onclick="retirerDuPanierPreco(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">✕</button>
@@ -4275,7 +4293,7 @@ function repartirLignePanier(inp) {
     c.classList.remove("rempli"); void c.offsetWidth;   // relance l'animation même sur une reprise
     if (base[i]) c.classList.add("rempli");
   });
-  majTotauxPanier();
+  majTotauxGrillePreco();
   const etat = document.getElementById("pp-etat");
   if (etat && total) {
     const n = base.filter(Boolean).length;
@@ -4290,7 +4308,7 @@ function brancherGrillePanier() {
   }
   const champs = [...document.querySelectorAll(".table-panier input[data-l]")];
   champs.forEach(inp => {
-    inp.addEventListener("input", majTotauxPanier);
+    inp.addEventListener("input", majTotauxGrillePreco);
     inp.addEventListener("paste", e => {
       const texte = (e.clipboardData || window.clipboardData).getData("text");
       if (!texte || !/[\t\n]/.test(texte)) return;   // une seule valeur : collage normal
@@ -4305,13 +4323,13 @@ function brancherGrillePanier() {
           cible.value = Number.isFinite(n) && n > 0 ? n : "";
         });
       });
-      majTotauxPanier();
+      majTotauxGrillePreco();
     });
   });
-  majTotauxPanier();
+  majTotauxGrillePreco();
 }
 
-function majTotauxPanier() {
+function majTotauxGrillePreco() {
   const prix = {};
   for (const p of PRECO_PRODUITS) prix[p.reference] = prixMini(p) || 0;
   const parLigne = {};
