@@ -1399,10 +1399,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789078610"></script>
-<script src="imports.js?v=1789078610"></script>
-<script src="merch-shopify.js?v=1789078610"></script>
-<script src="moteur-merch.js?v=1789078610"></script>
+<script src="config.js?v=1789078810"></script>
+<script src="imports.js?v=1789078810"></script>
+<script src="merch-shopify.js?v=1789078810"></script>
+<script src="moteur-merch.js?v=1789078810"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1858,7 +1858,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789078610";
+    v.src = "hero.mp4?v=1789078810";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3937,6 +3937,10 @@ async function rendreCampagnesClient() {
 let PRECO_COURANTE = null, PRECO_PRODUITS = [], PRECO_MARQUE = null, PRECO_RAYON = null, PRECO_CATEGORIE = null, PRECO_RECHERCHE = "";
 let PRECO_INFOS = {};   // la fiche de la campagne (visuel, date limite), pour la vitrine
 let PRECO_VUE = "vitrine";   // « vitrine » : les gros blocs seuls ; « grille » : les produits
+/* Le fournisseur range ses chaussures dans « Sportswear », « Running », « Jordan »… avec le
+   textile. Pour l'acheteur, une chaussure est d'abord une chaussure : tout ce qui est de
+   famille FOOTWEAR forme son propre bloc, les catégories fournisseur ne gardent que le reste. */
+const categorieDe = p => (p.famille || "").toUpperCase() === "FOOTWEAR" ? "Footwear" : (p.categorie || "");
 
 async function rendreCataloguePreco(campagne) {
   PRECO_COURANTE = campagne;
@@ -3976,7 +3980,7 @@ function rendreGrillePreco() {
   const produits = PRECO_PRODUITS.filter(p =>
     (!PRECO_MARQUE || p.marque === PRECO_MARQUE)
     && (!PRECO_RAYON || (p.rayon || "") === PRECO_RAYON)
-    && (!PRECO_CATEGORIE || (p.categorie || "") === PRECO_CATEGORIE)
+    && (!PRECO_CATEGORIE || categorieDe(p) === PRECO_CATEGORIE)
     && (!q || compact(p.reference).includes(q) || compact(p.designation).includes(q)));
   document.getElementById("preco-sous-titre").textContent =
     `${produits.length} référence${produits.length > 1 ? "s" : ""} proposée${produits.length > 1 ? "s" : ""}`
@@ -4005,8 +4009,8 @@ function rendreGrillePreco() {
      c'est ainsi que l'acheteur pense le sportswear, Fastmag ne connaissant que des noms
      de collections. Les compteurs suivent le rayon choisi. */
   const dansRayon = PRECO_PRODUITS.filter(p => !PRECO_RAYON || (p.rayon || "") === PRECO_RAYON);
-  const combienCat = v => dansRayon.filter(p => (p.categorie || "") === v).length;
-  const categories = [...new Set(dansRayon.map(p => p.categorie).filter(Boolean))]
+  const combienCat = v => dansRayon.filter(p => categorieDe(p) === v).length;
+  const categories = [...new Set(dansRayon.map(categorieDe).filter(Boolean))]
     .sort((a, b) => combienCat(b) - combienCat(a) || a.localeCompare(b));
   if (categories.length > 1) {
     if (barre) barre += `<span style="flex-basis:100%; height:0"></span>`;
@@ -4054,7 +4058,7 @@ function rendreGrillePreco() {
       <div class="infos">
         <div class="nom">${echapperHTML(p.designation || p.reference)}</div>
         <div class="sousnom">${echapperHTML(p.marque || "")} · ${echapperHTML(p.reference)}${
-          p.categorie ? ` · ${echapperHTML(p.categorie)}` : ""}</div>
+          categorieDe(p) ? ` · ${echapperHTML(categorieDe(p))}` : ""}</div>
         <div class="prix">dès ${eur(prixMini(p))} HT</div>
         <div class="sousnom" style="margin-top:6px; color:${saisi ? "#2e9e4f" : "var(--encre2)"}">${
           saisi ? `${saisi} pièce${saisi > 1 ? "s" : ""} précommandée${saisi > 1 ? "s" : ""}`
@@ -4078,13 +4082,13 @@ function rendreVitrinePreco() {
   const zone = document.getElementById("preco-vitrine");
   if (!zone) return;
   const compte = {};
-  for (const p of PRECO_PRODUITS) if (p.categorie) compte[p.categorie] = (compte[p.categorie] || 0) + 1;
+  for (const p of PRECO_PRODUITS) { const c = categorieDe(p); if (c) compte[c] = (compte[c] || 0) + 1; }
   const cats = Object.keys(compte).sort((a, b) =>
     (a === "Autre") - (b === "Autre") || compte[b] - compte[a] || a.localeCompare(b));
   if (cats.length < 2 || PRECO_VUE !== "vitrine") { zone.innerHTML = ""; zone.hidden = true; return; }
   zone.hidden = false;
   const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
-  const photoDe = c => (PRECO_PRODUITS.find(p => p.categorie === c && p.photo) || {}).photo;
+  const photoDe = c => (PRECO_PRODUITS.find(p => categorieDe(p) === c && p.photo) || {}).photo;
   const saison = (PRECO_COURANTE || "").replace(/^NIKE\s+/i, "");
   const visuel = PRECO_INFOS.image;
   zone.innerHTML = `
@@ -4275,7 +4279,7 @@ async function rendrePanierPreco(campagne) {
   let l = -1;
   const sections = rayons.map(rayon => {
     const groupe = parRayon[rayon]
-      .sort((x, y) => (x.categorie || "").localeCompare(y.categorie || "")
+      .sort((x, y) => categorieDe(x).localeCompare(categorieDe(y))
         || (x.designation || "").localeCompare(y.designation || "") || x.reference.localeCompare(y.reference));
     const colonnes = [...new Set(groupe.flatMap(p => (p.tailles || [])
         .filter(t => (t.offres || []).length).map(t => t.taille)))]
@@ -4292,7 +4296,7 @@ async function rendrePanierPreco(campagne) {
               <span>
                 <div class="pp-nom" title="${echapperHTML(p.designation || p.reference)}">${
                   echapperHTML(p.designation || p.reference)}</div>
-                <div class="pp-ref">${echapperHTML(p.reference)}${p.categorie ? " · " + echapperHTML(p.categorie) : ""} · ${eur(prixMini(p))} HT</div>
+                <div class="pp-ref">${echapperHTML(p.reference)}${categorieDe(p) ? " · " + echapperHTML(categorieDe(p)) : ""} · ${eur(prixMini(p))} HT</div>
               </span>
               <button class="pp-retirer" title="retirer de ma sélection"
                       onclick="retirerDuPanierPreco(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">✕</button>
