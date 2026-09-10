@@ -1399,10 +1399,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789078974"></script>
-<script src="imports.js?v=1789078974"></script>
-<script src="merch-shopify.js?v=1789078974"></script>
-<script src="moteur-merch.js?v=1789078974"></script>
+<script src="config.js?v=1789079155"></script>
+<script src="imports.js?v=1789079155"></script>
+<script src="merch-shopify.js?v=1789079155"></script>
+<script src="moteur-merch.js?v=1789079155"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1858,7 +1858,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789078974";
+    v.src = "hero.mp4?v=1789079155";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -2325,15 +2325,26 @@ function cleRecence(saison) {
 
 // Le périmètre rangé peut croiser une marque et une catégorie (FK > ACCESSOIRES).
 // Forme canonique « MARQUE:x|FAMILLE:y » : un seul rangement sert les deux navigations.
+/* Merch de précommande : « PRECO:<campagne> » range toute la campagne, « PRECO:<campagne>|BLOC:<bloc> »
+   un bloc (Footwear, Running…). La cascade s'arrête à la campagne : une campagne n'hérite pas
+   de l'ordre du site, elle a son propre repli (photo d'abord, puis référence). */
+let MERCH_CAMPAGNES = null;   // les campagnes ouvertes, pour le sélecteur (personnel)
+const MERCH_PRECO = {};       // campagne -> produits (chargés à la demande)
+const estContextePreco = ctx => typeof ctx === "string" && ctx.startsWith("PRECO:");
+const campagneDuContexte = ctx => ctx.split("|")[0].slice("PRECO:".length);
+const contextePreco = (campagne, bloc) => `PRECO:${campagne}` + (bloc ? `|BLOC:${bloc}` : "");
+
 function contexteMerch() {
   const principal = document.getElementById("merch-contexte").value;
   const second = document.getElementById("merch-affinage").value;
   if (!second) return principal;
+  if (estContextePreco(principal)) return `${principal}|${second}`;
   return principal.startsWith("MARQUE:") ? `${principal}|${second}` : `${second}|${principal}`;
 }
 
 // « FK > ACCESSOIRES », pour les messages
 function nomPerimetre(ctx) {
+  if (estContextePreco(ctx)) return "précommande " + ctx.split("|").map(c => c.slice(c.indexOf(":") + 1)).join(" > ");
   return ctx === "TOUT" ? "tout le site"
     : ctx.split("|").map(c => c.split(":")[1]).join(" > ");
 }
@@ -2342,11 +2353,17 @@ function nomPerimetre(ctx) {
 // Le site applique la même cascade côté serveur (fonction catalogue).
 function cascadeMerch(ctx) {
   if (!ctx || ctx === "TOUT") return ["TOUT"];
+  if (estContextePreco(ctx)) return ctx.includes("|") ? [ctx, ctx.split("|")[0]] : [ctx];
   if (!ctx.includes("|")) return [ctx, "TOUT"];
   const [marque, famille] = ctx.split("|");
   return [ctx, famille, marque, "TOUT"];
 }
 function produitsDuContexte(ctx) {
+  if (estContextePreco(ctx)) {
+    const liste = MERCH_PRECO[campagneDuContexte(ctx)] || [];
+    const bloc = (ctx.split("|")[1] || "").slice("BLOC:".length);
+    return bloc ? liste.filter(p => categorieDe(p) === bloc) : liste;
+  }
   if (ctx === "TOUT") return DATA.produits;
   return ctx.split("|").reduce((liste, part) => {
     const [type, val] = part.split(":");
@@ -2365,6 +2382,14 @@ function remplirAffinageMerch() {
     aff.disabled = true;
     return;
   }
+  if (estContextePreco(principal)) {
+    const blocs = [...new Set(produitsDuContexte(principal).map(categorieDe).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+    aff.disabled = false;
+    aff.innerHTML = `<option value="">Toute la campagne</option>`
+      + blocs.map(b => `<option value="BLOC:${echapperHTML(b)}">${echapperHTML(b)}</option>`).join("");
+    return;
+  }
   const [type, val] = principal.split(":");
   const cible = type === "MARQUE" ? "famille" : "marque";
   const valeurs = [...new Set(produitsDuContexte(principal).map(p => p[cible]).filter(Boolean))].sort();
@@ -2380,9 +2405,29 @@ async function rendreMerch() {
   if (!sel.options.length) {
     const marques = [...new Set(DATA.produits.map(p => p.marque).filter(Boolean))].sort();
     const familles = [...new Set(DATA.produits.map(p => p.famille).filter(Boolean))].sort();
+    if (MERCH_CAMPAGNES === null) {
+      MERCH_CAMPAGNES = (await api("/rest/v1/rpc/campagnes_precommande", { corps: {} }).catch(() => []))
+        .filter(c => c.ouverte).map(c => c.campagne);
+    }
     sel.innerHTML = `<option value="TOUT">Tout le site</option>
+      ${MERCH_CAMPAGNES.length ? `<optgroup label="Précommandes">${MERCH_CAMPAGNES.map(c =>
+        `<option value="PRECO:${echapperHTML(c)}">Précommande ${echapperHTML(c)}</option>`).join("")}</optgroup>` : ""}
       <optgroup label="Catégories">${familles.map(f => `<option value="FAMILLE:${f}">${f}</option>`).join("")}</optgroup>
       <optgroup label="Marques">${marques.map(m => `<option value="MARQUE:${m}">${m}</option>`).join("")}</optgroup>`;
+  }
+  // une campagne se charge à la première ouverture, comme le client la verra (tarif du personnel)
+  const principal = sel.value;
+  if (estContextePreco(principal) && !MERCH_PRECO[campagneDuContexte(principal)]) {
+    document.getElementById("merch-etat").textContent = "chargement de la campagne…";
+    try {
+      const lot = await api("/rest/v1/rpc/catalogue_precommande",
+        { corps: { p_campagne: campagneDuContexte(principal), limite: 1000 } });
+      lot.forEach(trierTailles);
+      MERCH_PRECO[campagneDuContexte(principal)] = lot;
+    } catch (e) {
+      document.getElementById("merch-etat").textContent = "campagne illisible : " + (e.donnees?.message || e.message);
+      MERCH_PRECO[campagneDuContexte(principal)] = [];
+    }
   }
   remplirAffinageMerch();
   const ctx = contexteMerch();
@@ -2394,7 +2439,7 @@ async function rendreMerch() {
         <input type="checkbox"><span class="ordre-coche"></span>
       </label>
       <div class="rang-merch">${i + 1}</div>
-      <div class="visuel"><img loading="lazy" src="${p.photo}" alt="" draggable="false">
+      <div class="visuel">${p.photo ? `<img loading="lazy" src="${p.photo}" alt="" draggable="false">` : blocSansVisuel(p)}
         ${p.promo_pct ? `<span class="pastille-promo">−${p.promo_pct}%</span>` : ""}</div>
       <div class="infos">
         <div class="nom">${p.designation || p.reference}</div>
@@ -2451,7 +2496,9 @@ async function rendreMerch() {
   };
   document.getElementById("btn-sel-vider").onclick = () => { selectionMerch.length = 0; majSelection(); };
   document.getElementById("merch-etat").textContent =
-    MERCH[ctx] ? "ordre personnalisé chargé" : "ordre automatique (stock)";
+    MERCH[ctx] ? "ordre personnalisé chargé"
+    : estContextePreco(ctx) ? (cascadeMerch(ctx).some(c => MERCH[c]) ? "ordre hérité de la campagne" : "ordre automatique (photo, puis référence)")
+    : "ordre automatique (stock)";
 
   let saisie = null;
   grille.querySelectorAll(".carte").forEach(c => {
@@ -3983,7 +4030,9 @@ async function rendreCataloguePreco(campagne) {
 function rendreGrillePreco() {
   const compact = v => String(v || "").toLowerCase().replace(/[\s-]/g, "");
   const q = compact(PRECO_RECHERCHE);
-  const produits = PRECO_PRODUITS.filter(p =>
+  // l'ordre merch du bloc, à défaut celui de la campagne, à défaut celui du serveur
+  const ctxMerch = contextePreco(PRECO_COURANTE, PRECO_CATEGORIE);
+  const produits = ordonner(PRECO_PRODUITS, ctxMerch).filter(p =>
     (!PRECO_MARQUE || p.marque === PRECO_MARQUE)
     && (!PRECO_RAYON || rayonDe(p) === PRECO_RAYON)
     && (!PRECO_CATEGORIE || categorieDe(p) === PRECO_CATEGORIE)
@@ -4094,7 +4143,9 @@ function rendreVitrinePreco() {
   if (cats.length < 2 || PRECO_VUE !== "vitrine") { zone.innerHTML = ""; zone.hidden = true; return; }
   zone.hidden = false;
   const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
-  const photoDe = c => (PRECO_PRODUITS.find(p => categorieDe(p) === c && p.photo) || {}).photo;
+  // la photo du bloc : le premier produit du bloc dans l'ordre merch
+  const photoDe = c => (ordonner(PRECO_PRODUITS, contextePreco(PRECO_COURANTE, c))
+    .find(p => categorieDe(p) === c && p.photo) || {}).photo;
   const saison = (PRECO_COURANTE || "").replace(/^NIKE\s+/i, "");
   const visuel = PRECO_INFOS.image;
   zone.innerHTML = `
