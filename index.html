@@ -1291,10 +1291,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789046000"></script>
-<script src="imports.js?v=1789046000"></script>
-<script src="merch-shopify.js?v=1789046000"></script>
-<script src="moteur-merch.js?v=1789046000"></script>
+<script src="config.js?v=1789074802"></script>
+<script src="imports.js?v=1789074802"></script>
+<script src="merch-shopify.js?v=1789074802"></script>
+<script src="moteur-merch.js?v=1789074802"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1744,7 +1744,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789046000";
+    v.src = "hero.mp4?v=1789074802";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3820,7 +3820,7 @@ async function rendreCampagnesClient() {
     : `<div class="cmd-carte" style="color:var(--encre2)">Aucune campagne n'est ouverte à votre magasin pour le moment.</div>`;
 }
 
-let PRECO_COURANTE = null, PRECO_PRODUITS = [], PRECO_MARQUE = null;
+let PRECO_COURANTE = null, PRECO_PRODUITS = [], PRECO_MARQUE = null, PRECO_RAYON = null;
 
 async function rendreCataloguePreco(campagne) {
   PRECO_COURANTE = campagne;
@@ -3830,7 +3830,7 @@ async function rendreCataloguePreco(campagne) {
   document.getElementById("preco-grille").innerHTML = "";
   try {
     PRECO_PRODUITS = await api("/rest/v1/rpc/catalogue_precommande",
-      { corps: { p_campagne: campagne, limite: 300, p_societe: clientActif?.id ?? null } });
+      { corps: { p_campagne: campagne, limite: 1000, p_societe: clientActif?.id ?? null } });
   } catch (e) {
     sous.textContent = "accès refusé à cette campagne";
     return;
@@ -3838,6 +3838,7 @@ async function rendreCataloguePreco(campagne) {
   PRECO_PRODUITS.forEach(trierTailles);
   memoriser(PRECO_PRODUITS);
   PRECO_MARQUE = null;
+  PRECO_RAYON = null;
   PRECO_OUVERT = null;
   document.getElementById("preco-saisie").innerHTML = "";
   await chargerSaisiePreco(campagne);
@@ -3845,18 +3846,38 @@ async function rendreCataloguePreco(campagne) {
 }
 
 function rendreGrillePreco() {
-  const produits = PRECO_MARQUE
-    ? PRECO_PRODUITS.filter(p => p.marque === PRECO_MARQUE) : PRECO_PRODUITS;
+  const produits = PRECO_PRODUITS.filter(p =>
+    (!PRECO_MARQUE || p.marque === PRECO_MARQUE)
+    && (!PRECO_RAYON || (p.rayon || "") === PRECO_RAYON));
   document.getElementById("preco-sous-titre").textContent =
     `${produits.length} référence${produits.length > 1 ? "s" : ""} proposée${produits.length > 1 ? "s" : ""}`
+    + (PRECO_RAYON ? ` sur ${PRECO_PRODUITS.length}` : "")
     + " · livraison à la date annoncée, ces produits ne sont pas en stock";
 
+  /* Une campagne fournisseur arrive en un seul bloc de plusieurs centaines de références.
+     Le rayon (FOOTWEAR, FOOTBALL, ACCESSOIRES…) est la façon dont l'acheteur découpe sa
+     commande : on le propose en premier, la marque ne servant qu'aux campagnes mixtes.
+     Les filtres ne referment PAS le panneau de saisie ouvert : une grille en cours de
+     remplissage n'est pas encore enregistrée, la vider serait une perte sèche. */
+  const combien = (cle, v) => PRECO_PRODUITS.filter(p => (p[cle] || "") === v).length;
+  const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
+  const puce = (libelle, actif, appel) =>
+    `<button class="puce-claire ${actif ? "actif" : ""}" onclick="${appel}">${echapperHTML(libelle)}</button>`;
+  const rayons = [...new Set(PRECO_PRODUITS.map(p => p.rayon).filter(Boolean))]
+    .sort((a, b) => combien("rayon", b) - combien("rayon", a) || a.localeCompare(b));
   const marques = [...new Set(PRECO_PRODUITS.map(p => p.marque).filter(Boolean))].sort();
-  document.getElementById("preco-filtres").innerHTML = marques.length > 1
-    ? `<button class="puce-claire ${PRECO_MARQUE ? "" : "actif"}" onclick="affinerPreco(null)">Toutes les marques</button>`
-      + marques.map(m => `<button class="puce-claire ${m === PRECO_MARQUE ? "actif" : ""}"
-          onclick="affinerPreco(${JSON.stringify(m).replaceAll('"', "&quot;")})">${echapperHTML(m)}</button>`).join("")
-    : "";
+  let barre = "";
+  if (rayons.length > 1) {
+    barre += puce(`Tous les rayons (${PRECO_PRODUITS.length})`, !PRECO_RAYON, "affinerPrecoRayon(null)")
+      + rayons.map(r => puce(`${r} (${combien("rayon", r)})`, r === PRECO_RAYON,
+                             `affinerPrecoRayon(${arg(r)})`)).join("");
+  }
+  if (marques.length > 1) {
+    if (barre) barre += `<span style="flex-basis:100%; height:0"></span>`;
+    barre += puce("Toutes les marques", !PRECO_MARQUE, "affinerPreco(null)")
+      + marques.map(m => puce(m, m === PRECO_MARQUE, `affinerPreco(${arg(m)})`)).join("");
+  }
+  document.getElementById("preco-filtres").innerHTML = barre;
 
   document.getElementById("preco-grille").innerHTML = produits.map(p => {
     const saisi = Object.entries(PRECO_SAISIE)
@@ -3882,6 +3903,7 @@ function rendreGrillePreco() {
 }
 
 function affinerPreco(marque) { PRECO_MARQUE = marque; rendreGrillePreco(); }
+function affinerPrecoRayon(rayon) { PRECO_RAYON = rayon; rendreGrillePreco(); }
 
 /* ---------------- saisie d'une précommande : tailles × fenêtres de livraison ----------------
    Une campagne annonce ses dates ; un produit n'est pas forcément offert sur toutes,
