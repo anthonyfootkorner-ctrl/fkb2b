@@ -63,7 +63,34 @@ const COLONNES_B2B = {
   // deux emplacements depuis le 25/08/2026 : CENTRAL sert en premier, WEB en dernier recours
   magasin: ["magasin", "depot", "dépôt", "emplacement", "site", "code_origine", "origine"],
   gencod: ["gencod", "ean", "code barre", "code-barres", "codebarre", "barcode", "ean13"],
+  /* Précommandes : une campagne peut s'étaler sur plusieurs livraisons (les CRD de
+     Nike). Une ligne par date, et la même référence revient autant de fois qu'elle a
+     de fenêtres. Sans cette colonne, la campagne garde une date unique. */
+  livraison: ["livraison", "date de livraison", "date livraison", "crd", "date crd",
+              "livraison prevue", "date", "delivery", "delivery date", "ship date"],
 };
+
+/* Une date de fichier peut arriver en JJ/MM/AAAA, AAAA-MM-JJ ou en numéro de série
+   Excel : on la ramène toujours en AAAA-MM-JJ, sinon on l'ignore plutôt que de
+   deviner un mois pour un jour. */
+function dateISO(v) {
+  const t = String(v ?? "").trim();
+  if (!t) return null;
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/.exec(t);
+  if (m) {
+    const [, j, mo, a] = m;
+    const an = a.length === 2 ? "20" + a : a;
+    return `${an}-${mo.padStart(2, "0")}-${j.padStart(2, "0")}`;
+  }
+  // numéro de série Excel (jours depuis le 30/12/1899)
+  if (/^\d{5}$/.test(t)) {
+    const d = new Date(Date.UTC(1899, 11, 30) + Number(t) * 86400000);
+    return d.toISOString().slice(0, 10);
+  }
+  return null;
+}
 // « CENTRAL » et « WEB » sont les seuls emplacements du stock vendable.
 const EMPLACEMENTS = { CENTRAL: "CENTRAL", CENTRALE: "CENTRAL", WEB: "WEB", SHOP: "WEB", SITE: "WEB" };
 const sansAccent = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -98,7 +125,8 @@ function detecterStockB2B(tampon) {
                 remplacement_libelle: "remplace le stock B2B du catalogue + recalcul des actifs",
                 colonnes: { ref, taille: trouverColonne(entete, COLONNES_B2B.taille), qte, preco,
                             magasin: trouverColonne(entete, COLONNES_B2B.magasin),
-                            gencod: trouverColonne(entete, COLONNES_B2B.gencod) } } };
+                            gencod: trouverColonne(entete, COLONNES_B2B.gencod),
+                            livraison: trouverColonne(entete, COLONNES_B2B.livraison) } } };
     }
   }
   return null;
@@ -257,9 +285,10 @@ async function verifierReferences(analyse) {
 // Fichier de stock B2B → lignes prêtes pour la base, avec le détail de ce qui a été lu
 // (les colonnes ayant été reconnues à l'intitulé, autant les montrer avant d'exécuter).
 function preparerStockB2B(analyse) {
-  const { ref, taille, qte, preco, magasin, gencod } = analyse.spec.colonnes;
+  const { ref, taille, qte, preco, magasin, gencod, livraison } = analyse.spec.colonnes;
   const parCle = new Map();
   let precommandes = 0, ignorees = 0, inconnus = new Set();
+  const dates = new Set(); let sansDate = 0;
   for (const l of analyse.lignes) {
     const reference = (l[ref] || "").trim();
     if (!reference) { ignorees++; continue; }
@@ -271,9 +300,12 @@ function preparerStockB2B(analyse) {
     const illimite = preco ? estVrai(l[preco]) : false;
     const q = qte ? (parseInt(parseFloat((l[qte] || "0").replace(",", ".")), 10) || 0) : 0;
     if (!illimite && q <= 0) { ignorees++; continue; }
-    const cle = emplacement + "|" + reference + "|" + t;
+    const jour = livraison ? dateISO(l[livraison]) : null;
+    if (livraison) { if (jour) dates.add(jour); else sansDate++; }
+    const cle = emplacement + "|" + reference + "|" + t + "|" + (jour || "");
     const e = parCle.get(cle)
-      || { magasin: emplacement, reference, taille: t, quantite: 0, illimite: false, gencod: null };
+      || { magasin: emplacement, reference, taille: t, quantite: 0, illimite: false,
+           gencod: null, livraison: jour };
     e.quantite += q;
     e.illimite = e.illimite || illimite;
     e.gencod ??= gencod ? ((l[gencod] || "").trim() || null) : null;
@@ -286,6 +318,7 @@ function preparerStockB2B(analyse) {
     central: rows.filter(r => r.magasin === "CENTRAL").length,
     web: rows.filter(r => r.magasin === "WEB").length,
     emplacementsInconnus: [...inconnus],
+    livraisons: [...dates].sort(), sansDate,
   };
 }
 
