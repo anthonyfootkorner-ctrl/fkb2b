@@ -1449,10 +1449,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789080286"></script>
-<script src="imports.js?v=1789080286"></script>
-<script src="merch-shopify.js?v=1789080286"></script>
-<script src="moteur-merch.js?v=1789080286"></script>
+<script src="config.js?v=1789080696"></script>
+<script src="imports.js?v=1789080696"></script>
+<script src="merch-shopify.js?v=1789080696"></script>
+<script src="moteur-merch.js?v=1789080696"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1914,7 +1914,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789080286";
+    v.src = "hero.mp4?v=1789080696";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4632,7 +4632,9 @@ function rendreListePrecoAdmin() {
           <button class="puce-claire" onclick="statutPreco('${e.id}','refusee', true)">Refuser</button>` : ""}
         ${e && e.statut === "validee" && peutIntegrer ? `<button class="puce-claire" onclick="statutPreco('${e.id}','integree')">Marquer intégrée Fastmag</button>` : ""}
         ${e && (e.statut === "validee" || e.statut === "refusee") && peutApprouver ? `<button class="puce-claire" onclick="statutPreco('${e.id}','transmise')">Remettre à valider</button>` : ""}
-        ${e ? `<button class="puce-claire" onclick="detailPrecoAdmin('${e.id}','${r.societe_id}')">Détail des lignes</button>` : ""}
+        ${e ? `<button class="puce-claire" onclick="detailPrecoAdmin('${e.id}','${r.societe_id}')">Détail des lignes</button>
+          <button class="puce-claire" style="border-color:#111; font-weight:600" title="Même format que les commandes B2B : une ligne par référence, taille et livraison ; date = cadencement ; critère = campagne + date"
+                  onclick="fichierFastmagPreco('${e.id}','${r.societe_id}')">⬇ Fichier Fastmag</button>` : ""}
         <span class="compte-produits" style="margin:0" id="pa-etat-${r.societe_id}"></span>
       </div>
       <div id="pa-detail-${r.societe_id}"></div>
@@ -4679,6 +4681,23 @@ async function detailPrecoAdmin(id, societeId) {
         <td class="tailles">${Object.entries(e.tailles).map(([k, q]) => `<span>${echapperHTML(k)} <b>${q}</b></span>`).join("")}</td>
         <td>${e.pieces}</td><td class="num">${eur(e.montant)}</td></tr>`;
     }).join("")}</tbody></table>`;
+}
+
+/* Le fichier d'import Fastmag d'une transmission, construit côté serveur dans le même
+   format que les commandes B2B. Fastmag lit de l'ISO-8859-1 : on encode ici comme le
+   fait la fonction d'envoi des commandes (un caractère hors table devient « ? »). */
+async function fichierFastmagPreco(id, societeId) {
+  const etat = document.getElementById(`pa-etat-${societeId}`);
+  if (etat) etat.textContent = "fichier…";
+  try {
+    const f = await api("/rest/v1/rpc/fichier_precommande", { corps: { p_id: id } });
+    const octets = new Uint8Array([...f.contenu].map(c => { const n = c.charCodeAt(0); return n < 256 ? n : 63; }));
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([octets], { type: "text/plain;charset=iso-8859-1" }));
+    a.download = f.nom;
+    a.click();
+    if (etat) etat.textContent = `${f.nom} — ${f.lignes} ligne${f.lignes > 1 ? "s" : ""}`;
+  } catch (e) { if (etat) etat.textContent = "fichier impossible : " + (e.donnees?.message || e.message); }
 }
 
 /* Cumul réseau par référence, taille et livraison, sur les transmissions au statut choisi —
