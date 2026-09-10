@@ -337,7 +337,33 @@
     font-size: 11.5px; font-weight: 600; letter-spacing: .02em; }
   .pp-crd.d0 { background: #2b7ab5; } .pp-crd.d1 { background: #8faa2b; }
   .pp-crd.d2 { background: #e8871e; } .pp-crd.d3 { background: #7a5ea8; }
-  .pp-presse { display: block; margin-top: 5px; border: 1px solid #d8d8d5; background: #fff; color: var(--encre2);
+  .valid-preco { margin: 0 22px 60px; max-width: 760px; }
+  .valid-info { background: #fff6e0; border: 1px solid #f0d9a0; color: #6b4f00; border-radius: 12px;
+    padding: 14px 18px; margin-bottom: 18px; font-size: 13.5px; line-height: 1.45; }
+  .table-valid { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--hairline);
+    border-radius: 12px; overflow: hidden; font-size: 14px; }
+  .table-valid th { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--encre2);
+    padding: 12px 16px; border-bottom: 1px solid var(--hairline); text-align: center; background: #f7f6f4; }
+  .table-valid td { padding: 14px 16px; border-bottom: 1px solid #f2f0ed; text-align: center; }
+  .table-valid td:first-child { text-align: left; }
+  .table-valid td .sous { display: block; font-size: 11.5px; color: var(--encre2); margin-top: 6px; text-transform: capitalize; }
+  .table-valid td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .table-valid tfoot td { border-top: 2px solid var(--encre); border-bottom: 0; font-weight: 600; }
+  .table-valid tfoot tr.remise td { border-top: 0; color: #b8860b; font-weight: 500; }
+  .table-valid tfoot tr.net td { border-top: 0; font-size: 16px; }
+  .valid-engagement { display: flex; gap: 14px; align-items: flex-start; margin: 26px 0 18px; padding: 16px 18px;
+    background: #fff; border: 1px solid var(--hairline); border-radius: 12px; font-size: 14px; line-height: 1.5; cursor: pointer; }
+  .valid-engagement input { width: 22px; height: 22px; flex: none; margin-top: 2px; accent-color: var(--encre); }
+  .valid-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .valid-actions .btn-noir { margin-left: 0; }
+  .valid-actions .btn-noir:disabled { opacity: .35; cursor: default; }
+  .valid-ok { text-align: center; padding: 40px 20px; background: #fff; border: 1px solid var(--hairline); border-radius: 14px; }
+  .valid-ok .grand { width: 64px; height: 64px; border-radius: 50%; background: #2e9e4f; color: #fff; font-size: 34px;
+    line-height: 64px; margin: 0 auto 14px; }
+  .valid-ok h2 { font-size: 22px; margin: 0 0 10px; }
+  .valid-ok p { margin: 6px 0; } .valid-ok .sous { color: var(--encre2); font-size: 13px; }
+  .table-panier td.pp-outils, .table-panier th.pp-outils { border-left: 1px solid var(--hairline); padding-left: 12px; }
+  .pp-presse { display: inline-block; border: 1px solid #d8d8d5; background: #fff; color: var(--encre2);
     border-radius: 999px; padding: 2px 9px; font-size: 10.5px; letter-spacing: .04em; cursor: pointer; }
   .pp-presse:hover { border-color: var(--encre); color: var(--encre); }
   .pp-presse.source { background: var(--encre); border-color: var(--encre); color: #fff; }
@@ -1156,6 +1182,7 @@
 
   <section class="vue page-claire" id="vue-preco-produit"></section>
   <section class="vue page-claire" id="vue-preco-panier"></section>
+  <section class="vue page-claire" id="vue-preco-validation"></section>
 
   <section class="vue page-claire" id="vue-calendrier">
     <div class="col-tete">
@@ -1405,10 +1432,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789079359"></script>
-<script src="imports.js?v=1789079359"></script>
-<script src="merch-shopify.js?v=1789079359"></script>
-<script src="moteur-merch.js?v=1789079359"></script>
+<script src="config.js?v=1789079704"></script>
+<script src="imports.js?v=1789079704"></script>
+<script src="merch-shopify.js?v=1789079704"></script>
+<script src="moteur-merch.js?v=1789079704"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1798,6 +1825,9 @@ function router() {
   } else if (route === "precommande") {
     document.getElementById("vue-precommande").classList.add("active");
     rendreCataloguePreco(decodeURIComponent(args.join("/")));
+  } else if (route === "preco-validation") {
+    document.getElementById("vue-preco-validation").classList.add("active");
+    rendreValidationPreco(decodeURIComponent(args.join("/")));
   } else if (route === "preco-panier") {
     document.getElementById("vue-preco-panier").classList.add("active");
     rendrePanierPreco(decodeURIComponent(args.join("/")));
@@ -1864,7 +1894,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789079359";
+    v.src = "hero.mp4?v=1789079704";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4364,9 +4394,7 @@ async function rendrePanierPreco(campagne) {
               <button class="pp-retirer" title="retirer de ma sélection"
                       onclick="retirerDuPanierPreco(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">✕</button>
             </div>` : ""}</td>
-          <td class="fige2"><span class="pp-crd d${dates.indexOf(d) % 4}">${jourCourt(d)}</span>
-            <button class="pp-presse" data-presse-l="${l}" type="button"
-                    onclick="pressePreco(${l})">Copier</button></td>
+          <td class="fige2"><span class="pp-crd d${dates.indexOf(d) % 4}">${jourCourt(d)}</span></td>
           <td class="total"><input class="pp-total" data-total-l="${l}"
               data-ref="${echapperHTML(p.reference)}" inputmode="numeric" placeholder="total"
               title="Saisissez un total : il se répartit sur les tailles selon la courbe de vente du réseau"></td>
@@ -4379,6 +4407,8 @@ async function rendrePanierPreco(campagne) {
               data-l="${l}" data-c="${c}" data-ref="${echapperHTML(p.reference)}"
               data-taille="${echapperHTML(t)}" data-livraison="${d || ""}"></td>`;
           }).join("")}
+          <td class="pp-outils"><button class="pp-presse" data-presse-l="${l}" type="button"
+                    onclick="pressePreco(${l})">Copier</button></td>
         </tr>`;
       });
     }).join("");
@@ -4387,12 +4417,13 @@ async function rendrePanierPreco(campagne) {
       <thead>
         <tr class="pp-section"><th class="fige">${echapperHTML(rayon)}
             <span class="sous">· ${groupe.length} produit${groupe.length > 1 ? "s" : ""}</span></th>
-          <th class="fige2"></th><th colspan="${colonnes.length + 2}" class="pp-section-montant" data-section-montant>—</th></tr>
+          <th class="fige2"></th><th colspan="${colonnes.length + 3}" class="pp-section-montant" data-section-montant>—</th></tr>
         <tr>
           <th class="fige">Produit</th><th class="fige2">Livraison</th>
           <th class="th-total" title="Saisissez un total : il se répartit automatiquement sur les tailles">Total → auto</th>
           <th class="th-montant">Montant HT</th>
           ${colonnes.map(t => `<th>${echapperHTML(t)}</th>`).join("")}
+          <th class="pp-outils" title="Copier la grille d'une ligne, la coller sur une autre">Grille</th>
         </tr>
       </thead>
       <tbody>${lignes}</tbody>
@@ -4422,7 +4453,9 @@ async function rendrePanierPreco(campagne) {
       <span class="pp-rayons" id="pp-rayons"></span>
       <span class="sous" id="pp-etat"></span>
       <button class="btn-blanc" style="margin-left:auto" id="pp-enregistrer"
-              onclick="enregistrerPanierPreco()">ENREGISTRER MA PRÉCOMMANDE</button>
+              onclick="enregistrerPanierPreco()">ENREGISTRER</button>
+      <button class="btn-blanc" id="pp-valider" title="Récapitulatif par date, puis transmission ferme"
+              onclick="allerValiderPreco()">VALIDER MA PRÉCOMMANDE →</button>
     </div>`;
 
   PRECO_PRESSE = null;
@@ -4436,6 +4469,128 @@ function basculerDepuisFiche(reference) {
   basculerPanierPreco(reference);
   rendreProduitPreco(PRECO_COURANTE, reference);
   if (ajout) animerVersGrille(source, document.getElementById("btn-vers-grille"));
+}
+
+/* ---------------- validation : récapitulatif par date, engagement, transmission ----------------
+   La grille est un brouillon que le magasin peut retoucher jusqu'à la date limite ;
+   « transmettre » en fige un instantané daté (precommande_envois). On part toujours de ce
+   qui est enregistré en base — jamais de l'écran — pour que le récap soit exactement ce
+   qui sera transmis. Une saisie non enregistrée est signalée avant de partir. */
+function allerValiderPreco() {
+  const parRef = {};
+  for (const inp of document.querySelectorAll(".table-panier input[data-l]")) {
+    (parRef[inp.dataset.ref] ??= []).push({ taille: inp.dataset.taille, livraison: inp.dataset.livraison || null,
+      quantite: Math.max(parseInt(inp.value, 10) || 0, 0) });
+  }
+  const nonEnregistre = Object.entries(parRef).some(([ref, lignes]) =>
+    lignes.some(l => (PRECO_SAISIE[cleSaisie(ref, l.taille, l.livraison)] || 0) !== l.quantite));
+  if (nonEnregistre && !confirm("Des quantités ne sont pas enregistrées : elles ne feront pas partie de la validation.\n\nContinuer sans les enregistrer ?")) return;
+  location.hash = `#/preco-validation/${encodeURIComponent(PRECO_COURANTE)}`;
+}
+
+async function rendreValidationPreco(campagne) {
+  const vue = document.getElementById("vue-preco-validation");
+  const retour = `#/preco-panier/${encodeURIComponent(campagne)}`;
+  vue.innerHTML = `<div class="col-tete"><div class="compte-produits">Chargement…</div></div>`;
+  if (PRECO_COURANTE !== campagne || !PRECO_PRODUITS.length) await rendreCataloguePreco(campagne);
+  let lignes = [], envoi = null;
+  try {
+    [lignes, envoi] = await Promise.all([
+      api("/rest/v1/rpc/ma_precommande", { corps: { p_campagne: campagne, p_societe: clientActif?.id ?? null } }),
+      api("/rest/v1/rpc/ma_precommande_envoi", { corps: { p_campagne: campagne, p_societe: clientActif?.id ?? null } }).catch(() => null),
+    ]);
+  } catch (e) {
+    vue.innerHTML = `<div class="col-tete"><span class="fil" onclick="location.hash='${retour}'">&larr; MA PRÉCOMMANDE</span>
+      <h1>VALIDATION</h1><div class="compte-produits">lecture impossible : ${echapperHTML(e.donnees?.message || e.message)}</div></div>`;
+    return;
+  }
+  lignes = (lignes || []).filter(l => Number(l.quantite) > 0);
+  const produit = ref => PRECO_PRODUITS.find(p => p.reference === ref);
+  const prixDe = l => Number(l.prix) || prixMini(produit(l.reference) || { tailles: [] }) || 0;
+
+  // le récap par date, puis le total ; la remise du compte s'applique comme sur une commande
+  const parDate = {};
+  const refs = new Set();
+  let pieces = 0, ht = 0;
+  for (const l of lignes) {
+    const d = l.livraison || "";
+    const e = (parDate[d] ??= { pieces: 0, montant: 0, refs: new Set() });
+    const q = Number(l.quantite), m = q * prixDe(l);
+    e.pieces += q; e.montant += m; e.refs.add(l.reference); refs.add(l.reference);
+    pieces += q; ht += m;
+  }
+  const dates = Object.keys(parDate).sort();
+  const remise = remiseCompte();
+  const net = ht * (1 - remise / 100);
+  const deadline = PRECO_INFOS?.deadline ? new Date(PRECO_INFOS.deadline).toLocaleDateString("fr-FR") : null;
+  const societe = clientActif?.nom ? `${clientActif.id_fastmag ? clientActif.id_fastmag + ") " : ""}${clientActif.nom}` : "votre magasin";
+
+  vue.innerHTML = `
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='${retour}'">&larr; MA PRÉCOMMANDE</span>
+      <h1>VALIDER MA PRÉCOMMANDE</h1>
+      <div class="compte-produits">${echapperHTML(campagne)} · ${echapperHTML(societe)}${
+        deadline ? ` · à transmettre avant le <b>${deadline}</b>` : ""}</div>
+    </div>
+    <div class="valid-preco">
+      ${envoi ? `<div class="valid-info">Une précommande a déjà été transmise le
+          <b>${new Date(envoi.envoye_le).toLocaleString("fr-FR", { day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}</b>
+          (n° ${envoi.numero} — ${envoi.pieces} pièces, ${eur(Number(envoi.total_net))} HT net).
+          Transmettre à nouveau la remplace.</div>` : ""}
+      ${!lignes.length ? `<div class="valid-info">Aucune quantité enregistrée sur cette campagne. Revenez à la grille,
+          saisissez, enregistrez, puis validez.</div>` : `
+      <table class="table-valid">
+        <thead><tr><th style="text-align:left">Livraison</th><th>Références</th><th>Pièces</th><th>Montant HT</th></tr></thead>
+        <tbody>${dates.map((d, i) => `<tr>
+            <td><span class="pp-crd d${(PRECO_LIVRAISONS.indexOf(d) >= 0 ? PRECO_LIVRAISONS.indexOf(d) : i) % 4}">${jourCourt(d)}</span>
+              <span class="sous">${d ? new Date(d).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : ""}</span></td>
+            <td>${parDate[d].refs.size}</td>
+            <td><b>${parDate[d].pieces}</b></td>
+            <td class="num"><b>${eur(parDate[d].montant)}</b></td>
+          </tr>`).join("")}
+        </tbody>
+        <tfoot>
+          <tr><td>Total</td><td>${refs.size}</td><td><b>${pieces}</b></td><td class="num"><b>${eur(ht)}</b></td></tr>
+          ${remise > 0 ? `<tr class="remise"><td colspan="3">Remise compte ${pct(remise)} %</td><td class="num">− ${eur(ht - net)}</td></tr>
+          <tr class="net"><td colspan="3">Net HT</td><td class="num"><b>${eur(net)}</b></td></tr>` : ""}
+        </tfoot>
+      </table>
+      <label class="valid-engagement">
+        <input type="checkbox" id="valid-coche" onchange="document.getElementById('valid-bouton').disabled = !this.checked">
+        <span>Je confirme cette précommande <b>ferme</b> pour ${echapperHTML(societe)} :
+          <b>${pieces} pièce${pieces > 1 ? "s" : ""}</b> sur ${refs.size} référence${refs.size > 1 ? "s" : ""},
+          <b>${eur(net)} HT${remise > 0 ? " net" : ""}</b>, livrées aux dates ci-dessus.</span>
+      </label>
+      <div class="valid-actions">
+        <button class="btn-noir" id="valid-bouton" disabled onclick="transmettrePreco()">TRANSMETTRE LA PRÉCOMMANDE</button>
+        <span class="compte-produits" id="valid-etat" style="margin:0"></span>
+      </div>`}
+    </div>`;
+  window.scrollTo({ top: 0 });
+}
+
+async function transmettrePreco() {
+  const bouton = document.getElementById("valid-bouton"), etat = document.getElementById("valid-etat");
+  if (!document.getElementById("valid-coche")?.checked) return;
+  bouton.disabled = true; etat.textContent = "transmission…";
+  try {
+    const r = await api("/rest/v1/rpc/transmettre_precommande",
+      { corps: { p_campagne: PRECO_COURANTE, p_societe: clientActif?.id ?? null } });
+    const vue = document.getElementById("vue-preco-validation");
+    vue.querySelector(".valid-preco").innerHTML = `
+      <div class="valid-ok">
+        <div class="grand">✓</div>
+        <h2>Précommande transmise</h2>
+        <p>N° <b>${r.numero}</b> · ${new Date(r.envoye_le).toLocaleString("fr-FR", { day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}
+          · <b>${r.pieces} pièces</b> sur ${r.references} références · <b>${eur(Number(r.total_net))} HT${Number(r.remise_pct) > 0 ? " net" : ""}</b></p>
+        <p class="sous">${(r.par_livraison || []).map(x => `${jourCourt(x.livraison)} : ${x.pieces} pièces, ${eur(Number(x.montant))}`).join(" · ")}</p>
+        <p class="sous">Vous pouvez encore retoucher la grille et transmettre à nouveau jusqu'à la date limite : la dernière transmission fait foi.</p>
+        <button class="puce-claire" onclick="location.hash='#/precommande/${encodeURIComponent(PRECO_COURANTE)}'">Retour à la campagne</button>
+      </div>`;
+  } catch (e) {
+    bouton.disabled = false;
+    etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 160);
+  }
 }
 
 /* Copier / coller une grille de tailles d'une ligne à l'autre — typiquement les coloris
