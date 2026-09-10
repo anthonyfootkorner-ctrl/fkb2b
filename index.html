@@ -1399,10 +1399,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789078859"></script>
-<script src="imports.js?v=1789078859"></script>
-<script src="merch-shopify.js?v=1789078859"></script>
-<script src="moteur-merch.js?v=1789078859"></script>
+<script src="config.js?v=1789078974"></script>
+<script src="imports.js?v=1789078974"></script>
+<script src="merch-shopify.js?v=1789078974"></script>
+<script src="moteur-merch.js?v=1789078974"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1858,7 +1858,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789078859";
+    v.src = "hero.mp4?v=1789078974";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3942,6 +3942,10 @@ let PRECO_VUE = "vitrine";   // « vitrine » : les gros blocs seuls ; « grille
    un accessoire : ces deux familles Fastmag forment leurs propres blocs, les catégories
    fournisseur ne gardent que le textile. */
 const BLOCS_PAR_FAMILLE = { FOOTWEAR: "Footwear", ACCESSOIRES: "Accessoires" };
+/* Fastmag range la même gamme enfant tantôt en KIDS, tantôt en YOUTH selon le coloris
+   (mêmes produits, même grille 6/8 → 13/15 ans) : un seul rayon enfant côté portail. */
+const RAYON_ALIAS = { YOUTH: "KIDS" };
+const rayonDe = p => RAYON_ALIAS[p.rayon] || p.rayon || "";
 const categorieDe = p => BLOCS_PAR_FAMILLE[(p.famille || "").toUpperCase()] || p.categorie || "";
 
 async function rendreCataloguePreco(campagne) {
@@ -3981,7 +3985,7 @@ function rendreGrillePreco() {
   const q = compact(PRECO_RECHERCHE);
   const produits = PRECO_PRODUITS.filter(p =>
     (!PRECO_MARQUE || p.marque === PRECO_MARQUE)
-    && (!PRECO_RAYON || (p.rayon || "") === PRECO_RAYON)
+    && (!PRECO_RAYON || rayonDe(p) === PRECO_RAYON)
     && (!PRECO_CATEGORIE || categorieDe(p) === PRECO_CATEGORIE)
     && (!q || compact(p.reference).includes(q) || compact(p.designation).includes(q)));
   document.getElementById("preco-sous-titre").textContent =
@@ -3994,11 +3998,11 @@ function rendreGrillePreco() {
      commande : on le propose en premier, la marque ne servant qu'aux campagnes mixtes.
      Les filtres ne referment PAS le panneau de saisie ouvert : une grille en cours de
      remplissage n'est pas encore enregistrée, la vider serait une perte sèche. */
-  const combien = (cle, v) => PRECO_PRODUITS.filter(p => (p[cle] || "") === v).length;
+  const combien = (cle, v) => PRECO_PRODUITS.filter(p => (cle === "rayon" ? rayonDe(p) : (p[cle] || "")) === v).length;
   const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
   const puce = (libelle, actif, appel) =>
     `<button class="puce-claire ${actif ? "actif" : ""}" onclick="${appel}">${echapperHTML(libelle)}</button>`;
-  const rayons = [...new Set(PRECO_PRODUITS.map(p => p.rayon).filter(Boolean))]
+  const rayons = [...new Set(PRECO_PRODUITS.map(rayonDe).filter(Boolean))]
     .sort((a, b) => combien("rayon", b) - combien("rayon", a) || a.localeCompare(b));
   const marques = [...new Set(PRECO_PRODUITS.map(p => p.marque).filter(Boolean))].sort();
   let barre = puce("← Catégories", false, "retourVitrine()");
@@ -4010,7 +4014,7 @@ function rendreGrillePreco() {
   /* Sous le rayon, la catégorie du fournisseur (Sportswear, Running, Training, Jordan…) :
      c'est ainsi que l'acheteur pense le sportswear, Fastmag ne connaissant que des noms
      de collections. Les compteurs suivent le rayon choisi. */
-  const dansRayon = PRECO_PRODUITS.filter(p => !PRECO_RAYON || (p.rayon || "") === PRECO_RAYON);
+  const dansRayon = PRECO_PRODUITS.filter(p => !PRECO_RAYON || rayonDe(p) === PRECO_RAYON);
   const combienCat = v => dansRayon.filter(p => categorieDe(p) === v).length;
   const categories = [...new Set(dansRayon.map(categorieDe).filter(Boolean))]
     .sort((a, b) => combienCat(b) - combienCat(a) || a.localeCompare(b));
@@ -4274,7 +4278,7 @@ async function rendrePanierPreco(campagne) {
   const ORDRE_RAYONS = ["SPORTSWEAR", "FOOTWEAR", "FOOTBALL", "ACCESSOIRES", "KIDS", "YOUTH"];
   const rangRayon = r => { const i = ORDRE_RAYONS.indexOf(r); return i < 0 ? 99 : i; };
   const parRayon = {};
-  for (const p of produits) (parRayon[p.rayon || "AUTRES"] ??= []).push(p);
+  for (const p of produits) (parRayon[rayonDe(p) || "AUTRES"] ??= []).push(p);
   const rayons = Object.keys(parRayon)
     .sort((x, y) => rangRayon(x) - rangRayon(y) || x.localeCompare(y));
 
