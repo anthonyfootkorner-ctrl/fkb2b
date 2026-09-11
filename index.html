@@ -355,6 +355,21 @@
   .pp-crd.d0 { background: #2b7ab5; } .pp-crd.d1 { background: #8faa2b; }
   .pp-crd.d2 { background: #e8871e; } .pp-crd.d3 { background: #7a5ea8; }
   .pa-budget { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--encre2); }
+  /* Magasins ouverts à la campagne : le réseau entier, en pastilles ; un clic ouvre ou ferme. */
+  .pa-acces .tete { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .pa-acces .tete h3 { margin: 0; }
+  .pa-acces .groupe { margin-top: 10px; }
+  .pa-acces .groupe-titre { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--encre2); margin-bottom: 6px; }
+  .pa-acces .pastilles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pa-mag { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 999px; border: 1px solid #d8d8d5;
+    background: #fff; color: var(--encre2); font-size: 12px; cursor: pointer; user-select: none; line-height: 1.2; transition: background 120ms, color 120ms; }
+  .pa-mag::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #d8d8d5; flex: none; }
+  .pa-mag:hover { border-color: #111; color: var(--encre); }
+  .pa-mag.ouvert { background: #111; color: #fff; border-color: #111; }
+  .pa-mag.ouvert::before { background: #2e9e4f; }
+  .pa-mag.modif { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #d9a441; }
+  .pa-mag b { font-weight: 600; }
+  .pa-mag .fin { opacity: .65; }
   .table-detail-preco { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12.5px; background: #fff;
     border: 1px solid var(--hairline); border-radius: 10px; overflow: hidden; }
   .table-detail-preco th { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--encre2);
@@ -1468,10 +1483,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789115470"></script>
-<script src="imports.js?v=1789115470"></script>
-<script src="merch-shopify.js?v=1789115470"></script>
-<script src="moteur-merch.js?v=1789115470"></script>
+<script src="config.js?v=1789122222"></script>
+<script src="imports.js?v=1789122222"></script>
+<script src="merch-shopify.js?v=1789122222"></script>
+<script src="moteur-merch.js?v=1789122222"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1937,7 +1952,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789115470";
+    v.src = "hero.mp4?v=1789122222";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4759,9 +4774,112 @@ async function rendrePrecommandesAdmin(campagne) {
       </div>
     </div>
     <div class="bloc-clair" style="margin: 0 22px 18px"><div class="recap-chiffres" id="pa-chiffres"></div></div>
+    <div class="bloc-clair pa-acces" style="margin: 0 22px 18px" id="pa-acces"><div class="compte-produits">Chargement des magasins…</div></div>
     <div id="pa-liste" style="margin: 0 22px 60px"><div class="compte-produits">Chargement…</div></div>`;
   document.getElementById("pa-filtre").value = PRECO_ADMIN_FILTRE;
-  await chargerListePrecoAdmin();
+  await Promise.all([chargerListePrecoAdmin(), rendreAccesPrecoAdmin()]);
+}
+
+/* Qui voit la campagne : tout le réseau Footkorner en pastilles, les ouverts en noir.
+   Un clic ouvre ou ferme un magasin, les raccourcis font le réseau d'un coup, et rien
+   ne part avant « Enregistrer ». Les budgets déjà saisis sont conservés. */
+let PRECO_ADMIN_ACCES = { societes: [], budgets: {}, initial: new Set() };
+async function rendreAccesPrecoAdmin() {
+  const zone = document.getElementById("pa-acces");
+  if (!zone) return;
+  const campagne = PRECO_ADMIN_CAMPAGNE;
+  const [autorises, societes] = await Promise.all([
+    api("/rest/v1/rpc/acces_campagne", { corps: { p_campagne: campagne } }).catch(() => []),
+    api("/rest/v1/societes?select=compte,nom,ville,id_fastmag,reseau&actif=eq.true&order=id_fastmag,nom").catch(() => []),
+  ]);
+  const budgets = {};
+  (autorises || []).forEach(a => budgets[a.compte] = a.budget);
+  const ouverts = new Set(Object.keys(budgets));
+  const reseauDe = x => (x.reseau || "").toUpperCase();
+  const duReseau = x => RESEAU_PRECOMMANDES.includes(reseauDe(x));
+  // le réseau entier, plus les autres enseignes qu'on aurait ouvertes exprès
+  const liste = (societes || []).filter(x => duReseau(x) || ouverts.has(x.compte));
+  PRECO_ADMIN_ACCES = { societes: liste, budgets, initial: ouverts };
+  const groupes = [["SUCC", "Succursales"], ["FRANCHISE", "Franchises"], ["AUTRES", "Autres enseignes ouvertes"]];
+  const dans = g => liste.filter(x => g === "AUTRES" ? !duReseau(x) : reseauDe(x) === g);
+  const pastille = x => `<span class="pa-mag${ouverts.has(x.compte) ? " ouvert" : ""}" data-compte="${echapperHTML(x.compte)}"
+      data-reseau="${echapperHTML(reseauDe(x))}"${estAdmin ? ` onclick="basculerMagasinPreco(this)" title="${ouverts.has(x.compte) ? "ouvert — cliquer pour fermer" : "fermé — cliquer pour ouvrir"}"` : ` style="cursor:default" title="${ouverts.has(x.compte) ? "ouvert" : "fermé"}"`}>
+      <b>${echapperHTML(x.id_fastmag ? x.id_fastmag + ") " : "")}${echapperHTML(x.nom || x.compte)}</b>${x.ville ? `<span class="fin">${echapperHTML(x.ville)}</span>` : ""}</span>`;
+  zone.innerHTML = `
+    <div class="tete">
+      <h3 class="titre-bloc" style="margin:0">Magasins ouverts à la campagne</h3>
+      <span class="compte-produits" id="pa-acces-resume"></span>
+      <span style="flex-basis:100%; height:0"></span>
+      ${estAdmin ? `<span class="compte-produits" style="margin:0">Cliquez un magasin pour l'ouvrir ou le fermer, puis enregistrez.</span>
+      <button class="puce-claire" onclick="cocherMagasinsPreco('RESEAU', true)">Ouvrir tout le réseau · ${liste.filter(duReseau).length}</button>
+      <button class="puce-claire" onclick="cocherMagasinsPreco('SUCC', true)">+ Succursales · ${dans("SUCC").length}</button>
+      <button class="puce-claire" onclick="cocherMagasinsPreco('FRANCHISE', true)">+ Franchises · ${dans("FRANCHISE").length}</button>
+      <button class="puce-claire" onclick="cocherMagasinsPreco('TOUS', false)">Tout fermer</button>
+      <button class="btn-noir" id="pa-acces-sauver" onclick="enregistrerAccesPrecoAdmin()">ENREGISTRER LES ACCÈS</button>`
+      : `<span class="compte-produits" style="margin:0">Seul l'administrateur ouvre ou ferme des magasins.</span>`}
+      <span class="compte-produits" id="pa-acces-etat" style="margin:0"></span>
+    </div>
+    ${groupes.map(([g, titre]) => dans(g).length ? `<div class="groupe">
+      <div class="groupe-titre">${titre} · <span data-groupe-compte="${g}"></span></div>
+      <div class="pastilles">${dans(g).map(pastille).join("")}</div></div>` : "").join("")}`;
+  majResumeAccesPreco();
+}
+
+function majResumeAccesPreco() {
+  const zone = document.getElementById("pa-acces");
+  if (!zone) return;
+  const tous = [...zone.querySelectorAll(".pa-mag")];
+  const ouverts = tous.filter(p => p.classList.contains("ouvert"));
+  const reseau = tous.filter(p => RESEAU_PRECOMMANDES.includes(p.dataset.reseau));
+  const ouvertsReseau = ouverts.filter(p => RESEAU_PRECOMMANDES.includes(p.dataset.reseau));
+  const modifs = tous.filter(p => p.classList.contains("ouvert") !== PRECO_ADMIN_ACCES.initial.has(p.dataset.compte));
+  modifs.forEach(p => p.classList.add("modif"));
+  tous.filter(p => !modifs.includes(p)).forEach(p => p.classList.remove("modif"));
+  document.getElementById("pa-acces-resume").innerHTML =
+    `<b>${ouvertsReseau.length}</b> magasin${ouvertsReseau.length > 1 ? "s" : ""} du réseau ouvert${ouvertsReseau.length > 1 ? "s" : ""} sur ${reseau.length}`
+    + (ouverts.length > ouvertsReseau.length ? ` · ${ouverts.length - ouvertsReseau.length} autre${ouverts.length - ouvertsReseau.length > 1 ? "s" : ""}` : "")
+    + (modifs.length ? ` — <span style="color:#8a6414">${modifs.length} changement${modifs.length > 1 ? "s" : ""} à enregistrer</span>` : "");
+  zone.querySelectorAll("[data-groupe-compte]").forEach(el => {
+    const g = el.dataset.groupeCompte;
+    const du = tous.filter(p => g === "AUTRES" ? !RESEAU_PRECOMMANDES.includes(p.dataset.reseau) : p.dataset.reseau === g);
+    el.textContent = `${du.filter(p => p.classList.contains("ouvert")).length} ouvert${du.filter(p => p.classList.contains("ouvert")).length > 1 ? "s" : ""} sur ${du.length}`;
+  });
+  const btn = document.getElementById("pa-acces-sauver");
+  if (btn) btn.style.opacity = modifs.length ? "1" : ".45";
+}
+
+function basculerMagasinPreco(el) {
+  el.classList.toggle("ouvert");
+  el.title = el.classList.contains("ouvert") ? "ouvert — cliquer pour fermer" : "fermé — cliquer pour ouvrir";
+  majResumeAccesPreco();
+}
+
+function cocherMagasinsPreco(cible, valeur) {
+  document.querySelectorAll("#pa-acces .pa-mag").forEach(p => {
+    const r = p.dataset.reseau;
+    const vise = cible === "TOUS" || (cible === "RESEAU" ? RESEAU_PRECOMMANDES.includes(r) : r === cible);
+    if (vise) p.classList.toggle("ouvert", valeur);
+  });
+  majResumeAccesPreco();
+}
+
+async function enregistrerAccesPrecoAdmin() {
+  const etat = document.getElementById("pa-acces-etat");
+  const ouverts = [...document.querySelectorAll("#pa-acces .pa-mag.ouvert")].map(p => p.dataset.compte);
+  const fermes = [...PRECO_ADMIN_ACCES.initial].filter(c => !ouverts.includes(c));
+  if (fermes.length && !confirm(`Fermer la campagne à ${fermes.length} magasin${fermes.length > 1 ? "s" : ""} ?\n\n`
+      + "Ils ne verront plus la campagne ; leur brouillon reste en base mais leur budget est effacé.")) return;
+  const lignes = ouverts.map(compte => ({ compte, budget: PRECO_ADMIN_ACCES.budgets[compte] ?? null }));
+  etat.textContent = "enregistrement…";
+  try {
+    const n = await api("/rest/v1/rpc/definir_acces_campagne", { corps: { p_campagne: PRECO_ADMIN_CAMPAGNE, p_lignes: lignes } });
+    etat.textContent = `${n} magasin${n > 1 ? "s" : ""} ouvert${n > 1 ? "s" : ""} ✓`;
+    await Promise.all([rendreAccesPrecoAdmin(), chargerListePrecoAdmin()]);
+    const e2 = document.getElementById("pa-acces-etat");
+    if (e2) e2.textContent = `${n} magasin${n > 1 ? "s" : ""} ouvert${n > 1 ? "s" : ""} ✓`;
+  } catch (e) {
+    etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 200);
+  }
 }
 
 let PRECO_ADMIN_RANGS = [];
