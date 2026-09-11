@@ -380,6 +380,10 @@
   .table-detail-preco td.tailles span b { color: var(--encre); }
   .table-detail-preco .sous { font-size: 11px; color: var(--encre2); }
   .valid-preco { margin: 0 22px 60px; max-width: 760px; }
+  .pp-verrou { display: flex; gap: 14px; align-items: flex-start; margin: 0 22px 14px; padding: 14px 18px; background: #eef7f0;
+    border: 1px solid #bfe3c7; border-radius: 12px; color: #1f5a2c; font-size: 13.5px; line-height: 1.5; }
+  .pp-verrou .ico { font-size: 22px; line-height: 1; }
+  .valid-info.verrou { background: #eef7f0; border-color: #bfe3c7; color: #1f5a2c; }
   .valid-info { background: #fff6e0; border: 1px solid #f0d9a0; color: #6b4f00; border-radius: 12px;
     padding: 14px 18px; margin-bottom: 18px; font-size: 13.5px; line-height: 1.45; }
   .table-valid { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--hairline);
@@ -1495,10 +1499,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789123886"></script>
-<script src="imports.js?v=1789123886"></script>
-<script src="merch-shopify.js?v=1789123886"></script>
-<script src="moteur-merch.js?v=1789123886"></script>
+<script src="config.js?v=1789124616"></script>
+<script src="imports.js?v=1789124616"></script>
+<script src="merch-shopify.js?v=1789124616"></script>
+<script src="moteur-merch.js?v=1789124616"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1966,7 +1970,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789123886";
+    v.src = "hero.mp4?v=1789124616";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4580,12 +4584,16 @@ async function rendrePanierPreco(campagne) {
   const produits = PRECO_PRODUITS.filter(p => PRECO_PANIER.has(p.reference));
   // la courbe de vente du réseau, pour répartir un total sur les tailles
   PRECO_COURBE = {};
+  let envoi = null;
   if (produits.length) {
-    try {
-      PRECO_COURBE = await api("/rest/v1/rpc/courbe_tailles",
-        { corps: { p_references: produits.map(p => p.reference) } }) || {};
-    } catch (e) { /* sans courbe, la répartition se fera à parts égales */ }
+    [PRECO_COURBE, envoi] = await Promise.all([
+      api("/rest/v1/rpc/courbe_tailles", { corps: { p_references: produits.map(p => p.reference) } })
+        .then(c => c || {}).catch(() => ({})),   // sans courbe, la répartition se fera à parts égales
+      api("/rest/v1/rpc/ma_precommande_envoi", { corps: { p_campagne: campagne, p_societe: clientActif?.id ?? null } })
+        .catch(() => null),
+    ]);
   }
+  const verrou = precoVerrouillee(envoi);
   if (!produits.length) {
     vue.innerHTML = `
       <div class="col-tete">
@@ -4685,26 +4693,37 @@ async function rendrePanierPreco(campagne) {
         Tapez un <b>total</b> sur une ligne : il se répartit sur les tailles selon la courbe de vente du réseau.
         Ou collez une grille depuis Excel : cliquez la première case puis <kbd>⌘V</kbd>.</div>
     </div>
-    <div class="pp-aide">
+    ${verrou ? `<div class="pp-verrou">
+      <span class="ico">✓</span>
+      <div><b>Précommande n° ${envoi.numero} ${envoi.statut === "integree" ? "intégrée en Fastmag" : "validée par Footkorner"}</b>
+        le ${dateHeure(envoi.validee_le || envoi.integree_le || envoi.envoye_le)} — ${envoi.pieces} pièces, ${eur(Number(envoi.total_net))} HT${Number(envoi.remise_pct) > 0 ? " net" : ""}.
+        Elle n'est plus modifiable : la grille ci-dessous est en lecture seule. Pour la retoucher, contactez votre commercial,
+        qui peut la remettre en attente.</div>
+    </div>` : `<div class="pp-aide">
       <span class="pp-aide-ico">⤳</span>
       <div><b>Répartition automatique.</b> Tapez un total dans la colonne bleue <b>TOTAL</b> d'une ligne :
         il se répartit aussitôt sur les tailles, au prorata de ce que le réseau vend réellement dans ce rayon.
         Exemple : 100 chaussures → 42 : 19 · 44 : 19 · 43 : 16 · 42.5 : 12 … Vous corrigez ensuite case par case si besoin.</div>
-    </div>
-    <div class="cadre-panier">${sections}</div>
+    </div>`}
+    <div class="cadre-panier${verrou ? " verrou" : ""}">${sections}</div>
     <div class="preco-barre" style="position:sticky">
       <span><b id="pp-pieces">0</b> <span class="sous">pièces</span></span>
       <span><b id="pp-montant">0,00 €</b> <span class="sous">HT</span></span>
       <span class="pp-rayons" id="pp-rayons"></span>
-      <span class="sous" id="pp-etat"></span>
-      <button class="btn-blanc" style="margin-left:auto" id="pp-enregistrer"
+      <span class="sous" id="pp-etat">${verrou ? "validée — lecture seule" : ""}</span>
+      ${verrou ? `<button class="btn-blanc" style="margin-left:auto" onclick="allerValiderPreco()">VOIR LE RÉCAPITULATIF →</button>`
+      : `<button class="btn-blanc" style="margin-left:auto" id="pp-enregistrer"
               onclick="enregistrerPanierPreco()">ENREGISTRER</button>
       <button class="btn-blanc" id="pp-valider" title="Récapitulatif par date, puis transmission ferme"
-              onclick="allerValiderPreco()">VALIDER MA PRÉCOMMANDE →</button>
+              onclick="allerValiderPreco()">VALIDER MA PRÉCOMMANDE →</button>`}
     </div>`;
 
   PRECO_PRESSE = null;
   brancherGrillePanier();
+  if (verrou) {
+    vue.querySelectorAll(".table-panier input").forEach(i => { i.disabled = true; });
+    vue.querySelectorAll(".table-panier button").forEach(b => { b.disabled = true; b.style.visibility = "hidden"; });
+  }
   window.scrollTo({ top: 0 });
 }
 
@@ -4721,6 +4740,8 @@ function basculerDepuisFiche(reference) {
    transmission et son statut dans le circuit (transmise → validée par le commercial →
    intégrée Fastmag). Le back-office voit la même chose pour tous les magasins ouverts à
    la campagne, avec le budget, l'écart, et ceux qui n'ont pas encore transmis. */
+// Validée par le commercial (ou intégrée Fastmag) : le magasin ne touche plus à rien.
+const precoVerrouillee = envoi => !!envoi && ["validee", "integree"].includes(envoi.statut);
 const LIBELLES_PRECO = { transmise: ["TRANSMISE — À VALIDER", "attente"], validee: ["VALIDÉE — À INTÉGRER", "attente"],
                          integree: ["INTÉGRÉE FASTMAG", "ok"], refusee: ["REFUSÉE", "alerte"] };
 const dateHeure = iso => iso ? new Date(iso).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
@@ -5137,6 +5158,7 @@ async function rendreValidationPreco(campagne) {
   const net = ht * (1 - remise / 100);
   const deadline = PRECO_INFOS?.deadline ? new Date(PRECO_INFOS.deadline).toLocaleDateString("fr-FR") : null;
   const societe = clientActif?.nom ? `${clientActif.id_fastmag ? clientActif.id_fastmag + ") " : ""}${clientActif.nom}` : "votre magasin";
+  const verrou = precoVerrouillee(envoi);
 
   vue.innerHTML = `
     <div class="col-tete">
@@ -5148,15 +5170,18 @@ async function rendreValidationPreco(campagne) {
                   title="La précommande de chaque magasin se valide séparément : choisissez celui que vous validez">
             ${magasins.map(m => `<option value="${m.id}"${m.id === clientActif?.id ? " selected" : ""}>${
               echapperHTML(m.id_fastmag ? m.id_fastmag + ") " : "")}${echapperHTML(m.nom || m.compte)}${m.ville ? " · " + echapperHTML(m.ville) : ""}${
-              m.envoi ? " — transmise" : m.pieces > 0 ? ` — ${m.pieces} pièces saisies` : " — rien de saisi"}</option>`).join("")}
+              precoVerrouillee(m.envoi) ? (m.envoi.statut === "integree" ? " — intégrée" : " — validée") : m.envoi ? " — transmise" : m.pieces > 0 ? ` — ${m.pieces} pièces saisies` : " — rien de saisi"}</option>`).join("")}
           </select></label>` : echapperHTML(societe)}${
         deadline ? ` · à transmettre avant le <b>${deadline}</b>` : ""}</div>
     </div>
     <div class="valid-preco">
-      ${envoi ? `<div class="valid-info">Une précommande a déjà été transmise le
+      ${verrou ? `<div class="valid-info verrou"><b>Précommande n° ${envoi.numero} ${envoi.statut === "integree" ? "intégrée en Fastmag" : "validée par Footkorner"}</b>
+          le ${dateHeure(envoi.validee_le || envoi.integree_le || envoi.envoye_le)} — ${envoi.pieces} pièces, ${eur(Number(envoi.total_net))} HT${Number(envoi.remise_pct) > 0 ? " net" : ""}.
+          Elle n'est plus modifiable ni retransmissible. Pour la retoucher, contactez votre commercial, qui peut la remettre en attente.</div>`
+      : envoi ? `<div class="valid-info">Une précommande a déjà été transmise le
           <b>${new Date(envoi.envoye_le).toLocaleString("fr-FR", { day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}</b>
-          (n° ${envoi.numero} — ${envoi.pieces} pièces, ${eur(Number(envoi.total_net))} HT net).
-          Transmettre à nouveau la remplace.</div>` : ""}
+          (n° ${envoi.numero} — ${envoi.pieces} pièces, ${eur(Number(envoi.total_net))} HT net)${envoi.statut === "refusee" ? `, puis <b>refusée</b> par Footkorner${envoi.commentaire ? ` : <i>${echapperHTML(envoi.commentaire)}</i>` : ""}` : ""}.
+          Vous pouvez la retoucher et la transmettre à nouveau tant qu'elle n'est pas validée par votre commercial : la dernière transmission fait foi.</div>` : ""}
       ${!lignes.length ? `<div class="valid-info">Aucune quantité enregistrée sur cette campagne. Revenez à la grille,
           saisissez, enregistrez, puis validez.</div>` : `
       <table class="table-valid">
@@ -5175,7 +5200,7 @@ async function rendreValidationPreco(campagne) {
           <tr class="net"><td colspan="3">Net HT</td><td class="num"><b>${eur(net)}</b></td></tr>` : ""}
         </tfoot>
       </table>
-      <div class="valid-conditions">
+      ${verrou ? `<div id="preco-dupli"></div>` : `<div class="valid-conditions">
         <b>Conditions de précommande.</b> Les références, quantités, dates de livraison et prix ci-dessus sont ceux
         communiqués par le fournisseur à ce jour. Une précommande reste soumise à ses aléas, indépendants de Footkorner :
         <b>annulation ou réduction</b> de certaines références, <b>report</b> d'une date de livraison, ou <b>ajustement de prix</b>.
@@ -5192,7 +5217,7 @@ async function rendreValidationPreco(campagne) {
         <button class="btn-noir" id="valid-bouton" disabled onclick="transmettrePreco()">TRANSMETTRE LA PRÉCOMMANDE</button>
         <span class="compte-produits" id="valid-etat" style="margin:0"></span>
       </div>
-      <div id="preco-dupli"></div>`}
+      <div id="preco-dupli"></div>`}`}
     </div>`;
   window.scrollTo({ top: 0 });
   if (lignes.length) rendreDupliPreco(campagne, magasins);
@@ -5207,7 +5232,9 @@ async function rendreDupliPreco(campagne, magasins) {
   magasins = magasins || await api("/rest/v1/rpc/mes_magasins_campagne", { corps: { p_campagne: campagne } }).catch(() => []);
   const autres = (magasins || []).filter(m => m.id !== clientActif?.id);
   if (!autres.length) { zone.innerHTML = ""; return; }
-  const etatDe = m => m.envoi
+  const etatDe = m => precoVerrouillee(m.envoi)
+    ? `<span class="etat ok">${m.envoi.statut === "integree" ? "intégrée" : "validée"} n° ${m.envoi.numero} · ${m.envoi.pieces} pièces<br><span style="color:var(--encre2)">figée, plus modifiable</span></span>`
+    : m.envoi
     ? `<span class="etat ok">transmise n° ${m.envoi.numero} · ${m.envoi.pieces} pièces<br><span style="color:var(--encre2)">${dateHeure(m.envoi.envoye_le)}</span></span>`
     : m.pieces > 0 ? `<span class="etat">déjà ${m.pieces} pièces saisies, pas transmis</span>`
     : `<span class="etat">rien de saisi</span>`;
@@ -5219,7 +5246,7 @@ async function rendreDupliPreco(campagne, magasins) {
         ces quantités <b>s'y ajoutent</b>, rien n'est écrasé. Chaque magasin reste ensuite à transmettre depuis son propre
         compte, sauf si vous cochez « transmettre aussitôt ».</div>
       <div class="liste">${autres.map(m => `<label class="mag">
-          <input type="checkbox" value="${m.id}" data-pieces="${m.pieces || 0}" onchange="majBoutonDupliPreco()">
+          <input type="checkbox" value="${m.id}" data-pieces="${m.pieces || 0}" onchange="majBoutonDupliPreco()"${precoVerrouillee(m.envoi) ? " disabled" : ""}>
           <b>${echapperHTML(m.id_fastmag ? m.id_fastmag + ") " : "")}${echapperHTML(m.nom || m.compte)}</b>
           <span style="color:var(--encre2)">${echapperHTML(m.ville || "")}</span>
           ${etatDe(m)}
@@ -5264,6 +5291,7 @@ async function dupliquerPreco() {
     const bilanZone = document.getElementById("dupli-bilan");
     if (bilanZone) bilanZone.innerHTML = bilan.map(b => {
       const m = MES_SOCIETES.find(x => x.id === b.societe_id) || {};
+      if (b.verrouillee) return `<div>— <b>${echapperHTML(etiquetteMagasin(m))}</b> : précommande déjà validée par Footkorner, non modifiée</div>`;
       const ajout = b.ajoutees != null && Number(b.ajoutees) !== Number(b.pieces) ? `${b.ajoutees} pièces ajoutées, ` : "";
       return `<div>✓ <b>${echapperHTML(etiquetteMagasin(m))}</b> : ${ajout}${b.pieces} pièce${b.pieces > 1 ? "s" : ""} au total sur ${b.references} référence${b.references > 1 ? "s" : ""}${
         b.envoi ? `, <b>transmise</b> n° ${b.envoi.numero}` : `, en brouillon — à transmettre depuis ce magasin`}
