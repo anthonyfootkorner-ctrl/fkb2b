@@ -380,6 +380,17 @@
   .table-detail-preco td.tailles span b { color: var(--encre); }
   .table-detail-preco .sous { font-size: 11px; color: var(--encre2); }
   .valid-preco { margin: 0 22px 60px; max-width: 760px; }
+  .panier-sel { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+  .panier-sel label { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+  .panier-sel select { background: #fff; color: var(--encre); border: 1px solid #d8d8d5; border-radius: 8px; padding: 7px 10px; font-size: 13px; max-width: 320px; }
+  .preco-fusion { margin: 0 22px 14px; padding: 14px 18px; background: #fff; border: 1px solid var(--hairline); border-radius: 12px; }
+  .preco-fusion .liste { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+  .preco-fusion label.mag { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--hairline); border-radius: 10px; cursor: pointer; font-size: 13px; }
+  .preco-fusion label.mag input { width: 16px; height: 16px; accent-color: #111; }
+  .pa-panier { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-top: 1px dashed var(--hairline); font-size: 13px; }
+  .pa-panier .nom { font-weight: 600; }
+  .pa-panier .meta { flex-basis: 100%; color: var(--encre2); font-size: 12px; }
+  .pa-panier .actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .pp-verrou { display: flex; gap: 14px; align-items: flex-start; margin: 0 22px 14px; padding: 14px 18px; background: #eef7f0;
     border: 1px solid #bfe3c7; border-radius: 12px; color: #1f5a2c; font-size: 13.5px; line-height: 1.5; }
   .pp-verrou .ico { font-size: 22px; line-height: 1; }
@@ -1232,6 +1243,7 @@
       <span class="fil" onclick="location.hash='#/precommandes'">&larr; PRÉCOMMANDES</span>
       <h1 id="preco-titre"></h1>
       <div class="compte-produits" id="preco-sous-titre"></div>
+      <div id="preco-paniers" style="margin-top:10px"></div>
     </div>
     <div class="preco-vitrine" id="preco-vitrine"></div>
     <div style="padding: 0 22px 12px">
@@ -1499,10 +1511,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789124616"></script>
-<script src="imports.js?v=1789124616"></script>
-<script src="merch-shopify.js?v=1789124616"></script>
-<script src="moteur-merch.js?v=1789124616"></script>
+<script src="config.js?v=1789132029"></script>
+<script src="imports.js?v=1789132029"></script>
+<script src="merch-shopify.js?v=1789132029"></script>
+<script src="moteur-merch.js?v=1789132029"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1794,7 +1806,7 @@ async function changerSociete(id) {
   localStorage.setItem("fkb2b-societe", id);
   majEtiquetteMagasin();
   // la précommande est propre à chaque magasin : la prochaine page préco relit tout
-  PRECO_COURANTE = null; PRECO_SAISIE = {}; PRECO_PANIER = new Set();
+  PRECO_COURANTE = null; PRECO_SAISIE = {}; PRECO_PANIER = new Set(); PRECO_PANIERS = []; PRECO_PANIER_ID = null;
   // recharge le catalogue aux tarifs de la société choisie
   CONNUS.clear();
   const refsPanier = [...new Set([...panier.values()].map(l => l.produit.reference))];
@@ -1970,7 +1982,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789124616";
+    v.src = "hero.mp4?v=1789132029";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4326,6 +4338,8 @@ function rendreGrillePreco() {
     `${produits.length} référence${produits.length > 1 ? "s" : ""} proposée${produits.length > 1 ? "s" : ""}`
     + (PRECO_RAYON || PRECO_CATEGORIE || q ? ` sur ${PRECO_PRODUITS.length}` : "")
     + " · livraison à la date annoncée, ces produits ne sont pas en stock";
+  const zonePaniers = document.getElementById("preco-paniers");
+  if (zonePaniers) zonePaniers.innerHTML = rendreSelecteurPanierPreco({ actions: true });
 
   /* Une campagne fournisseur arrive en un seul bloc de plusieurs centaines de références.
      Le rayon (FOOTWEAR, FOOTBALL, ACCESSOIRES…) est la façon dont l'acheteur découpe sa
@@ -4485,7 +4499,143 @@ function rechercherPreco(valeur) {   // 483 cartes à redessiner : on laisse fin
    n'a aucun sens pour une livraison à un an. */
 let PRECO_PANIER = new Set();
 
-const clePanierPreco = () => `preco-panier|${PRECO_COURANTE}|${clientActif?.id || ""}`;
+/* Plusieurs paniers nommés par magasin et par campagne : chacun a sa saisie, sa
+   transmission et sa validation. La sélection de produits (ci-dessus) est propre au
+   panier ouvert, comme la grille. */
+let PRECO_PANIERS = [];        // les paniers du magasin sur la campagne (mes_paniers)
+let PRECO_PANIER_ID = null;    // celui qu'on remplit
+const clePanierActif = (campagne, societeId) => `preco-panier-actif|${campagne ?? PRECO_COURANTE}|${societeId ?? (clientActif?.id || "")}`;
+const panierActif = () => PRECO_PANIERS.find(p => p.id === PRECO_PANIER_ID) || null;
+const libellePanier = x => !x ? "" : `${x.nom} — ${x.verrouille ? (x.envoi?.statut === "integree" ? "intégré Fastmag" : "validé")
+  : x.envoi ? `transmis (${x.envoi.pieces} pièces)` : Number(x.pieces) > 0 ? `${x.pieces} pièces` : "vide"}`;
+
+function rendreSelecteurPanierPreco(options = {}) {
+  if (!PRECO_PANIERS.length) return "";
+  const p = panierActif();
+  return `<span class="panier-sel">
+    <label>Panier
+      <select onchange="choisirPanierPreco(this.value)" title="Chaque panier se transmet et se valide séparément">
+        ${PRECO_PANIERS.map(x => `<option value="${x.id}"${x.id === PRECO_PANIER_ID ? " selected" : ""}>${echapperHTML(libellePanier(x))}</option>`).join("")}
+        <option value="__nouveau">＋ Nouveau panier…</option>
+      </select></label>
+    ${options.actions ? `<button class="puce-claire" onclick="nouveauPanierPreco()">＋ Nouveau panier</button>
+      <button class="puce-claire" onclick="renommerPanierPreco()">Renommer</button>
+      ${PRECO_PANIERS.length > 1 && p && !p.verrouille ? `<button class="puce-claire" onclick="ouvrirFusionPreco()">Fusionner des paniers…</button>` : ""}
+      ${p && !p.envoi ? `<button class="puce-claire" onclick="supprimerPanierPreco()">Supprimer ce panier</button>` : ""}` : ""}
+  </span>`;
+}
+
+async function rafraichirPaniersPreco() {
+  PRECO_PANIERS = await api("/rest/v1/rpc/mes_paniers",
+    { corps: { p_campagne: PRECO_COURANTE, p_societe: clientActif?.id ?? null } }).catch(() => PRECO_PANIERS);
+}
+
+// Le panier ouvert change : on relit sa saisie, sa sélection, et la page se redessine.
+async function choisirPanierPreco(id) {
+  if (!id) return;
+  if (id === "__nouveau") { await nouveauPanierPreco(); return; }
+  if (!PRECO_PANIERS.some(p => p.id === id)) return;
+  PRECO_PANIER_ID = id;
+  try { localStorage.setItem(clePanierActif(), id); } catch (e) { /* mémoire locale refusée */ }
+  await relireSaisiePanier(PRECO_COURANTE);
+  chargerPanierPreco();
+  redessinerPagePreco();
+}
+
+async function redessinerPagePreco() {
+  const route = location.hash.split("/")[1];
+  if (route === "preco-panier") await rendrePanierPreco(PRECO_COURANTE);
+  else if (route === "preco-validation") await rendreValidationPreco(PRECO_COURANTE);
+  else if (route === "precommande") rendreGrillePreco();
+  else router();
+}
+
+async function nouveauPanierPreco() {
+  const nom = prompt("Nom du nouveau panier :", `Panier ${PRECO_PANIERS.length + 1}`);
+  if (nom === null) { redessinerPagePreco(); return; }
+  try {
+    const p = await api("/rest/v1/rpc/creer_panier",
+      { corps: { p_campagne: PRECO_COURANTE, p_societe: clientActif?.id ?? null, p_nom: nom } });
+    PRECO_PANIERS.push(p);
+    await choisirPanierPreco(p.id);
+  } catch (e) { alert("Impossible de créer le panier : " + (e.donnees?.message || e.message)); }
+}
+
+async function renommerPanierPreco() {
+  const p = panierActif();
+  if (!p) return;
+  const nom = prompt("Nouveau nom du panier :", p.nom);
+  if (nom === null || !nom.trim()) return;
+  try {
+    const r = await api("/rest/v1/rpc/renommer_panier", { corps: { p_panier: p.id, p_nom: nom } });
+    Object.assign(p, r);
+    redessinerPagePreco();
+  } catch (e) { alert("Impossible de renommer : " + (e.donnees?.message || e.message)); }
+}
+
+async function supprimerPanierPreco() {
+  const p = panierActif();
+  if (!p) return;
+  if (!confirm(`Supprimer le panier « ${p.nom} »${Number(p.pieces) > 0 ? ` et ses ${p.pieces} pièces saisies` : ""} ?`)) return;
+  try {
+    await api("/rest/v1/rpc/supprimer_panier", { corps: { p_panier: p.id } });
+    PRECO_PANIERS = PRECO_PANIERS.filter(x => x.id !== p.id);
+    if (!PRECO_PANIERS.length) {
+      PRECO_PANIERS = [await api("/rest/v1/rpc/creer_panier",
+        { corps: { p_campagne: PRECO_COURANTE, p_societe: clientActif?.id ?? null, p_nom: "Panier 1" } })];
+    }
+    await choisirPanierPreco(PRECO_PANIERS[0].id);
+  } catch (e) { alert("Impossible de supprimer : " + (e.donnees?.message || e.message)); }
+}
+
+/* Fusion : les paniers cochés se versent dans le panier ouvert (les quantités
+   s'additionnent) puis disparaissent. Un panier validé ne se fusionne pas. */
+function ouvrirFusionPreco() {
+  const zone = document.getElementById("preco-fusion");
+  if (!zone) { location.hash = `#/preco-panier/${encodeURIComponent(PRECO_COURANTE)}`; return; }
+  if (zone.innerHTML) { zone.innerHTML = ""; return; }
+  const dest = panierActif();
+  const autres = PRECO_PANIERS.filter(x => x.id !== PRECO_PANIER_ID);
+  zone.innerHTML = `<div class="preco-fusion">
+    <b>Fusionner dans « ${echapperHTML(dest?.nom || "")} »</b>
+    <div class="compte-produits">Cochez les paniers à verser dans celui-ci : mêmes références, tailles et dates, les quantités
+      s'additionnent. Les paniers versés disparaissent ; s'ils avaient été transmis sans être validés, cette transmission
+      est annulée et le panier fusionné sera à transmettre à nouveau. Un panier déjà validé par Footkorner ne se fusionne pas.</div>
+    <div class="liste">${autres.map(x => `<label class="mag">
+        <input type="checkbox" value="${x.id}"${x.verrouille ? " disabled" : ""}>
+        <b>${echapperHTML(x.nom)}</b> <span style="color:var(--encre2)">${echapperHTML(libellePanier(x).replace(x.nom + " — ", ""))}</span>
+      </label>`).join("")}</div>
+    <div class="formu">
+      <button class="btn-noir" onclick="lancerFusionPreco()">FUSIONNER</button>
+      <button class="puce-claire" onclick="document.getElementById('preco-fusion').innerHTML=''">Annuler</button>
+      <span class="compte-produits" id="preco-fusion-etat" style="margin:0"></span>
+    </div></div>`;
+}
+
+async function lancerFusionPreco() {
+  const sources = [...document.querySelectorAll("#preco-fusion input:checked")].map(i => i.value);
+  const etat = document.getElementById("preco-fusion-etat");
+  if (!sources.length) { etat.textContent = "cochez au moins un panier"; return; }
+  etat.textContent = "fusion…";
+  try {
+    const r = await api("/rest/v1/rpc/fusionner_paniers", { corps: { p_dest: PRECO_PANIER_ID, p_sources: sources } });
+    await rafraichirPaniersPreco();
+    await relireSaisiePanier(PRECO_COURANTE);
+    chargerPanierPreco();
+    await redessinerPagePreco();
+    const e2 = document.getElementById("pp-etat");
+    if (e2) e2.textContent = `fusion faite ✓ — « ${r.nom} » : ${r.pieces} pièces`;
+  } catch (e) { etat.textContent = "échec : " + (e.donnees?.message || e.message); }
+}
+
+// Depuis Mon compte : ouvrir un panier précis d'une campagne (grille ou validation).
+function ouvrirPanierPreco(campagne, panierId, page) {
+  try { if (panierId) localStorage.setItem(clePanierActif(campagne), panierId); } catch (e) { /* sans mémoire locale */ }
+  PRECO_COURANTE = null;   // force la relecture des paniers de cette campagne
+  location.hash = `#/${page === "validation" ? "preco-validation" : "preco-panier"}/${encodeURIComponent(campagne)}`;
+}
+
+const clePanierPreco = () => `preco-panier|${PRECO_COURANTE}|${clientActif?.id || ""}|${PRECO_PANIER_ID || ""}`;
 
 function chargerPanierPreco() {
   PRECO_PANIER = new Set();
@@ -4563,7 +4713,9 @@ function rendreBarrePreco() {
   barre.hidden = !n;
   if (!n) return;
   const pieces = [...PRECO_PANIER].reduce((s, r) => s + piecesSaisies(r), 0);
+  const pa = panierActif();
   barre.innerHTML = `
+    ${pa ? `<span><span class="sous">panier</span> <b>${echapperHTML(pa.nom)}</b></span>` : ""}
     <span><b>${n}</b> <span class="sous">produit${n > 1 ? "s" : ""} sélectionné${n > 1 ? "s" : ""}</span></span>
     <span><b>${pieces}</b> <span class="sous">pièce${pieces > 1 ? "s" : ""} saisie${pieces > 1 ? "s" : ""}</span></span>
     <button class="btn-blanc" style="margin-left:auto"
@@ -4589,19 +4741,22 @@ async function rendrePanierPreco(campagne) {
     [PRECO_COURBE, envoi] = await Promise.all([
       api("/rest/v1/rpc/courbe_tailles", { corps: { p_references: produits.map(p => p.reference) } })
         .then(c => c || {}).catch(() => ({})),   // sans courbe, la répartition se fera à parts égales
-      api("/rest/v1/rpc/ma_precommande_envoi", { corps: { p_campagne: campagne, p_societe: clientActif?.id ?? null } })
+      api("/rest/v1/rpc/ma_precommande_envoi", { corps: { p_campagne: campagne, p_societe: clientActif?.id ?? null, p_panier: PRECO_PANIER_ID } })
         .catch(() => null),
     ]);
   }
   const verrou = precoVerrouillee(envoi);
+  const pa = panierActif();
   if (!produits.length) {
     vue.innerHTML = `
       <div class="col-tete">
         <span class="fil" onclick="location.hash='${retour}'">&larr; ${echapperHTML(campagne)}</span>
-        <h1>MA PRÉCOMMANDE</h1>
-        <div class="compte-produits">Votre sélection est vide. Ajoutez des produits depuis la campagne
+        <h1>MA PRÉCOMMANDE${pa ? ` <span style="font-weight:400; color:var(--encre2)">· ${echapperHTML(pa.nom)}</span>` : ""}</h1>
+        <div style="margin:8px 0 10px">${rendreSelecteurPanierPreco({ actions: true })}</div>
+        <div class="compte-produits">Ce panier est vide. Ajoutez des produits depuis la campagne
           avec le bouton <b>+</b> en haut de chaque visuel.</div>
-      </div>`;
+      </div>
+      <div id="preco-fusion"></div>`;
     return;
   }
 
@@ -4686,16 +4841,18 @@ async function rendrePanierPreco(campagne) {
   vue.innerHTML = `
     <div class="col-tete">
       <span class="fil" onclick="location.hash='${retour}'">&larr; ${echapperHTML(campagne)}</span>
-      <h1>MA PRÉCOMMANDE</h1>
+      <h1>MA PRÉCOMMANDE${pa ? ` <span style="font-weight:400; color:var(--encre2)">· ${echapperHTML(pa.nom)}</span>` : ""}</h1>
+      <div style="margin:8px 0 10px">${rendreSelecteurPanierPreco({ actions: true })}</div>
       <div class="compte-produits">${produits.length} produit${produits.length > 1 ? "s" : ""}
         · ${rayons.length} rayon${rayons.length > 1 ? "s" : ""}
         · ${dates.length} date${dates.length > 1 ? "s" : ""} de livraison.
         Tapez un <b>total</b> sur une ligne : il se répartit sur les tailles selon la courbe de vente du réseau.
         Ou collez une grille depuis Excel : cliquez la première case puis <kbd>⌘V</kbd>.</div>
     </div>
+    <div id="preco-fusion"></div>
     ${verrou ? `<div class="pp-verrou">
       <span class="ico">✓</span>
-      <div><b>Précommande n° ${envoi.numero} ${envoi.statut === "integree" ? "intégrée en Fastmag" : "validée par Footkorner"}</b>
+      <div><b>Panier « ${echapperHTML(pa?.nom || "")} » — précommande n° ${envoi.numero} ${envoi.statut === "integree" ? "intégrée en Fastmag" : "validée par Footkorner"}</b>
         le ${dateHeure(envoi.validee_le || envoi.integree_le || envoi.envoye_le)} — ${envoi.pieces} pièces, ${eur(Number(envoi.total_net))} HT${Number(envoi.remise_pct) > 0 ? " net" : ""}.
         Elle n'est plus modifiable : la grille ci-dessous est en lecture seule. Pour la retoucher, contactez votre commercial,
         qui peut la remettre en attente.</div>
@@ -4748,14 +4905,15 @@ const dateHeure = iso => iso ? new Date(iso).toLocaleString("fr-FR", { day: "2-d
 
 function rendreMesPrecommandes(precos) {
   if (!precos.length) return `<div class="rang" style="color:var(--gris)">Aucune campagne de précommande ouverte à votre magasin</div>`;
+  const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
   return precos.map(p => {
     const e = p.envoi, b = p.brouillon;
-    const [lib, cls] = e ? (LIBELLES_PRECO[e.statut] || [e.statut, ""]) : ["NON TRANSMISE", "alerte"];
+    const [lib, cls] = e ? (LIBELLES_PRECO[e.statut] || [e.statut, ""]) : [p.panier ? "NON TRANSMIS" : "RIEN DE SAISI", "alerte"];
     const mag = MES_SOCIETES.find(x => x.id === p.societe_id);
     const jours = p.deadline ? Math.ceil((new Date(p.deadline) - Date.now()) / 864e5) : null;
-    const lien = `#/precommande/${encodeURIComponent(p.campagne)}`;
+    const ouvrable = p.ouverte && (jours === null || jours >= 0);
     return `<div class="rang">
-      <b>${echapperHTML(p.campagne)}</b>
+      <b>${echapperHTML(p.campagne)}</b>${p.panier ? ` <span style="color:var(--encre2)">· panier « ${echapperHTML(p.panier)} »</span>` : ""}
       <span class="etiquette ${cls}">${lib}</span>
       ${MES_SOCIETES.length > 1 && mag ? `<span class="mag-cmd">${echapperHTML(etiquetteMagasin(mag))}</span>` : ""}
       <span class="fin">${e
@@ -4765,9 +4923,10 @@ function rendreMesPrecommandes(precos) {
         b && e && (b.pieces !== e.pieces) ? ` · <b>brouillon modifié depuis (${b.pieces} pièces)</b>` : ""}${
         p.deadline ? ` · ${jours < 0 ? "clôturée le " + new Date(p.deadline).toLocaleDateString("fr-FR")
                        : jours === 0 ? "dernier jour" : jours + " jour" + (jours > 1 ? "s" : "") + " pour transmettre"}` : ""}</span>
-      ${p.ouverte && (jours === null || jours >= 0) ? `<button class="puce" style="margin-left:12px"
-          onclick="location.hash='#/preco-panier/${encodeURIComponent(p.campagne)}'">${b ? "Modifier la grille" : "Saisir"}</button>
-        ${b && (!e || b.pieces !== e.pieces) ? `<button class="puce" onclick="location.hash='#/preco-validation/${encodeURIComponent(p.campagne)}'">Valider / transmettre</button>` : ""}` : ""}
+      ${ouvrable && !p.verrouille ? `<button class="puce" style="margin-left:12px"
+          onclick="ouvrirPanierPreco(${arg(p.campagne)}, ${arg(p.panier_id || "")}, 'grille')">${b ? "Modifier la grille" : "Saisir"}</button>
+        ${b && (!e || b.pieces !== e.pieces) ? `<button class="puce" onclick="ouvrirPanierPreco(${arg(p.campagne)}, ${arg(p.panier_id || "")}, 'validation')">Valider / transmettre</button>` : ""}` : ""}
+      ${ouvrable && p.verrouille ? `<button class="puce" style="margin-left:12px" onclick="ouvrirPanierPreco(${arg(p.campagne)}, ${arg(p.panier_id || "")}, 'validation')">Voir</button>` : ""}
       ${e && e.par_livraison?.length ? `<div class="fin" style="margin-top:6px">${e.par_livraison.map(x =>
           `${jourCourt(x.livraison)} : ${x.pieces} pièces, ${eur(Number(x.montant))}`).join(" · ")}</div>` : ""}
     </div>`;
@@ -4951,73 +5110,101 @@ async function chargerListePrecoAdmin() {
   rendreListePrecoAdmin();
 }
 
+/* Un magasin peut avoir plusieurs paniers : chacun a sa transmission, sa validation, son
+   fichier Fastmag. La carte du magasin les liste ; le budget se compare au cumul de ce
+   qu'il a transmis (hors refusés). */
+const envoisTransmis = r => (r.paniers || []).map(p => p.envoi).filter(e => e && e.statut !== "refusee");
+const totalTransmis = r => envoisTransmis(r).reduce((s, e) => s + Number(e.total_net || 0), 0);
+
 function rendreListePrecoAdmin() {
   const rangs = PRECO_ADMIN_RANGS;
   const chiffre = (v, lib) => `<div class="recap-chiffre"><b>${v}</b><span>${lib}</span></div>`;
-  const transmis = rangs.filter(r => r.envoi);
-  const nonTransmis = rangs.filter(r => !r.envoi);
-  const parStatut = st => transmis.filter(r => r.envoi.statut === st).length;
-  const montant = transmis.reduce((s, r) => s + Number(r.envoi.total_net || 0), 0);
+  const paniers = rangs.flatMap(r => (r.paniers || []).map(p => ({ ...p, magasin: r })));
+  const transmis = rangs.filter(r => envoisTransmis(r).length);
+  const nonTransmis = rangs.filter(r => !envoisTransmis(r).length);
+  const parStatut = st => paniers.filter(p => p.envoi && p.envoi.statut === st).length;
+  const montant = rangs.reduce((s, r) => s + totalTransmis(r), 0);
   const budget = rangs.reduce((s, r) => s + Number(r.budget || 0), 0);
-  const horsBudget = r => r.envoi && Number(r.budget) > 0 && Number(r.envoi.total_net) > Number(r.budget);
+  const horsBudget = r => Number(r.budget) > 0 && totalTransmis(r) > Number(r.budget);
   document.getElementById("pa-chiffres").innerHTML =
     chiffre(rangs.length, "magasins ouverts")
     + chiffre(transmis.length, "ont transmis")
     + chiffre(nonTransmis.length, "n'ont pas transmis")
-    + chiffre(parStatut("transmise"), "à valider")
+    + chiffre(parStatut("transmise"), "paniers à valider")
     + chiffre(parStatut("validee"), "à intégrer")
-    + chiffre(parStatut("integree"), "intégrées")
+    + chiffre(parStatut("integree"), "intégrés")
     + chiffre(eur(montant), "transmis HT net")
     + (budget ? chiffre(eur(budget), "budget cumulé") + chiffre(rangs.filter(horsBudget).length, "au-dessus du budget") : "");
 
   const f = PRECO_ADMIN_FILTRE;
   const vues = rangs.filter(r =>
     !f ? true
-    : f === "non_transmis" ? !r.envoi
+    : f === "non_transmis" ? !envoisTransmis(r).length
     : f === "hors_budget" ? horsBudget(r)
-    : (r.envoi && r.envoi.statut === f));
+    : (r.paniers || []).some(p => p.envoi && p.envoi.statut === f));
   const zone = document.getElementById("pa-liste");
   if (!vues.length) { zone.innerHTML = `<div class="compte-produits">Aucun magasin dans cette sélection.</div>`; return; }
   zone.innerHTML = vues.map(r => {
-    const e = r.envoi, b = r.brouillon;
-    const [lib, cls] = e ? (LIBELLES_PRECO[e.statut] || [e.statut, ""]) : ["NON TRANSMISE", "alerte"];
-    const ecart = e && Number(r.budget) > 0 ? Number(e.total_net) - Number(r.budget) : null;
+    const nb = (r.paniers || []).length;
+    const tot = totalTransmis(r);
+    const ecart = envoisTransmis(r).length && Number(r.budget) > 0 ? tot - Number(r.budget) : null;
     const nomMag = `${r.id_fastmag ? r.id_fastmag + ") " : ""}${r.nom}${r.ville ? " · " + r.ville : ""}`;
+    const aValider = (r.paniers || []).filter(p => p.envoi && p.envoi.statut === "transmise").length;
+    const [libMag, clsMag] = !nb ? ["RIEN DE SAISI", "alerte"]
+      : !envoisTransmis(r).length ? ["NON TRANSMIS", "alerte"]
+      : aValider ? [`${aValider} À VALIDER`, "attente"]
+      : (r.paniers || []).some(p => p.envoi && p.envoi.statut === "validee") ? ["À INTÉGRER", "attente"] : ["INTÉGRÉ", "ok"];
     return `<div class="cmd-carte" id="pa-${r.societe_id}">
       <div class="cmd-tete">
         <span class="cmd-num">${echapperHTML(nomMag)}</span>
-        <span class="badge-c ${cls}">${lib}</span>
+        <span class="badge-c ${clsMag}">${libMag}</span>
         <span class="badge-c" style="opacity:.7">${echapperHTML(r.reseau || "")}</span>
-        ${e ? `<span class="cmd-montant">${eur(Number(e.total_net))} HT${Number(e.remise_pct) > 0 ? " net" : ""}</span>` : ""}
+        ${nb ? `<span class="badge-c" style="opacity:.7">${nb} panier${nb > 1 ? "s" : ""}</span>` : ""}
+        ${envoisTransmis(r).length ? `<span class="cmd-montant">${eur(tot)} HT net transmis</span>` : ""}
       </div>
-      <div class="cmd-meta">
-        ${e ? `Transmission n° <b>${e.numero}</b> le <b>${dateHeure(e.envoye_le)}</b>${e.auteur_email ? " par " + echapperHTML(e.auteur_email) : ""}
-               · <b>${e.pieces}</b> pièces · ${e.references} références${Number(e.remise_pct) > 0 ? ` · remise ${pct(Number(e.remise_pct))} % déduite` : ""}
-               ${e.validee_le ? `· ${e.statut === "refusee" ? "refusée" : "validée"} le ${dateHeure(e.validee_le)}` : ""}
-               ${e.integree_le ? `· intégrée le ${dateHeure(e.integree_le)}` : ""}`
-           : b ? `Brouillon en cours : <b>${b.pieces}</b> pièces · ${b.references} références · ${eur(Number(b.montant))} HT — dernière saisie ${dateHeure(b.maj_le)}, <b>pas encore transmis</b>`
-               : `Rien de saisi pour le moment`}
-        ${e && b && b.pieces !== e.pieces ? `<br><span style="color:#8a6414">Brouillon modifié depuis la transmission (${b.pieces} pièces) — le magasin devra retransmettre.</span>` : ""}
-        ${e && e.par_livraison?.length ? `<br>${e.par_livraison.map(x => `${jourCourt(x.livraison)} : <b>${x.pieces}</b> pièces, ${eur(Number(x.montant))}`).join(" · ")}` : ""}
-        ${e && e.commentaire ? `<br><i>${echapperHTML(e.commentaire)}</i>` : ""}
-      </div>
-      <div class="cmd-actions">
+      ${(r.paniers || []).map(p => rendrePanierAdmin(p, r)).join("")}
+      <div class="cmd-actions" style="border-top:1px dashed var(--hairline); padding-top:8px">
         <label class="pa-budget">Budget
           <input class="qte-claire" style="width:110px" type="number" min="0" step="100" value="${r.budget ?? ""}" placeholder="—"
                  onchange="definirBudgetPreco('${r.societe_id}', this.value)"> € HT</label>
         ${ecart !== null ? `<span class="badge-c ${ecart > 0 ? "alerte" : "ok"}">${ecart > 0 ? "+" : ""}${eur(ecart)} vs budget</span>` : ""}
-        ${e && e.statut === "transmise" && peutApprouver ? `<button class="puce-claire" onclick="statutPreco('${e.id}','validee')">✓ Valider</button>
-          <button class="puce-claire" onclick="statutPreco('${e.id}','refusee', true)">Refuser</button>` : ""}
-        ${e && e.statut === "validee" && peutIntegrer ? `<button class="puce-claire" onclick="statutPreco('${e.id}','integree')">Marquer intégrée Fastmag</button>` : ""}
-        ${e && (e.statut === "validee" || e.statut === "refusee") && peutApprouver ? `<button class="puce-claire" onclick="statutPreco('${e.id}','transmise')">Remettre à valider</button>` : ""}
-        ${e ? `<button class="puce-claire" onclick="detailPrecoAdmin('${e.id}','${r.societe_id}')">Détail des lignes</button>
-          <button class="puce-claire" style="border-color:#111; font-weight:600" title="Même format que les commandes B2B : une ligne par référence, taille et livraison ; date = cadencement ; critère = campagne + date"
-                  onclick="fichierFastmagPreco('${e.id}','${r.societe_id}')">⬇ Fichier Fastmag</button>` : ""}
         <span class="compte-produits" style="margin:0" id="pa-etat-${r.societe_id}"></span>
       </div>
-      <div id="pa-detail-${r.societe_id}"></div>
     </div>`;
   }).join("");
+}
+
+function rendrePanierAdmin(p, r) {
+  const e = p.envoi;
+  const b = Number(p.pieces) > 0 ? p : null;
+  const [lib, cls] = e ? (LIBELLES_PRECO[e.statut] || [e.statut, ""]) : ["NON TRANSMIS", "alerte"];
+  return `<div class="pa-panier">
+      <span class="nom">« ${echapperHTML(p.nom)} »</span>
+      <span class="badge-c ${cls}">${lib}</span>
+      ${e ? `<span class="cmd-montant" style="font-size:13px">${eur(Number(e.total_net))} HT${Number(e.remise_pct) > 0 ? " net" : ""}</span>` : ""}
+      <span class="meta">
+        ${e ? `Transmission n° <b>${e.numero}</b> le <b>${dateHeure(e.envoye_le)}</b>${e.auteur_email ? " par " + echapperHTML(e.auteur_email) : ""}
+               · <b>${e.pieces}</b> pièces · ${e.references} références${Number(e.remise_pct) > 0 ? ` · remise ${pct(Number(e.remise_pct))} % déduite` : ""}
+               ${e.validee_le ? `· ${e.statut === "refusee" ? "refusée" : "validée"} le ${dateHeure(e.validee_le)}` : ""}
+               ${e.integree_le ? `· intégrée le ${dateHeure(e.integree_le)}` : ""}`
+           : b ? `Brouillon : <b>${b.pieces}</b> pièces · ${b.references} références · ${eur(Number(b.montant))} HT — dernière saisie ${dateHeure(b.maj_le)}, <b>pas encore transmis</b>`
+               : `Panier vide`}
+        ${e && b && Number(b.pieces) !== Number(e.pieces) && !p.verrouille ? `<br><span style="color:#8a6414">Saisie modifiée depuis la transmission (${b.pieces} pièces) — le magasin devra retransmettre.</span>` : ""}
+        ${e && e.par_livraison?.length ? `<br>${e.par_livraison.map(x => `${jourCourt(x.livraison)} : <b>${x.pieces}</b> pièces, ${eur(Number(x.montant))}`).join(" · ")}` : ""}
+        ${e && e.commentaire ? `<br><i>${echapperHTML(e.commentaire)}</i>` : ""}
+      </span>
+      ${e ? `<span class="actions">
+        ${e.statut === "transmise" && peutApprouver ? `<button class="puce-claire" onclick="statutPreco('${e.id}','validee')">✓ Valider</button>
+          <button class="puce-claire" onclick="statutPreco('${e.id}','refusee', true)">Refuser</button>` : ""}
+        ${e.statut === "validee" && peutIntegrer ? `<button class="puce-claire" onclick="statutPreco('${e.id}','integree')">Marquer intégrée Fastmag</button>` : ""}
+        ${(e.statut === "validee" || e.statut === "refusee") && peutApprouver ? `<button class="puce-claire" onclick="statutPreco('${e.id}','transmise')">Remettre à valider</button>` : ""}
+        <button class="puce-claire" onclick="detailPrecoAdmin('${e.id}','${e.id}')">Détail des lignes</button>
+        <button class="puce-claire" style="border-color:#111; font-weight:600" title="Même format que les commandes B2B : une ligne par référence, taille et livraison ; date = cadencement ; critère = campagne + date"
+                onclick="fichierFastmagPreco('${e.id}','${e.id}')">⬇ Fichier Fastmag</button>
+        <span class="compte-produits" style="margin:0" id="pa-etat-${e.id}"></span>
+      </span>
+      <div id="pa-detail-${e.id}" style="flex-basis:100%"></div>` : ""}
+    </div>`;
 }
 
 async function statutPreco(id, statut, demanderMotif = false) {
@@ -5084,11 +5271,11 @@ async function exporterPrecoAdmin() {
   const statuts = prompt("Cumuler quelles transmissions ? (transmise, validee, integree — séparées par des virgules)", "validee,integree");
   if (statuts === null) return;
   const voulus = statuts.split(",").map(x => x.trim()).filter(Boolean);
-  const rangs = PRECO_ADMIN_RANGS.filter(r => r.envoi && voulus.includes(r.envoi.statut));
-  if (!rangs.length) { alert("Aucune transmission dans ces statuts."); return; }
+  const envois = PRECO_ADMIN_RANGS.flatMap(r => (r.paniers || []).map(p => p.envoi)).filter(e => e && voulus.includes(e.statut));
+  if (!envois.length) { alert("Aucune transmission dans ces statuts."); return; }
   const cumul = {};
-  for (const r of rangs) {
-    const lignes = await api("/rest/v1/rpc/precommande_envoi_lignes", { corps: { p_id: r.envoi.id } }).catch(() => []);
+  for (const e0 of envois) {
+    const lignes = await api("/rest/v1/rpc/precommande_envoi_lignes", { corps: { p_id: e0.id } }).catch(() => []);
     for (const l of lignes || []) {
       const k = `${l.reference}|${l.taille}|${l.livraison || ""}`;
       const e = (cumul[k] ??= { reference: l.reference, taille: l.taille, livraison: l.livraison || "", pieces: 0, magasins: 0 });
@@ -5129,8 +5316,8 @@ async function rendreValidationPreco(campagne) {
   let lignes = [], envoi = null, magasins = [];
   try {
     [lignes, envoi, magasins] = await Promise.all([
-      api("/rest/v1/rpc/ma_precommande", { corps: { p_campagne: campagne, p_societe: clientActif?.id ?? null } }),
-      api("/rest/v1/rpc/ma_precommande_envoi", { corps: { p_campagne: campagne, p_societe: clientActif?.id ?? null } }).catch(() => null),
+      api("/rest/v1/rpc/ma_precommande", { corps: { p_campagne: campagne, p_societe: clientActif?.id ?? null, p_panier: PRECO_PANIER_ID } }),
+      api("/rest/v1/rpc/ma_precommande_envoi", { corps: { p_campagne: campagne, p_societe: clientActif?.id ?? null, p_panier: PRECO_PANIER_ID } }).catch(() => null),
       MES_SOCIETES.length > 1 ? api("/rest/v1/rpc/mes_magasins_campagne", { corps: { p_campagne: campagne } }).catch(() => []) : [],
     ]);
   } catch (e) {
@@ -5159,6 +5346,7 @@ async function rendreValidationPreco(campagne) {
   const deadline = PRECO_INFOS?.deadline ? new Date(PRECO_INFOS.deadline).toLocaleDateString("fr-FR") : null;
   const societe = clientActif?.nom ? `${clientActif.id_fastmag ? clientActif.id_fastmag + ") " : ""}${clientActif.nom}` : "votre magasin";
   const verrou = precoVerrouillee(envoi);
+  const pa = panierActif();
 
   vue.innerHTML = `
     <div class="col-tete">
@@ -5171,7 +5359,8 @@ async function rendreValidationPreco(campagne) {
             ${magasins.map(m => `<option value="${m.id}"${m.id === clientActif?.id ? " selected" : ""}>${
               echapperHTML(m.id_fastmag ? m.id_fastmag + ") " : "")}${echapperHTML(m.nom || m.compte)}${m.ville ? " · " + echapperHTML(m.ville) : ""}${
               precoVerrouillee(m.envoi) ? (m.envoi.statut === "integree" ? " — intégrée" : " — validée") : m.envoi ? " — transmise" : m.pieces > 0 ? ` — ${m.pieces} pièces saisies` : " — rien de saisi"}</option>`).join("")}
-          </select></label>` : echapperHTML(societe)}${
+          </select></label>` : echapperHTML(societe)}
+        · ${rendreSelecteurPanierPreco()}${
         deadline ? ` · à transmettre avant le <b>${deadline}</b>` : ""}</div>
     </div>
     <div class="valid-preco">
@@ -5182,7 +5371,7 @@ async function rendreValidationPreco(campagne) {
           <b>${new Date(envoi.envoye_le).toLocaleString("fr-FR", { day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}</b>
           (n° ${envoi.numero} — ${envoi.pieces} pièces, ${eur(Number(envoi.total_net))} HT net)${envoi.statut === "refusee" ? `, puis <b>refusée</b> par Footkorner${envoi.commentaire ? ` : <i>${echapperHTML(envoi.commentaire)}</i>` : ""}` : ""}.
           Vous pouvez la retoucher et la transmettre à nouveau tant qu'elle n'est pas validée par votre commercial : la dernière transmission fait foi.</div>` : ""}
-      ${!lignes.length ? `<div class="valid-info">Aucune quantité enregistrée sur cette campagne. Revenez à la grille,
+      ${!lignes.length ? `<div class="valid-info">Aucune quantité enregistrée dans ce panier. Revenez à la grille,
           saisissez, enregistrez, puis validez.</div>` : `
       <table class="table-valid">
         <thead><tr><th style="text-align:left">Livraison</th><th>Références</th><th>Pièces</th><th>Montant HT</th></tr></thead>
@@ -5209,7 +5398,7 @@ async function rendreValidationPreco(campagne) {
       </div>
       <label class="valid-engagement">
         <input type="checkbox" id="valid-coche" onchange="document.getElementById('valid-bouton').disabled = !this.checked">
-        <span>Je confirme cette précommande <b>ferme</b> pour ${echapperHTML(societe)} —
+        <span>Je confirme cette précommande <b>ferme</b> pour ${echapperHTML(societe)}${pa ? `, panier « ${echapperHTML(pa.nom)} »` : ""} —
           <b>${pieces} pièce${pieces > 1 ? "s" : ""}</b> sur ${refs.size} référence${refs.size > 1 ? "s" : ""},
           <b>${eur(net)} HT${remise > 0 ? " net" : ""}</b>, livrées aux dates ci-dessus — et j'accepte les conditions ci-dessus.</span>
       </label>
@@ -5232,21 +5421,19 @@ async function rendreDupliPreco(campagne, magasins) {
   magasins = magasins || await api("/rest/v1/rpc/mes_magasins_campagne", { corps: { p_campagne: campagne } }).catch(() => []);
   const autres = (magasins || []).filter(m => m.id !== clientActif?.id);
   if (!autres.length) { zone.innerHTML = ""; return; }
-  const etatDe = m => precoVerrouillee(m.envoi)
-    ? `<span class="etat ok">${m.envoi.statut === "integree" ? "intégrée" : "validée"} n° ${m.envoi.numero} · ${m.envoi.pieces} pièces<br><span style="color:var(--encre2)">figée, plus modifiable</span></span>`
-    : m.envoi
-    ? `<span class="etat ok">transmise n° ${m.envoi.numero} · ${m.envoi.pieces} pièces<br><span style="color:var(--encre2)">${dateHeure(m.envoi.envoye_le)}</span></span>`
-    : m.pieces > 0 ? `<span class="etat">déjà ${m.pieces} pièces saisies, pas transmis</span>`
+  const etatDe = m => Number(m.paniers) > 0
+    ? `<span class="etat${Number(m.transmis) > 0 ? " ok" : ""}">${m.paniers} panier${m.paniers > 1 ? "s" : ""} · ${m.pieces} pièces${
+        Number(m.transmis) > 0 ? `<br>${m.transmis} transmis` : "<br>rien de transmis"}</span>`
     : `<span class="etat">rien de saisi</span>`;
   zone.innerHTML = `
     <div class="preco-dupli">
       <h3>Mes autres magasins sur cette campagne</h3>
-      <div class="compte-produits">Reprenez cette précommande telle quelle pour d'autres magasins : mêmes références, mêmes tailles,
-        mêmes quantités et mêmes dates, aux prix de la grille tarifaire de chaque magasin. Si un magasin a déjà une saisie,
-        ces quantités <b>s'y ajoutent</b>, rien n'est écrasé. Chaque magasin reste ensuite à transmettre depuis son propre
-        compte, sauf si vous cochez « transmettre aussitôt ».</div>
+      <div class="compte-produits">Reprenez ce panier tel quel pour d'autres magasins : chacun reçoit un <b>nouveau panier</b>
+        du même nom, avec les mêmes références, tailles, quantités et dates, aux prix de sa grille tarifaire. Ses autres
+        paniers ne bougent pas. Chaque magasin reste ensuite à transmettre depuis son propre compte, sauf si vous cochez
+        « transmettre aussitôt ».</div>
       <div class="liste">${autres.map(m => `<label class="mag">
-          <input type="checkbox" value="${m.id}" data-pieces="${m.pieces || 0}" onchange="majBoutonDupliPreco()"${precoVerrouillee(m.envoi) ? " disabled" : ""}>
+          <input type="checkbox" value="${m.id}" onchange="majBoutonDupliPreco()">
           <b>${echapperHTML(m.id_fastmag ? m.id_fastmag + ") " : "")}${echapperHTML(m.nom || m.compte)}</b>
           <span style="color:var(--encre2)">${echapperHTML(m.ville || "")}</span>
           ${etatDe(m)}
@@ -5283,7 +5470,7 @@ async function dupliquerPreco() {
   bouton.disabled = true; etat.textContent = transmettre ? "duplication et transmission…" : "duplication…";
   try {
     const bilan = await api("/rest/v1/rpc/dupliquer_precommande", { corps: {
-      p_campagne: PRECO_COURANTE, p_source: clientActif?.id ?? null, p_cibles: cibles, p_transmettre: transmettre } });
+      p_campagne: PRECO_COURANTE, p_source: clientActif?.id ?? null, p_cibles: cibles, p_transmettre: transmettre, p_panier: PRECO_PANIER_ID } });
     // la liste se redessine avec les nouveaux états, puis le bilan de ce qui vient d'être fait
     await rendreDupliPreco(PRECO_COURANTE);
     const etat2 = document.getElementById("dupli-etat");
@@ -5291,11 +5478,9 @@ async function dupliquerPreco() {
     const bilanZone = document.getElementById("dupli-bilan");
     if (bilanZone) bilanZone.innerHTML = bilan.map(b => {
       const m = MES_SOCIETES.find(x => x.id === b.societe_id) || {};
-      if (b.verrouillee) return `<div>— <b>${echapperHTML(etiquetteMagasin(m))}</b> : précommande déjà validée par Footkorner, non modifiée</div>`;
-      const ajout = b.ajoutees != null && Number(b.ajoutees) !== Number(b.pieces) ? `${b.ajoutees} pièces ajoutées, ` : "";
-      return `<div>✓ <b>${echapperHTML(etiquetteMagasin(m))}</b> : ${ajout}${b.pieces} pièce${b.pieces > 1 ? "s" : ""} au total sur ${b.references} référence${b.references > 1 ? "s" : ""}${
-        b.envoi ? `, <b>transmise</b> n° ${b.envoi.numero}` : `, en brouillon — à transmettre depuis ce magasin`}
-        ${!b.envoi ? `<button class="puce-claire" style="margin-left:8px" onclick="allerValiderPourMagasin('${b.societe_id}')">Aller valider →</button>` : ""}</div>`;
+      return `<div>✓ <b>${echapperHTML(etiquetteMagasin(m))}</b> : nouveau panier « ${echapperHTML(b.panier || "")} », ${b.pieces} pièce${b.pieces > 1 ? "s" : ""} sur ${b.references} référence${b.references > 1 ? "s" : ""}${
+        b.envoi ? `, <b>transmis</b> n° ${b.envoi.numero}` : `, à transmettre depuis ce magasin`}
+        ${!b.envoi ? `<button class="puce-claire" style="margin-left:8px" onclick="allerValiderPourMagasin('${b.societe_id}', '${b.panier_id}')">Aller valider →</button>` : ""}</div>`;
     }).join("");
   } catch (e) {
     bouton.disabled = false;
@@ -5313,8 +5498,9 @@ async function changerMagasinValidation(societeId) {
 }
 
 // Bascule sur le magasin, puis ouvre sa page de validation de la même campagne.
-async function allerValiderPourMagasin(societeId) {
+async function allerValiderPourMagasin(societeId, panierId) {
   const campagne = PRECO_COURANTE;
+  try { if (panierId) localStorage.setItem(clePanierActif(campagne, societeId), panierId); } catch (e) { /* sans mémoire locale */ }
   await changerSociete(societeId);
   location.hash = `#/preco-validation/${encodeURIComponent(campagne)}`;
 }
@@ -5325,16 +5511,18 @@ async function transmettrePreco() {
   bouton.disabled = true; etat.textContent = "transmission…";
   try {
     const r = await api("/rest/v1/rpc/transmettre_precommande",
-      { corps: { p_campagne: PRECO_COURANTE, p_societe: clientActif?.id ?? null } });
+      { corps: { p_campagne: PRECO_COURANTE, p_societe: clientActif?.id ?? null, p_panier: PRECO_PANIER_ID } });
+    await rafraichirPaniersPreco();
     const vue = document.getElementById("vue-preco-validation");
     vue.querySelector(".valid-preco").innerHTML = `
       <div class="valid-ok">
         <div class="grand">✓</div>
         <h2>Précommande transmise</h2>
-        <p>N° <b>${r.numero}</b> · ${new Date(r.envoye_le).toLocaleString("fr-FR", { day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}
+        <p>${r.panier ? `Panier « ${echapperHTML(r.panier)} » · ` : ""}N° <b>${r.numero}</b> · ${new Date(r.envoye_le).toLocaleString("fr-FR", { day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}
           · <b>${r.pieces} pièces</b> sur ${r.references} références · <b>${eur(Number(r.total_net))} HT${Number(r.remise_pct) > 0 ? " net" : ""}</b></p>
         <p class="sous">${(r.par_livraison || []).map(x => `${jourCourt(x.livraison)} : ${x.pieces} pièces, ${eur(Number(x.montant))}`).join(" · ")}</p>
-        <p class="sous">Vous pouvez encore retoucher la grille et transmettre à nouveau jusqu'à la date limite : la dernière transmission fait foi.</p>
+        <p class="sous">Vous pouvez encore retoucher ce panier et le transmettre à nouveau tant qu'il n'est pas validé par votre commercial : la dernière transmission fait foi.
+          Pour une autre commande, ouvrez un nouveau panier.</p>
         <button class="puce-claire" onclick="location.hash='#/precommande/${encodeURIComponent(PRECO_COURANTE)}'">Retour à la campagne</button>
       </div>
       <div id="preco-dupli"></div>`;
@@ -5513,7 +5701,7 @@ async function enregistrerPanierPreco() {
       etat.textContent = `enregistrement… ${++fait}/${aEnvoyer.length}`;
       const r = await api("/rest/v1/rpc/enregistrer_precommande", { corps: {
         p_campagne: PRECO_COURANTE, p_societe: clientActif?.id ?? null,
-        p_reference: ref, p_lignes: lignes } });
+        p_reference: ref, p_lignes: lignes, p_panier: PRECO_PANIER_ID } });
       pieces += r.pieces || 0;
       for (const l of lignes) {
         const c = cleSaisie(ref, l.taille, l.livraison);
@@ -5542,12 +5730,29 @@ const jourCourt = (d) => d
 const cleSaisie = (ref, taille, livraison) => `${ref}|${taille}|${livraison || ""}`;
 
 async function chargerSaisiePreco(campagne) {
-  const [fenetres, saisie] = await Promise.all([
+  const [fenetres, paniers] = await Promise.all([
     api("/rest/v1/rpc/livraisons_campagne", { corps: { p_campagne: campagne } }).catch(() => []),
-    api("/rest/v1/rpc/ma_precommande",
-      { corps: { p_campagne: campagne, p_societe: clientActif?.id ?? null } }).catch(() => []),
+    api("/rest/v1/rpc/mes_paniers", { corps: { p_campagne: campagne, p_societe: clientActif?.id ?? null } }).catch(() => []),
   ]);
   PRECO_LIVRAISONS = (fenetres || []).map(f => f.livraison);
+  PRECO_PANIERS = paniers || [];
+  if (!PRECO_PANIERS.length) {   // premier passage : un panier par défaut
+    try {
+      PRECO_PANIERS = [await api("/rest/v1/rpc/creer_panier",
+        { corps: { p_campagne: campagne, p_societe: clientActif?.id ?? null, p_nom: "Panier 1" } })];
+    } catch (e) { PRECO_PANIERS = []; }
+  }
+  let memo = null;
+  try { memo = localStorage.getItem(clePanierActif(campagne)); } catch (e) { /* sans mémoire locale */ }
+  PRECO_PANIER_ID = (PRECO_PANIERS.find(p => p.id === memo) || PRECO_PANIERS[0] || {}).id || null;
+  await relireSaisiePanier(campagne);
+}
+
+async function relireSaisiePanier(campagne) {
+  const saisie = PRECO_PANIER_ID
+    ? await api("/rest/v1/rpc/ma_precommande",
+        { corps: { p_campagne: campagne, p_societe: clientActif?.id ?? null, p_panier: PRECO_PANIER_ID } }).catch(() => [])
+    : [];
   PRECO_SAISIE = {};
   for (const l of (saisie || [])) {
     PRECO_SAISIE[cleSaisie(l.reference, l.taille, l.livraison)] = Number(l.quantite) || 0;
