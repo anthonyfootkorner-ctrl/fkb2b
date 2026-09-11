@@ -400,6 +400,18 @@
     background: #fff; border: 1px solid var(--hairline); border-radius: 12px; font-size: 14px; line-height: 1.5; cursor: pointer; }
   .valid-engagement input { width: 22px; height: 22px; flex: none; margin-top: 2px; accent-color: var(--encre); }
   .valid-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  /* Dupliquer la précommande vers les autres magasins du compte */
+  .preco-dupli { margin: 18px 0 0; padding: 18px 20px; background: #fff; border: 1px solid var(--hairline); border-radius: 14px; }
+  .preco-dupli h3 { margin: 0 0 6px; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
+  .preco-dupli .liste { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+  .preco-dupli .mag { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--hairline); border-radius: 10px; cursor: pointer; font-size: 13px; }
+  .preco-dupli .mag:has(input:checked) { border-color: #111; background: #f6f6f4; }
+  .preco-dupli .mag input { width: 16px; height: 16px; accent-color: #111; }
+  .preco-dupli .mag .etat { margin-left: auto; font-size: 12px; color: var(--encre2); text-align: right; }
+  .preco-dupli .mag .etat.ok { color: #2e9e4f; }
+  .preco-dupli .options { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+  .preco-dupli .bilan { margin-top: 12px; font-size: 13px; }
+  .preco-dupli .bilan div { padding: 4px 0; }
   .valid-actions .btn-noir { margin-left: 0; }
   .valid-actions .btn-noir:disabled { opacity: .35; cursor: default; }
   .valid-ok { text-align: center; padding: 40px 20px; background: #fff; border: 1px solid var(--hairline); border-radius: 14px; }
@@ -1483,10 +1495,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789122533"></script>
-<script src="imports.js?v=1789122533"></script>
-<script src="merch-shopify.js?v=1789122533"></script>
-<script src="moteur-merch.js?v=1789122533"></script>
+<script src="config.js?v=1789123084"></script>
+<script src="imports.js?v=1789123084"></script>
+<script src="merch-shopify.js?v=1789123084"></script>
+<script src="moteur-merch.js?v=1789123084"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1777,6 +1789,8 @@ async function changerSociete(id) {
   clientActif = MES_SOCIETES.find(s => s.id === id);
   localStorage.setItem("fkb2b-societe", id);
   majEtiquetteMagasin();
+  // la précommande est propre à chaque magasin : la prochaine page préco relit tout
+  PRECO_COURANTE = null; PRECO_SAISIE = {}; PRECO_PANIER = new Set();
   // recharge le catalogue aux tarifs de la société choisie
   CONNUS.clear();
   const refsPanier = [...new Set([...panier.values()].map(l => l.produit.reference))];
@@ -1952,7 +1966,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789122533";
+    v.src = "hero.mp4?v=1789123084";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -5169,9 +5183,95 @@ async function rendreValidationPreco(campagne) {
       <div class="valid-actions">
         <button class="btn-noir" id="valid-bouton" disabled onclick="transmettrePreco()">TRANSMETTRE LA PRÉCOMMANDE</button>
         <span class="compte-produits" id="valid-etat" style="margin:0"></span>
-      </div>`}
+      </div>
+      <div id="preco-dupli"></div>`}
     </div>`;
   window.scrollTo({ top: 0 });
+  if (lignes.length) rendreDupliPreco(campagne);
+}
+
+/* Un compte qui tient plusieurs magasins saisit une fois, puis reprend la même grille
+   pour les autres. Le serveur recopie la saisie (brouillon cible remplacé, prix de la
+   grille tarifaire de chaque magasin) et, si on le demande, transmet dans la foulée. */
+async function rendreDupliPreco(campagne) {
+  const zone = document.getElementById("preco-dupli");
+  if (!zone || MES_SOCIETES.length < 2) return;
+  const magasins = await api("/rest/v1/rpc/mes_magasins_campagne", { corps: { p_campagne: campagne } }).catch(() => []);
+  const autres = (magasins || []).filter(m => m.id !== clientActif?.id);
+  if (!autres.length) { zone.innerHTML = ""; return; }
+  const etatDe = m => m.envoi
+    ? `<span class="etat ok">transmise n° ${m.envoi.numero} · ${m.envoi.pieces} pièces<br><span style="color:var(--encre2)">${dateHeure(m.envoi.envoye_le)}</span></span>`
+    : m.pieces > 0 ? `<span class="etat">brouillon : ${m.pieces} pièces, pas transmis</span>`
+    : `<span class="etat">rien de saisi</span>`;
+  zone.innerHTML = `
+    <div class="preco-dupli">
+      <h3>Mes autres magasins sur cette campagne</h3>
+      <div class="compte-produits">Reprenez cette précommande telle quelle pour d'autres magasins : mêmes références, mêmes tailles,
+        mêmes quantités et mêmes dates, aux prix de la grille tarifaire de chaque magasin. Leur saisie en cours est remplacée.
+        Chaque magasin reste ensuite à transmettre depuis son propre compte, sauf si vous cochez « transmettre aussitôt ».</div>
+      <div class="liste">${autres.map(m => `<label class="mag">
+          <input type="checkbox" value="${m.id}" data-pieces="${m.pieces || 0}" onchange="majBoutonDupliPreco()">
+          <b>${echapperHTML(m.id_fastmag ? m.id_fastmag + ") " : "")}${echapperHTML(m.nom || m.compte)}</b>
+          <span style="color:var(--encre2)">${echapperHTML(m.ville || "")}</span>
+          ${etatDe(m)}
+        </label>`).join("")}</div>
+      <div class="options">
+        <button class="puce-claire" onclick="document.querySelectorAll('#preco-dupli .mag input').forEach(i => i.checked = true); majBoutonDupliPreco()">Tout cocher</button>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer">
+          <input type="checkbox" id="dupli-transmettre" style="width:16px; height:16px; accent-color:#111">
+          Transmettre aussitôt pour ces magasins — j'accepte les conditions ci-dessus pour chacun d'eux
+        </label>
+      </div>
+      <div class="valid-actions" style="margin-top:12px">
+        <button class="btn-noir" id="dupli-bouton" disabled onclick="dupliquerPreco()">DUPLIQUER</button>
+        <span class="compte-produits" id="dupli-etat" style="margin:0"></span>
+      </div>
+      <div class="bilan" id="dupli-bilan"></div>
+    </div>`;
+}
+
+function majBoutonDupliPreco() {
+  const n = document.querySelectorAll("#preco-dupli .mag input:checked").length;
+  const b = document.getElementById("dupli-bouton");
+  if (!b) return;
+  b.disabled = !n;
+  b.textContent = n ? `DUPLIQUER SUR ${n} MAGASIN${n > 1 ? "S" : ""}` : "DUPLIQUER";
+}
+
+async function dupliquerPreco() {
+  const coches = [...document.querySelectorAll("#preco-dupli .mag input:checked")];
+  const cibles = coches.map(i => i.value);
+  if (!cibles.length) return;
+  const transmettre = document.getElementById("dupli-transmettre")?.checked || false;
+  const ecrases = coches.filter(i => Number(i.dataset.pieces) > 0).length;
+  if (ecrases && !confirm(`${ecrases} magasin${ecrases > 1 ? "s ont" : " a"} déjà une saisie sur cette campagne : elle sera remplacée par celle-ci. Continuer ?`)) return;
+  const bouton = document.getElementById("dupli-bouton"), etat = document.getElementById("dupli-etat");
+  bouton.disabled = true; etat.textContent = transmettre ? "duplication et transmission…" : "duplication…";
+  try {
+    const bilan = await api("/rest/v1/rpc/dupliquer_precommande", { corps: {
+      p_campagne: PRECO_COURANTE, p_source: clientActif?.id ?? null, p_cibles: cibles, p_transmettre: transmettre } });
+    // la liste se redessine avec les nouveaux états, puis le bilan de ce qui vient d'être fait
+    await rendreDupliPreco(PRECO_COURANTE);
+    const etat2 = document.getElementById("dupli-etat");
+    if (etat2) etat2.textContent = `fait ✓ — ${bilan.length} magasin${bilan.length > 1 ? "s" : ""}`;
+    const bilanZone = document.getElementById("dupli-bilan");
+    if (bilanZone) bilanZone.innerHTML = bilan.map(b => {
+      const m = MES_SOCIETES.find(x => x.id === b.societe_id) || {};
+      return `<div>✓ <b>${echapperHTML(etiquetteMagasin(m))}</b> : ${b.pieces} pièce${b.pieces > 1 ? "s" : ""} sur ${b.references} référence${b.references > 1 ? "s" : ""}${
+        b.envoi ? `, <b>transmise</b> n° ${b.envoi.numero}` : `, en brouillon — à transmettre depuis ce magasin`}
+        ${!b.envoi ? `<button class="puce-claire" style="margin-left:8px" onclick="allerValiderPourMagasin('${b.societe_id}')">Aller valider →</button>` : ""}</div>`;
+    }).join("");
+  } catch (e) {
+    bouton.disabled = false;
+    etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 160);
+  }
+}
+
+// Bascule sur le magasin, puis ouvre sa page de validation de la même campagne.
+async function allerValiderPourMagasin(societeId) {
+  const campagne = PRECO_COURANTE;
+  await changerSociete(societeId);
+  location.hash = `#/preco-validation/${encodeURIComponent(campagne)}`;
 }
 
 async function transmettrePreco() {
@@ -5191,7 +5291,9 @@ async function transmettrePreco() {
         <p class="sous">${(r.par_livraison || []).map(x => `${jourCourt(x.livraison)} : ${x.pieces} pièces, ${eur(Number(x.montant))}`).join(" · ")}</p>
         <p class="sous">Vous pouvez encore retoucher la grille et transmettre à nouveau jusqu'à la date limite : la dernière transmission fait foi.</p>
         <button class="puce-claire" onclick="location.hash='#/precommande/${encodeURIComponent(PRECO_COURANTE)}'">Retour à la campagne</button>
-      </div>`;
+      </div>
+      <div id="preco-dupli"></div>`;
+    rendreDupliPreco(PRECO_COURANTE);
   } catch (e) {
     bouton.disabled = false;
     etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 160);
