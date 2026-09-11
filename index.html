@@ -1245,12 +1245,12 @@
       <div class="compte-produits" id="preco-sous-titre"></div>
       <div id="preco-paniers" style="margin-top:10px"></div>
     </div>
-    <div class="preco-vitrine" id="preco-vitrine"></div>
     <div style="padding: 0 22px 12px">
       <input id="preco-recherche" class="preco-recherche" type="search" autocomplete="off" spellcheck="false"
-             placeholder="Rechercher une référence ou un nom — ex. 394053-005, initiator"
+             placeholder="Rechercher dans toute la campagne : référence, nom, club, modèle, couleur — ex. psg, vomero, 394053-005"
              oninput="rechercherPreco(this.value)">
     </div>
+    <div class="preco-vitrine" id="preco-vitrine"></div>
     <div class="col-filtres" id="preco-filtres" style="padding: 0 22px 16px; display:flex; gap:8px; flex-wrap:wrap"></div>
     <div class="grille-col" id="preco-grille" style="margin: 0 22px 60px"></div>
     <div class="preco-barre" id="preco-barre" hidden></div>
@@ -1511,10 +1511,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789132029"></script>
-<script src="imports.js?v=1789132029"></script>
-<script src="merch-shopify.js?v=1789132029"></script>
-<script src="moteur-merch.js?v=1789132029"></script>
+<script src="config.js?v=1789156209"></script>
+<script src="imports.js?v=1789156209"></script>
+<script src="merch-shopify.js?v=1789156209"></script>
+<script src="moteur-merch.js?v=1789156209"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1982,7 +1982,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789132029";
+    v.src = "hero.mp4?v=1789156209";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4324,19 +4324,34 @@ async function rendreCataloguePreco(campagne) {
   rendreGrillePreco();
 }
 
+/* La recherche porte sur toute la campagne, quel que soit le bloc ouvert : référence, nom,
+   collection Fastmag (PSG, CHELSEA, VOMERO…), coloris fournisseur, couleur, catégorie, rayon.
+   Sans accents ni espaces ni tirets ; plusieurs mots = tous doivent se retrouver. */
+const normaliserRecherche = v => String(v || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[\s\-_./]/g, "");
+const SYNONYMES_FAMILLE = { FOOTWEAR: "chaussures baskets sneakers", "TSHIRT ET POLO": "tshirt tee maillot polo jersey",
+  "SWEAT ET HOODY": "sweat hoodie hoody veste", PANTALON: "pantalon jogging pant", SHORT: "short", ACCESSOIRES: "accessoires casquette sac chaussettes",
+  VESTE: "veste jacket", SURVETEMENT: "survetement ensemble tracksuit" };
+function correspondPreco(p, mots) {
+  if (!mots.length) return true;
+  const meule = normaliserRecherche([p.reference, p.designation, p.sous_famille, p.coloris, p.couleur, categorieDe(p), p.rayon, p.famille,
+    SYNONYMES_FAMILLE[(p.famille || "").toUpperCase()] || "", p.marque, p.saison].join(" "));
+  return mots.every(m => meule.includes(m));
+}
+
 function rendreGrillePreco() {
-  const compact = v => String(v || "").toLowerCase().replace(/[\s-]/g, "");
-  const q = compact(PRECO_RECHERCHE);
+  const mots = String(PRECO_RECHERCHE || "").split(/\s+/).map(normaliserRecherche).filter(Boolean);
+  const q = mots.length > 0;
   // l'ordre merch du bloc, à défaut celui de la campagne, à défaut celui du serveur
-  const ctxMerch = contextePreco(PRECO_COURANTE, PRECO_CATEGORIE);
+  const ctxMerch = contextePreco(PRECO_COURANTE, q ? null : PRECO_CATEGORIE);
   const produits = ordonner(PRECO_PRODUITS, ctxMerch).filter(p =>
-    (!PRECO_MARQUE || p.marque === PRECO_MARQUE)
-    && (!PRECO_RAYON || rayonDe(p) === PRECO_RAYON)
-    && (!PRECO_CATEGORIE || categorieDe(p) === PRECO_CATEGORIE)
-    && (!q || compact(p.reference).includes(q) || compact(p.designation).includes(q)));
-  document.getElementById("preco-sous-titre").textContent =
-    `${produits.length} référence${produits.length > 1 ? "s" : ""} proposée${produits.length > 1 ? "s" : ""}`
-    + (PRECO_RAYON || PRECO_CATEGORIE || q ? ` sur ${PRECO_PRODUITS.length}` : "")
+    q ? correspondPreco(p, mots)
+      : (!PRECO_MARQUE || p.marque === PRECO_MARQUE)
+        && (!PRECO_RAYON || rayonDe(p) === PRECO_RAYON)
+        && (!PRECO_CATEGORIE || categorieDe(p) === PRECO_CATEGORIE));
+  document.getElementById("preco-sous-titre").textContent = q
+    ? `${produits.length} résultat${produits.length > 1 ? "s" : ""} pour « ${PRECO_RECHERCHE.trim()} » sur ${PRECO_PRODUITS.length} références`
+    : `${produits.length} référence${produits.length > 1 ? "s" : ""} proposée${produits.length > 1 ? "s" : ""}`
+    + (PRECO_RAYON || PRECO_CATEGORIE ? ` sur ${PRECO_PRODUITS.length}` : "")
     + " · livraison à la date annoncée, ces produits ne sont pas en stock";
   const zonePaniers = document.getElementById("preco-paniers");
   if (zonePaniers) zonePaniers.innerHTML = rendreSelecteurPanierPreco({ actions: true });
@@ -4354,7 +4369,9 @@ function rendreGrillePreco() {
     .sort((a, b) => combien("rayon", b) - combien("rayon", a) || a.localeCompare(b));
   const marques = [...new Set(PRECO_PRODUITS.map(p => p.marque).filter(Boolean))].sort();
   let barre = puce("← Catégories", false, "retourVitrine()");
-  if (rayons.length > 1) {
+  if (q) {
+    barre += `<button class="puce-claire actif" onclick="effacerRecherchePreco()">✕ Effacer la recherche « ${echapperHTML(PRECO_RECHERCHE.trim())} »</button>`;
+  } else if (rayons.length > 1) {
     barre += puce(`Tous les rayons (${PRECO_PRODUITS.length})`, !PRECO_RAYON, "affinerPrecoRayon(null)")
       + rayons.map(r => puce(`${r} (${combien("rayon", r)})`, r === PRECO_RAYON,
                              `affinerPrecoRayon(${arg(r)})`)).join("");
@@ -4366,13 +4383,13 @@ function rendreGrillePreco() {
   const combienCat = v => dansRayon.filter(p => categorieDe(p) === v).length;
   const categories = ordreBlocsPreco(PRECO_COURANTE, [...new Set(dansRayon.map(categorieDe).filter(Boolean))]
     .sort((a, b) => combienCat(b) - combienCat(a) || a.localeCompare(b)));
-  if (categories.length > 1) {
+  if (!q && categories.length > 1) {
     if (barre) barre += `<span style="flex-basis:100%; height:0"></span>`;
     barre += puce(`Toutes les catégories (${dansRayon.length})`, !PRECO_CATEGORIE, "affinerPrecoCategorie(null)")
       + categories.map(c => puce(`${c} (${combienCat(c)})`, c === PRECO_CATEGORIE,
                                  `affinerPrecoCategorie(${arg(c)})`)).join("");
   }
-  if (marques.length > 1) {
+  if (!q && marques.length > 1) {
     if (barre) barre += `<span style="flex-basis:100%; height:0"></span>`;
     barre += puce("Toutes les marques", !PRECO_MARQUE, "affinerPreco(null)")
       + marques.map(m => puce(m, m === PRECO_MARQUE, `affinerPreco(${arg(m)})`)).join("");
@@ -4384,8 +4401,7 @@ function rendreGrillePreco() {
 
   /* Page d'arrivée : les gros blocs seuls, pas de produits en dessous. On ne voit la
      grille qu'après avoir choisi une catégorie (ou toute la campagne). */
-  const enVitrine = PRECO_VUE === "vitrine";
-  document.getElementById("preco-recherche").parentElement.hidden = enVitrine;
+  const enVitrine = PRECO_VUE === "vitrine" && !q;   // une recherche montre toujours ses résultats
   document.getElementById("preco-filtres").hidden = enVitrine;
   document.getElementById("preco-grille").hidden = enVitrine;
   if (enVitrine) {
@@ -4439,7 +4455,7 @@ function rendreVitrinePreco() {
   for (const p of PRECO_PRODUITS) { const c = categorieDe(p); if (c) compte[c] = (compte[c] || 0) + 1; }
   const cats = ordreBlocsPreco(PRECO_COURANTE, Object.keys(compte).sort((a, b) =>
     (a === "Autre") - (b === "Autre") || compte[b] - compte[a] || a.localeCompare(b)));
-  if (cats.length < 2 || PRECO_VUE !== "vitrine") { zone.innerHTML = ""; zone.hidden = true; return; }
+  if (cats.length < 2 || PRECO_VUE !== "vitrine" || String(PRECO_RECHERCHE || "").trim()) { zone.innerHTML = ""; zone.hidden = true; return; }
   zone.hidden = false;
   const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
   // la photo du bloc : le premier produit du bloc dans l'ordre merch
@@ -4487,6 +4503,14 @@ function rechercherPreco(valeur) {   // 483 cartes à redessiner : on laisse fin
   PRECO_RECHERCHE = valeur;
   clearTimeout(rechercheEnAttente);
   rechercheEnAttente = setTimeout(rendreGrillePreco, 120);
+}
+
+function effacerRecherchePreco() {
+  PRECO_RECHERCHE = "";
+  const champ = document.getElementById("preco-recherche");
+  if (champ) champ.value = "";
+  rendreGrillePreco();
+  window.scrollTo({ top: 0 });
 }
 
 /* ---------------- panier de précommande ----------------
