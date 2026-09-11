@@ -278,6 +278,23 @@
   .vitrine-tuile.photo:not(.noir) img.fond { mix-blend-mode: multiply; }
   @media (max-width: 700px) { .preco-vitrine { margin: 0 12px 40px; grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .vitrine-tuile { height: 220px; } }
+  /* Merch préco : l'ordre des blocs de la page d'arrivée, à glisser comme les produits. */
+  .merch-blocs { margin: 0 22px 18px; padding: 14px 16px 16px; background: #fff; border: 1px solid var(--hairline); border-radius: 14px; }
+  .merch-blocs .tete { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .merch-blocs .tete h3 { margin: 0; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
+  .merch-blocs .tete .compte-produits { margin: 0; }
+  .merch-blocs .liste { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+  .bloc-merch { position: relative; flex: 0 0 150px; height: 190px; border-radius: 12px; overflow: hidden; cursor: grab;
+    background: var(--tuile); border: 1px solid var(--hairline); display: flex; flex-direction: column; user-select: none; }
+  .bloc-merch.saisie { opacity: .35; }
+  .bloc-merch img { flex: 1; min-height: 0; width: 100%; object-fit: cover; object-position: center top; display: block; mix-blend-mode: multiply; pointer-events: none; }
+  .bloc-merch .vide { flex: 1; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; padding: 10px; text-align: center; }
+  .bloc-merch .pied { background: #111; color: #fff; padding: 8px 10px; font-size: 12px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .bloc-merch .pied span { opacity: .6; font-size: 11px; }
+  .bloc-merch .rang { position: absolute; top: 8px; left: 8px; background: #111; color: #fff; font-size: 11px; font-weight: 700; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .bloc-merch .fleches { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; }
+  .bloc-merch .fleches button { width: 24px; height: 22px; border: 0; border-radius: 6px; background: rgba(255,255,255,.92); color: #111; font-size: 12px; cursor: pointer; }
+  .bloc-merch .fleches button:hover { background: #111; color: #fff; }
   .preco-recherche { width: min(460px, 100%); background: #fff; border: 1px solid #d8d8d5; border-radius: 10px;
     padding: 11px 14px; font-size: 14px; color: var(--encre); transition: border-color 150ms ease; }
   .preco-recherche:focus { outline: none; border-color: var(--encre); }
@@ -969,6 +986,7 @@
         <a href="#/commandes" id="bo-commandes">Commandes<span id="bo-badge"></span></a>
         <a href="#/precommandes-admin" id="bo-precommandes">Précommandes</a>
         <a href="#/merch" id="bo-merch">Merch B2B</a>
+        <a href="#/merch-preco" id="bo-merch-preco">Merch Préco</a>
         <a href="#/merch-shopify" id="bo-merch-shopify">Merch Shopify</a>
         <a href="#/imports" id="bo-imports">Imports</a>
         <a href="#/utilisateurs" id="bo-utilisateurs">Utilisateurs</a>
@@ -1067,6 +1085,7 @@
         <button class="puce-claire" id="btn-sel-vider">Tout décocher</button>
       </div>
     </div>
+    <div id="merch-blocs" hidden></div>
     <div class="grille-col" id="grille-merch"></div>
   </section>
 
@@ -1449,10 +1468,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789114210"></script>
-<script src="imports.js?v=1789114210"></script>
-<script src="merch-shopify.js?v=1789114210"></script>
-<script src="moteur-merch.js?v=1789114210"></script>
+<script src="config.js?v=1789115470"></script>
+<script src="imports.js?v=1789115470"></script>
+<script src="merch-shopify.js?v=1789115470"></script>
+<script src="moteur-merch.js?v=1789115470"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1564,6 +1583,7 @@ async function init() {
     montrer("bo-tableau", estStaff);
     montrer("bo-commandes", estStaff);
     montrer("bo-merch", estAdmin || estMerch);
+    montrer("bo-merch-preco", estAdmin || estMerch);
     montrer("bo-merch-shopify", estAdmin || estMerch);
     montrer("bo-imports", estAdmin);
     montrer("bo-utilisateurs", estAdmin || MON_ROLE === "admin_commercial");
@@ -1836,6 +1856,9 @@ function router() {
   } else if (route === "merch") {
     document.getElementById("vue-merch").classList.add("active");
     rendreMerch();
+  } else if (route === "merch-preco") {
+    document.getElementById("vue-merch").classList.add("active");
+    rendreMerchPreco(args.length ? decodeURIComponent(args.join("/")) : null);
   } else if (route === "precommandes") {
     document.getElementById("vue-precommandes").classList.add("active");
     rendreCampagnesClient();
@@ -1914,7 +1937,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789114210";
+    v.src = "hero.mp4?v=1789115470";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -2389,6 +2412,16 @@ const MERCH_PRECO = {};       // campagne -> produits (chargés à la demande)
 const estContextePreco = ctx => typeof ctx === "string" && ctx.startsWith("PRECO:");
 const campagneDuContexte = ctx => ctx.split("|")[0].slice("PRECO:".length);
 const contextePreco = (campagne, bloc) => `PRECO:${campagne}` + (bloc ? `|BLOC:${bloc}` : "");
+/* L'ordre des blocs de la page d'arrivée (Footwear, Running, Jordan…) vit dans la même
+   table que les produits, sous « PRECO:<campagne>|BLOCS », la référence étant le nom du
+   bloc. Les blocs non rangés suivent, dans l'ordre automatique (les plus fournis d'abord). */
+const contexteBlocs = campagne => `PRECO:${campagne}|BLOCS`;
+function ordreBlocsPreco(campagne, blocs) {
+  const rangs = MERCH[contexteBlocs(campagne)];
+  if (!rangs) return blocs;
+  const rang = b => rangs[b] ?? 1e9;
+  return blocs.map((b, i) => [b, i]).sort((x, y) => rang(x[0]) - rang(y[0]) || x[1] - y[1]).map(x => x[0]);
+}
 
 function contexteMerch() {
   const principal = document.getElementById("merch-contexte").value;
@@ -2439,8 +2472,8 @@ function remplirAffinageMerch() {
     return;
   }
   if (estContextePreco(principal)) {
-    const blocs = [...new Set(produitsDuContexte(principal).map(categorieDe).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b));
+    const blocs = ordreBlocsPreco(campagneDuContexte(principal),
+      [...new Set(produitsDuContexte(principal).map(categorieDe).filter(Boolean))].sort((a, b) => a.localeCompare(b)));
     aff.disabled = false;
     aff.innerHTML = `<option value="">Toute la campagne</option>`
       + blocs.map(b => `<option value="BLOC:${echapperHTML(b)}">${echapperHTML(b)}</option>`).join("");
@@ -2453,6 +2486,130 @@ function remplirAffinageMerch() {
   aff.disabled = false;
   aff.innerHTML = `<option value="">${type === "MARQUE" ? "Toutes les catégories" : "Toutes les marques"}</option>`
     + valeurs.map(v => `<option value="${prefixe}${echapperHTML(v)}">${echapperHTML(v)}</option>`).join("");
+}
+
+// « Merch Préco » du menu : la page merch, ouverte directement sur une campagne.
+async function rendreMerchPreco(campagne) {
+  const sel = document.getElementById("merch-contexte");
+  if (!sel.options.length) await rendreMerch();      // construit le sélecteur (et charge les ventes)
+  const cible = campagne ? contextePreco(campagne)
+    : estContextePreco(sel.value) ? sel.value
+    : MERCH_CAMPAGNES?.length ? contextePreco(MERCH_CAMPAGNES[0]) : null;
+  if (!cible) {
+    document.getElementById("merch-etat").textContent = "aucune campagne de précommande ouverte";
+    return;
+  }
+  if (sel.value !== cible) { sel.value = cible; document.getElementById("merch-affinage").value = ""; }
+  await rendreMerch();
+}
+
+/* Le bandeau des blocs : visible quand on range toute une campagne. Chaque bloc se
+   glisse ou se pousse d'une flèche ; l'enregistrement est distinct de celui des produits. */
+function rendreBlocsMerch() {
+  const zone = document.getElementById("merch-blocs");
+  if (!zone) return;
+  const principal = document.getElementById("merch-contexte").value;
+  const affinage = document.getElementById("merch-affinage").value;
+  if (!estContextePreco(principal) || affinage) { zone.hidden = true; zone.innerHTML = ""; return; }
+  const campagne = campagneDuContexte(principal);
+  const produits = produitsDuContexte(principal);
+  const compte = {};
+  for (const p of produits) { const c = categorieDe(p); if (c) compte[c] = (compte[c] || 0) + 1; }
+  const blocs = ordreBlocsPreco(campagne, Object.keys(compte).sort((a, b) =>
+    (a === "Autre") - (b === "Autre") || compte[b] - compte[a] || a.localeCompare(b)));
+  if (blocs.length < 2) { zone.hidden = true; zone.innerHTML = ""; return; }
+  const photoDe = c => (ordonner(produits, contextePreco(campagne, c)).find(p => categorieDe(p) === c && p.photo) || {}).photo;
+  const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
+  zone.hidden = false;
+  zone.className = "merch-blocs";
+  zone.innerHTML = `
+    <div class="tete">
+      <h3>Blocs de la page d'arrivée</h3>
+      <span class="compte-produits">Glissez les blocs, ou poussez-les d'une flèche : c'est l'ordre que le magasin voit en ouvrant la campagne. Cliquez un bloc pour ranger ses produits.</span>
+      <button class="btn-noir" onclick="enregistrerBlocsMerch()">ENREGISTRER L'ORDRE DES BLOCS</button>
+      <button class="puce-claire" onclick="effacerBlocsMerch()">Ordre automatique</button>
+      <span class="compte-produits" id="merch-blocs-etat">${MERCH[contexteBlocs(campagne)] ? "ordre personnalisé chargé" : "ordre automatique (les plus fournis d'abord)"}</span>
+    </div>
+    <div class="liste">${blocs.map((b, i) => {
+      const ph = photoDe(b);
+      return `<div class="bloc-merch" draggable="true" data-bloc="${echapperHTML(b)}" ondblclick="ouvrirBlocMerch(${arg(b)})">
+        <div class="rang">${i + 1}</div>
+        <div class="fleches"><button type="button" title="Avancer" onclick="pousserBlocMerch(${arg(b)}, -1)">◀</button><button type="button" title="Reculer" onclick="pousserBlocMerch(${arg(b)}, 1)">▶</button></div>
+        ${ph ? `<img loading="lazy" src="${ph}" alt="" draggable="false">` : `<div class="vide">${echapperHTML(b)}</div>`}
+        <div class="pied" onclick="ouvrirBlocMerch(${arg(b)})" title="Ranger les produits de ce bloc" style="cursor:pointer">${echapperHTML(b)} <span>${compte[b]}</span></div>
+      </div>`; }).join("")}</div>`;
+  const liste = zone.querySelector(".liste");
+  let saisie = null;
+  liste.querySelectorAll(".bloc-merch").forEach(t => {
+    t.addEventListener("dragstart", () => { saisie = t; requestAnimationFrame(() => t.classList.add("saisie")); });
+    t.addEventListener("dragend", () => { t.classList.remove("saisie"); saisie = null; renumeroterBlocsMerch(); });
+    t.addEventListener("dragover", e => {
+      e.preventDefault();
+      if (!saisie || saisie === t) return;
+      const r = t.getBoundingClientRect();
+      liste.insertBefore(saisie, (e.clientX - r.left) < r.width / 2 ? t : t.nextSibling);
+    });
+  });
+  liste.addEventListener("dragover", e => e.preventDefault());
+}
+
+function renumeroterBlocsMerch() {
+  const zone = document.getElementById("merch-blocs");
+  zone.querySelectorAll(".bloc-merch").forEach((t, i) => t.querySelector(".rang").textContent = i + 1);
+  document.getElementById("merch-blocs-etat").textContent = "ordre des blocs non enregistré";
+  travailNonEnregistre = true;
+}
+
+function pousserBlocMerch(bloc, sens) {
+  const liste = document.querySelector("#merch-blocs .liste");
+  const t = liste.querySelector(`.bloc-merch[data-bloc="${CSS.escape(bloc)}"]`);
+  if (!t) return;
+  if (sens < 0 && t.previousElementSibling) liste.insertBefore(t, t.previousElementSibling);
+  if (sens > 0 && t.nextElementSibling) liste.insertBefore(t.nextElementSibling, t);
+  renumeroterBlocsMerch();
+}
+
+function ouvrirBlocMerch(bloc) {
+  const aff = document.getElementById("merch-affinage");
+  aff.value = "BLOC:" + bloc;
+  if (aff.value !== "BLOC:" + bloc) return;
+  rendreMerch();
+}
+
+async function enregistrerBlocsMerch() {
+  const etat = document.getElementById("merch-blocs-etat");
+  const campagne = campagneDuContexte(document.getElementById("merch-contexte").value);
+  const ctx = contexteBlocs(campagne);
+  const positions = [...document.querySelectorAll("#merch-blocs .bloc-merch")]
+    .map((t, i) => ({ contexte: ctx, reference: t.dataset.bloc, position: i + 1 }));
+  etat.textContent = "enregistrement…";
+  try {
+    await api(`/rest/v1/merch_positions?contexte=eq.${encodeURIComponent(ctx)}`, { methode: "DELETE" });
+    await api("/rest/v1/merch_positions", { corps: positions });
+    await chargerMerch();
+    travailNonEnregistre = false;
+    etat.textContent = `ordre des blocs enregistré ✓ (${positions.length} blocs)`;
+    document.getElementById("merch-affinage").dataset.pour = "";   // l'affinage suit le nouvel ordre
+    remplirAffinageMerch();
+  } catch (e) {
+    etat.textContent = "échec : " + (e.donnees?.message || e.message);
+  }
+}
+
+async function effacerBlocsMerch() {
+  const etat = document.getElementById("merch-blocs-etat");
+  const campagne = campagneDuContexte(document.getElementById("merch-contexte").value);
+  const ctx = contexteBlocs(campagne);
+  etat.textContent = "suppression…";
+  try {
+    await api(`/rest/v1/merch_positions?contexte=eq.${encodeURIComponent(ctx)}`, { methode: "DELETE" });
+    await chargerMerch();
+    document.getElementById("merch-affinage").dataset.pour = "";
+    remplirAffinageMerch();
+    rendreBlocsMerch();
+  } catch (e) {
+    etat.textContent = "échec : " + (e.donnees?.message || e.message);
+  }
 }
 
 async function rendreMerch() {
@@ -2555,6 +2712,7 @@ async function rendreMerch() {
     MERCH[ctx] ? "ordre personnalisé chargé"
     : estContextePreco(ctx) ? (cascadeMerch(ctx).some(c => MERCH[c]) ? "ordre hérité de la campagne" : "ordre automatique (photo, puis référence)")
     : "ordre automatique (stock)";
+  rendreBlocsMerch();
 
   let saisie = null;
   grille.querySelectorAll(".carte").forEach(c => {
@@ -4159,8 +4317,8 @@ function rendreGrillePreco() {
      de collections. Les compteurs suivent le rayon choisi. */
   const dansRayon = PRECO_PRODUITS.filter(p => !PRECO_RAYON || rayonDe(p) === PRECO_RAYON);
   const combienCat = v => dansRayon.filter(p => categorieDe(p) === v).length;
-  const categories = [...new Set(dansRayon.map(categorieDe).filter(Boolean))]
-    .sort((a, b) => combienCat(b) - combienCat(a) || a.localeCompare(b));
+  const categories = ordreBlocsPreco(PRECO_COURANTE, [...new Set(dansRayon.map(categorieDe).filter(Boolean))]
+    .sort((a, b) => combienCat(b) - combienCat(a) || a.localeCompare(b)));
   if (categories.length > 1) {
     if (barre) barre += `<span style="flex-basis:100%; height:0"></span>`;
     barre += puce(`Toutes les catégories (${dansRayon.length})`, !PRECO_CATEGORIE, "affinerPrecoCategorie(null)")
@@ -4232,8 +4390,8 @@ function rendreVitrinePreco() {
   if (!zone) return;
   const compte = {};
   for (const p of PRECO_PRODUITS) { const c = categorieDe(p); if (c) compte[c] = (compte[c] || 0) + 1; }
-  const cats = Object.keys(compte).sort((a, b) =>
-    (a === "Autre") - (b === "Autre") || compte[b] - compte[a] || a.localeCompare(b));
+  const cats = ordreBlocsPreco(PRECO_COURANTE, Object.keys(compte).sort((a, b) =>
+    (a === "Autre") - (b === "Autre") || compte[b] - compte[a] || a.localeCompare(b)));
   if (cats.length < 2 || PRECO_VUE !== "vitrine") { zone.innerHTML = ""; zone.hidden = true; return; }
   zone.hidden = false;
   const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
@@ -4597,6 +4755,7 @@ async function rendrePrecommandesAdmin(campagne) {
         <span class="compte-produits" style="margin:0">${info.deadline ? `date limite ${new Date(info.deadline).toLocaleDateString("fr-FR")}` : "sans date limite"}
           · ${info.references || 0} références</span>
         <button class="puce-claire" onclick="exporterPrecoAdmin()">Exporter le cumul (CSV)</button>
+        <button class="puce-claire" onclick="location.hash='#/merch-preco/'+encodeURIComponent(PRECO_ADMIN_CAMPAGNE)">Merch de la campagne →</button>
       </div>
     </div>
     <div class="bloc-clair" style="margin: 0 22px 18px"><div class="recap-chiffres" id="pa-chiffres"></div></div>
