@@ -1483,10 +1483,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789122222"></script>
-<script src="imports.js?v=1789122222"></script>
-<script src="merch-shopify.js?v=1789122222"></script>
-<script src="moteur-merch.js?v=1789122222"></script>
+<script src="config.js?v=1789122533"></script>
+<script src="imports.js?v=1789122533"></script>
+<script src="merch-shopify.js?v=1789122533"></script>
+<script src="moteur-merch.js?v=1789122533"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1952,7 +1952,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789122222";
+    v.src = "hero.mp4?v=1789122533";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4802,13 +4802,22 @@ async function rendreAccesPrecoAdmin() {
   PRECO_ADMIN_ACCES = { societes: liste, budgets, initial: ouverts };
   const groupes = [["SUCC", "Succursales"], ["FRANCHISE", "Franchises"], ["AUTRES", "Autres enseignes ouvertes"]];
   const dans = g => liste.filter(x => g === "AUTRES" ? !duReseau(x) : reseauDe(x) === g);
+  /* Fastmag nomme certains magasins « FOOTKORNER » tout court (Valvert, Marseille Plan-de-
+     Campagne…) : on montre alors le code compte, seul repère parlant. Tri par nom affiché. */
+  const generique = x => /^(FOOT ?KORNER|FK)?$/i.test((x.nom || "").trim()) || (x.nom || "").trim().toUpperCase() === x.compte;
+  const nomDe = x => generique(x) ? x.compte.replace(/^FK(?=[A-Z])/, "FK ") : x.nom;
+  liste.sort((a, b) => nomDe(a).localeCompare(nomDe(b), "fr"));
   const pastille = x => `<span class="pa-mag${ouverts.has(x.compte) ? " ouvert" : ""}" data-compte="${echapperHTML(x.compte)}"
-      data-reseau="${echapperHTML(reseauDe(x))}"${estAdmin ? ` onclick="basculerMagasinPreco(this)" title="${ouverts.has(x.compte) ? "ouvert — cliquer pour fermer" : "fermé — cliquer pour ouvrir"}"` : ` style="cursor:default" title="${ouverts.has(x.compte) ? "ouvert" : "fermé"}"`}>
-      <b>${echapperHTML(x.id_fastmag ? x.id_fastmag + ") " : "")}${echapperHTML(x.nom || x.compte)}</b>${x.ville ? `<span class="fin">${echapperHTML(x.ville)}</span>` : ""}</span>`;
+      data-reseau="${echapperHTML(reseauDe(x))}" data-cle="${echapperHTML([x.id_fastmag, x.nom, x.ville, x.compte].filter(Boolean).join(" ").toLowerCase())}"${estAdmin ? ` onclick="basculerMagasinPreco(this)" title="${ouverts.has(x.compte) ? "ouvert — cliquer pour fermer" : "fermé — cliquer pour ouvrir"}"` : ` style="cursor:default" title="${ouverts.has(x.compte) ? "ouvert" : "fermé"}"`}>
+      <b>${echapperHTML(x.id_fastmag ? x.id_fastmag + ") " : "")}${echapperHTML(nomDe(x))}</b>${x.ville ? `<span class="fin">${echapperHTML(x.ville)}</span>` : ""}${
+        generique(x) && x.nom ? `<span class="fin">(${echapperHTML(x.nom)})</span>` : ""}</span>`;
   zone.innerHTML = `
     <div class="tete">
       <h3 class="titre-bloc" style="margin:0">Magasins ouverts à la campagne</h3>
       <span class="compte-produits" id="pa-acces-resume"></span>
+      <input class="qte-claire" id="pa-acces-recherche" style="width:300px; text-align:left; margin-left:auto"
+             placeholder="${estAdmin ? "taper un nom pour ajouter, puis Entrée" : "chercher un magasin…"}"
+             oninput="filtrerMagasinsPreco(this.value)" onkeydown="if (event.key === 'Enter') { event.preventDefault(); ouvrirMagasinPrecoRecherche(); } if (event.key === 'Escape') { this.value = ''; filtrerMagasinsPreco(''); }">
       <span style="flex-basis:100%; height:0"></span>
       ${estAdmin ? `<span class="compte-produits" style="margin:0">Cliquez un magasin pour l'ouvrir ou le fermer, puis enregistrez.</span>
       <button class="puce-claire" onclick="cocherMagasinsPreco('RESEAU', true)">Ouvrir tout le réseau · ${liste.filter(duReseau).length}</button>
@@ -4846,6 +4855,25 @@ function majResumeAccesPreco() {
   });
   const btn = document.getElementById("pa-acces-sauver");
   if (btn) btn.style.opacity = modifs.length ? "1" : ".45";
+}
+
+function filtrerMagasinsPreco(valeur) {
+  const q = (valeur || "").trim().toLowerCase();
+  document.querySelectorAll("#pa-acces .pa-mag").forEach(p => p.hidden = !!q && !p.dataset.cle.includes(q));
+  document.querySelectorAll("#pa-acces .groupe").forEach(g => g.hidden = !!q && ![...g.querySelectorAll(".pa-mag")].some(p => !p.hidden));
+}
+
+// Entrée dans la recherche : le premier magasin affiché s'ouvre, le champ se vide.
+function ouvrirMagasinPrecoRecherche() {
+  const champ = document.getElementById("pa-acces-recherche");
+  const visibles = [...document.querySelectorAll("#pa-acces .pa-mag")].filter(p => !p.hidden);
+  if (!champ.value.trim() || !visibles.length) return;
+  const cible = visibles.find(p => !p.classList.contains("ouvert")) || visibles[0];
+  if (!cible.classList.contains("ouvert") && estAdmin) basculerMagasinPreco(cible);
+  champ.value = "";
+  filtrerMagasinsPreco("");
+  cible.scrollIntoView({ block: "center", behavior: "smooth" });
+  cible.animate([{ transform: "scale(1.15)" }, { transform: "scale(1)" }], { duration: 400, easing: "ease-out" });
 }
 
 function basculerMagasinPreco(el) {
