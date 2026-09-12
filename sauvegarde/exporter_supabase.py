@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """Sauvegarde FKB2B : exporte les tables « travail humain » de Supabase en JSON.
 
-Usage : SUPABASE_URL=https://xxx.supabase.co SUPABASE_SERVICE_KEY=... python3 exporter_supabase.py DOSSIER
+Usage : SUPABASE_URL=https://xxx.supabase.co python3 exporter_supabase.py DOSSIER
 Écrit DOSSIER/<table>.json (une ligne JSON par enregistrement) et DOSSIER/RESUME.md.
+La clé service_role n'est PAS lue par le script : dans l'environnement cloud Claude Code, un
+« identifiant API » ajoute lui-même les en-têtes `apikey` et `Authorization` aux requêtes vers
+l'hôte Supabase (le script ne voit jamais la clé). En local, SUPABASE_SERVICE_KEY peut être
+fournie et les en-têtes sont alors envoyés par le script. Les appels passent par curl, qui
+respecte le proxy et le certificat de l'environnement.
 Les tables ré-importables depuis Fastmag ou Shopify (variantes, tarifs, stocks, photos, ventes)
 ne sont pas prises : elles se reconstruisent par un dépôt dans le Centre d'import.
 """
-import json, os, sys, urllib.request, urllib.error, datetime
+import json, os, sys, subprocess, datetime
 
 TABLES = [
     "societes", "profils", "acces_societes", "adresses",
@@ -17,11 +22,21 @@ TABLES = [
 ]
 PAGE = 1000
 
+def lire_page(url, cle, table, debut):
+    entetes = ["-H", "Range-Unit: items", "-H", f"Range: {debut}-{debut + PAGE - 1}", "-H", "Prefer: count=exact"]
+    if cle:
+        entetes += ["-H", f"apikey: {cle}", "-H", f"Authorization: Bearer {cle}"]
+    r = subprocess.run(["curl", "-sS", "--fail-with-body", "--max-time", "120", *entetes, f"{url}/rest/v1/{table}?select=*"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError((r.stdout or r.stderr).strip()[:300] or f"curl code {r.returncode}")
+    return json.loads(r.stdout)
+
 def main():
     url = os.environ.get("SUPABASE_URL", "").rstrip("/")
-    cle = os.environ.get("SUPABASE_SERVICE_KEY", "")
-    if not url or not cle:
-        print("ERREUR : SUPABASE_URL et SUPABASE_SERVICE_KEY doivent être définis dans l'environnement.", file=sys.stderr)
+    cle = os.environ.get("SUPABASE_SERVICE_KEY", "")   # facultative : absente dans le cloud (proxy d'identifiants)
+    if not url:
+        print("ERREUR : SUPABASE_URL doit être définie dans l'environnement.", file=sys.stderr)
         sys.exit(2)
     dossier = sys.argv[1] if len(sys.argv) > 1 else "."
     os.makedirs(dossier, exist_ok=True)
@@ -31,22 +46,14 @@ def main():
         lignes, debut = [], 0
         try:
             while True:
-                req = urllib.request.Request(f"{url}/rest/v1/{table}?select=*", headers={
-                    "apikey": cle, "Authorization": f"Bearer {cle}",
-                    "Range-Unit": "items", "Range": f"{debut}-{debut + PAGE - 1}", "Prefer": "count=exact"})
-                with urllib.request.urlopen(req, timeout=120) as rep:
-                    page = json.loads(rep.read().decode("utf-8"))
+                page = lire_page(url, cle, table, debut)
+                if not isinstance(page, list):
+                    raise RuntimeError(f"réponse inattendue : {str(page)[:200]}")
                 lignes.extend(page)
                 if len(page) < PAGE:
                     break
                 debut += PAGE
-        except urllib.error.HTTPError as e:
-            corps = e.read().decode("utf-8", "replace")[:200]
-            print(f"ERREUR {table} : HTTP {e.code} {corps}", file=sys.stderr)
-            resume.append(f"| {table} | ERREUR HTTP {e.code} |")
-            erreurs += 1
-            continue
-        except Exception as e:  # réseau, JSON…
+        except Exception as e:  # HTTP, réseau, JSON…
             print(f"ERREUR {table} : {e}", file=sys.stderr)
             resume.append(f"| {table} | ERREUR {type(e).__name__} |")
             erreurs += 1
