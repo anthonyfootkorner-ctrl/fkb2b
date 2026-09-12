@@ -370,6 +370,57 @@
   .pa-mag.modif { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #d9a441; }
   .pa-mag b { font-weight: 600; }
   .pa-mag .fin { opacity: .65; }
+  /* Tableau de bord précommandes : cartes, tableaux à barres, matrice, colonnes de tailles. */
+  .tb-perimetre { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  .tb-sep { width: 1px; height: 18px; background: var(--hairline); margin: 0 4px; }
+  .puce-claire.tb-chip.on { background: #111; color: #fff; border-color: #111; }
+  .tb-bloc { margin-bottom: 18px; }
+  .tb-bloc .recap-chiffres { padding-bottom: 12px; }
+  .tb-bloc .recap-chiffre i { display: block; font-style: normal; font-size: 11px; color: var(--encre2); margin-top: 2px; }
+  .tb-grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 18px; margin-bottom: 18px; }
+  .tb-grille .tb-bloc { margin-bottom: 0; min-width: 0; }
+  .tb-tete { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .tb-reseau { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tb-entonnoir { display: grid; gap: 6px; margin-top: 4px; max-width: 640px; }
+  .tb-etape { display: grid; grid-template-columns: 130px 1fr 60px 50px; gap: 10px; align-items: center; font-size: 12.5px; }
+  .tb-etape .lib { color: var(--encre2); }
+  .tb-etape .barre { display: block; height: 10px; background: #ecebe8; border-radius: 999px; overflow: hidden; }
+  .tb-etape .barre i { display: block; height: 100%; background: #111; border-radius: 999px; }
+  .tb-etape b { text-align: right; }
+  .tb-etape .part { color: var(--encre2); font-size: 11px; text-align: right; }
+  .tb-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background: #fff; border: 1px solid var(--hairline); border-radius: 10px; overflow: hidden; }
+  .tb-table th { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--encre2); padding: 8px 10px; background: #f7f6f4; text-align: left; white-space: nowrap; }
+  .tb-table th.num { text-align: right; }
+  .tb-table td { padding: 7px 10px; border-top: 1px solid #f2f0ed; vertical-align: middle; }
+  .tb-table td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tb-table td.num small { display: block; font-size: 10.5px; color: var(--encre2); }
+  .tb-table td.lib { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tb-table td.lib .sous, .tb-table td.sous { color: var(--encre2); font-size: 11.5px; white-space: normal; }
+  .tb-table td.rang { color: var(--encre2); font-size: 11px; width: 24px; }
+  .tb-table td.barre { min-width: 150px; }
+  .tb-table td.barre span { display: inline-block; width: calc(100% - 52px); height: 9px; background: #ecebe8; border-radius: 999px; overflow: hidden; vertical-align: middle; }
+  .tb-table td.barre span i { display: block; height: 100%; background: #111; border-radius: 999px; }
+  .tb-table td.barre em { display: inline-block; width: 46px; margin-left: 6px; font-style: normal; font-size: 11px; color: var(--encre2); text-align: right; vertical-align: middle; font-variant-numeric: tabular-nums; }
+  .tb-table tr.tb-total td { border-top: 2px solid #111; background: #fbfbfa; }
+  .tb-table tr.tb-reste td { text-align: center; background: #fbfbfa; }
+  .tb-matrice td.cell small { display: block; font-size: 10px; opacity: .75; }
+  .tb-tops td.photo { width: 44px; }
+  .tb-tops td.photo img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; background: var(--tuile); display: block; }
+  .tb-tops td.tailles { white-space: nowrap; }
+  .tb-tops td.tailles span { display: inline-block; margin: 1px 3px 1px 0; padding: 2px 6px; border-radius: 6px; background: #f2f2f0; font-size: 10.5px; color: var(--encre2); }
+  .tb-tops td.tailles span b { color: var(--encre); margin-left: 3px; }
+  .tb-tops td.tailles span.top { background: #111; color: #ddd; }
+  .tb-tops td.tailles span.top b { color: #fff; }
+  .tb-tailles { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+  .tb-tailles-bloc .titre { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--encre2); margin-bottom: 8px; }
+  .tb-cols { display: flex; align-items: flex-end; gap: 4px; height: 110px; border-bottom: 1px solid var(--hairline); padding-bottom: 20px; position: relative; overflow-x: auto; }
+  .tb-col { flex: 1; min-width: 26px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; position: relative; }
+  .tb-col i { display: block; width: 100%; max-width: 34px; background: #111; border-radius: 4px 4px 0 0; }
+  .tb-col small { font-size: 9.5px; color: var(--encre2); margin-bottom: 2px; }
+  .tb-col span { position: absolute; top: 100%; margin-top: 4px; font-size: 9px; color: var(--encre2); white-space: nowrap; }
+  .tb-dormantes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tb-dormantes .pa-mag::before { display: none; }
+  .tb-dormantes .pa-mag img { width: 22px; height: 22px; object-fit: cover; border-radius: 4px; }
   .table-detail-preco { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12.5px; background: #fff;
     border: 1px solid var(--hairline); border-radius: 10px; overflow: hidden; }
   .table-detail-preco th { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--encre2);
@@ -1027,6 +1078,7 @@
         <a href="#/backoffice" id="bo-tableau">Tableau de bord</a>
         <a href="#/commandes" id="bo-commandes">Commandes<span id="bo-badge"></span></a>
         <a href="#/precommandes-admin" id="bo-precommandes">Précommandes</a>
+        <a href="#/tableau-bord-preco" id="bo-tableau-preco">Dashboard Préco</a>
         <a href="#/merch" id="bo-merch">Merch B2B</a>
         <a href="#/merch-preco" id="bo-merch-preco">Merch Préco</a>
         <a href="#/merch-shopify" id="bo-merch-shopify">Merch Shopify</a>
@@ -1260,6 +1312,7 @@
   <section class="vue page-claire" id="vue-preco-panier"></section>
   <section class="vue page-claire" id="vue-preco-validation"></section>
   <section class="vue page-claire" id="vue-precommandes-admin"></section>
+  <section class="vue page-claire" id="vue-tableau-bord-preco"></section>
 
   <section class="vue page-claire" id="vue-calendrier">
     <div class="col-tete">
@@ -1511,10 +1564,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789216462"></script>
-<script src="imports.js?v=1789216462"></script>
-<script src="merch-shopify.js?v=1789216462"></script>
-<script src="moteur-merch.js?v=1789216462"></script>
+<script src="config.js?v=1789234446"></script>
+<script src="imports.js?v=1789234446"></script>
+<script src="merch-shopify.js?v=1789234446"></script>
+<script src="moteur-merch.js?v=1789234446"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1625,6 +1678,7 @@ async function init() {
     const montrer = (id, oui) => document.getElementById(id).style.display = oui ? "" : "none";
     montrer("bo-tableau", estStaff);
     montrer("bo-commandes", estStaff);
+    montrer("bo-tableau-preco", estStaff);
     montrer("bo-merch", estAdmin || estMerch);
     montrer("bo-merch-preco", estAdmin || estMerch);
     montrer("bo-merch-shopify", estAdmin || estMerch);
@@ -1913,6 +1967,9 @@ function router() {
   } else if (route === "precommandes-admin") {
     document.getElementById("vue-precommandes-admin").classList.add("active");
     rendrePrecommandesAdmin(decodeURIComponent(args.join("/")));
+  } else if (route === "tableau-bord-preco") {
+    document.getElementById("vue-tableau-bord-preco").classList.add("active");
+    rendreTableauBordPreco(decodeURIComponent(args.join("/")));
   } else if (route === "preco-validation") {
     document.getElementById("vue-preco-validation").classList.add("active");
     rendreValidationPreco(decodeURIComponent(args.join("/")));
@@ -1982,7 +2039,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789216462";
+    v.src = "hero.mp4?v=1789234446";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4993,6 +5050,7 @@ async function rendrePrecommandesAdmin(campagne) {
         <button class="puce-claire" onclick="exporterPrecoAdmin()">Exporter le cumul (CSV)</button>
         <button class="puce-claire" onclick="excelPrecoReseau()" title="Toutes les transmissions de la campagne : cumul réseau, récap par magasin, et un bon de commande par magasin et panier">⬇ Excel réseau</button>
         <button class="puce-claire" onclick="location.hash='#/merch-preco/'+encodeURIComponent(PRECO_ADMIN_CAMPAGNE)">Merch de la campagne →</button>
+        <button class="puce-claire forte" onclick="location.hash='#/tableau-bord-preco/'+encodeURIComponent(PRECO_ADMIN_CAMPAGNE)">📊 Tableau de bord →</button>
       </div>
     </div>
     <div class="bloc-clair" style="margin: 0 22px 18px"><div class="recap-chiffres" id="pa-chiffres"></div></div>
@@ -5992,6 +6050,337 @@ async function excelPrecoReseau() {
     feuilles.push(f);
   }
   telechargerXlsx(`PRECO_${String(PRECO_ADMIN_CAMPAGNE).replace(/[^\w-]+/g, "_")}_RESEAU_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`, feuilles);
+}
+
+
+/* ---------------- tableau de bord des précommandes (back-office) ----------------
+   Lecture d'analyste sur une campagne : d'abord l'avancement (magasins, paniers, montants
+   par statut), puis, sur un périmètre de statuts au choix, la répartition par cadencement,
+   catégorie, rayon, famille, sous-famille, les tops produits, le profil de tailles, le
+   classement des magasins et les références que personne n'a prises. Tout est agrégé
+   côté serveur (tableau_bord_precommande) : la page ne reçoit que des totaux. */
+let TB_PRECO = { campagne: null, statuts: ["transmise", "validee", "integree"], donnees: null, tri: "montant", tout: {} };
+const STATUTS_TB = [["brouillon", "Brouillons", "en cours, non transmis"], ["transmise", "Transmis", "à valider"],
+  ["validee", "Validés", "à intégrer"], ["integree", "Intégrés", "Fastmag"], ["refusee", "Refusés", ""]];
+const tbNb = n => Math.round(Number(n) || 0).toLocaleString("fr-FR");
+const tbPart = (v, t) => Number(t) > 0 ? Math.round(Number(v) / Number(t) * 1000) / 10 : 0;
+const tbPct = (v, t) => Number(t) > 0 ? pct(tbPart(v, t)) + " %" : "—";
+const tbDate = d => d ? new Date(d + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) : "à la date de la campagne";
+
+async function rendreTableauBordPreco(campagne) {
+  const vue = document.getElementById("vue-tableau-bord-preco");
+  if (!estStaff) { vue.innerHTML = `<div class="col-tete"><div class="compte-produits">Réservé aux comptes internes.</div></div>`; return; }
+  const campagnes = await api("/rest/v1/rpc/campagnes_precommande", { corps: {} }).catch(() => []);
+  if (!campagnes.length) { vue.innerHTML = `<div class="col-tete"><h1>TABLEAU DE BORD</h1><div class="compte-produits">Aucune campagne.</div></div>`; return; }
+  TB_PRECO.campagne = campagne && campagnes.some(c => c.campagne === campagne) ? campagne
+    : (TB_PRECO.campagne && campagnes.some(c => c.campagne === TB_PRECO.campagne) ? TB_PRECO.campagne : campagnes[0].campagne);
+  const info = campagnes.find(c => c.campagne === TB_PRECO.campagne) || {};
+  vue.innerHTML = `
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='#/precommandes-admin/'+encodeURIComponent(TB_PRECO.campagne)">&larr; PRÉCOMMANDES</span>
+      <h1>TABLEAU DE BORD PRÉCOMMANDES</h1>
+      <div class="compte-produits">Où en est la campagne, ce qui se commande et chez qui : montants HT bruts (avant remise), calculés sur la saisie courante des paniers.</div>
+      <div class="formu" style="margin-top:14px">
+        <select class="qte-claire" style="width:260px; text-align:left" onchange="location.hash='#/tableau-bord-preco/'+encodeURIComponent(this.value)">
+          ${campagnes.map(c => `<option value="${echapperHTML(c.campagne)}"${c.campagne === TB_PRECO.campagne ? " selected" : ""}>${
+            echapperHTML(c.campagne)}${c.ouverte ? "" : " (fermée)"}</option>`).join("")}
+        </select>
+        <span class="compte-produits" style="margin:0">${info.deadline ? `date limite ${new Date(info.deadline).toLocaleDateString("fr-FR")}` : "sans date limite"}
+          · ${info.references || 0} références</span>
+        <button class="puce-claire" onclick="chargerTableauBordPreco()">↻ Actualiser</button>
+        <button class="puce-claire" onclick="excelTableauBordPreco()" title="Toutes les tables du tableau de bord, une feuille par analyse">⬇ Excel</button>
+      </div>
+      <div class="tb-perimetre" id="tb-perimetre"></div>
+    </div>
+    <div id="tb-corps" style="margin: 0 22px 60px"><div class="compte-produits">Chargement…</div></div>`;
+  rendrePerimetreTB();
+  await chargerTableauBordPreco();
+}
+
+/* Le périmètre analysé : les statuts de panier retenus. Par défaut ce qui est engagé
+   (transmis, validé, intégré) ; les brouillons donnent la tendance avant transmission. */
+function rendrePerimetreTB() {
+  const zone = document.getElementById("tb-perimetre");
+  if (!zone) return;
+  zone.innerHTML = `<span class="compte-produits" style="margin:0">Périmètre analysé :</span>
+    ${STATUTS_TB.map(([s, lib, sous]) => `<button class="puce-claire tb-chip${TB_PRECO.statuts.includes(s) ? " on" : ""}"
+        onclick="basculerStatutTB('${s}')" title="${sous ? echapperHTML(sous) : lib}">${lib}</button>`).join("")}
+    <span class="tb-sep"></span>
+    <button class="puce-claire" onclick="definirStatutsTB(['transmise','validee','integree'])">Engagé</button>
+    <button class="puce-claire" onclick="definirStatutsTB(['validee','integree'])">Validé seulement</button>
+    <button class="puce-claire" onclick="definirStatutsTB(['brouillon','transmise','validee','integree'])">Tout sauf refusés</button>`;
+}
+function basculerStatutTB(s) {
+  TB_PRECO.statuts = TB_PRECO.statuts.includes(s) ? TB_PRECO.statuts.filter(x => x !== s) : TB_PRECO.statuts.concat(s);
+  if (!TB_PRECO.statuts.length) TB_PRECO.statuts = [s];
+  rendrePerimetreTB(); chargerTableauBordPreco();
+}
+function definirStatutsTB(liste) { TB_PRECO.statuts = liste.slice(); rendrePerimetreTB(); chargerTableauBordPreco(); }
+
+async function chargerTableauBordPreco() {
+  const corps = document.getElementById("tb-corps");
+  if (!corps) return;
+  corps.style.opacity = ".5";
+  try {
+    TB_PRECO.donnees = await api("/rest/v1/rpc/tableau_bord_precommande", { corps: { p_campagne: TB_PRECO.campagne, p_statuts: TB_PRECO.statuts } });
+  } catch (e) {
+    corps.style.opacity = "1";
+    corps.innerHTML = `<div class="compte-produits">Impossible de charger : ${echapperHTML(String(e.donnees?.message || e.message))}</div>`;
+    return;
+  }
+  corps.style.opacity = "1";
+  if (!TB_PRECO.donnees) { corps.innerHTML = `<div class="compte-produits">Réservé aux comptes internes.</div>`; return; }
+  dessinerTableauBordPreco();
+}
+
+const tbDim = nom => (TB_PRECO.donnees?.dims || []).filter(d => d.dim === nom);
+
+function dessinerTableauBordPreco() {
+  const d = TB_PRECO.donnees;
+  const corps = document.getElementById("tb-corps");
+  const st = s => (d.par_statut || []).find(x => x.statut === s) || { paniers: 0, magasins: 0, pieces: 0, montant: 0, montant_net: 0 };
+  const engage = ["transmise", "validee", "integree"].reduce((s, k) => s + Number(st(k).montant), 0);
+  const engageNet = ["transmise", "validee", "integree"].reduce((s, k) => s + Number(st(k).montant_net), 0);
+  const valideNet = ["validee", "integree"].reduce((s, k) => s + Number(st(k).montant_net), 0);
+  const sc = d.scope || {};
+  const chiffre = (v, lib, sous) => `<div class="recap-chiffre"><b>${v}</b><span>${lib}</span>${sous ? `<i>${sous}</i>` : ""}</div>`;
+  const ouverts = Number(d.magasins_ouverts) || 0;
+  const budget = Number(d.budget_total) || 0;
+
+  /* 1. Avancement : l'entonnoir des magasins et les paniers par statut. */
+  const avancement = `<div class="bloc-clair tb-bloc">
+    <h3 class="titre-bloc">Avancement de la campagne</h3>
+    <div class="recap-chiffres">
+      ${chiffre(ouverts, "magasins ouverts")}
+      ${chiffre(d.magasins_saisi || 0, "ont commencé", tbPct(d.magasins_saisi, ouverts) + " des ouverts")}
+      ${chiffre(d.magasins_transmis || 0, "ont transmis", tbPct(d.magasins_transmis, ouverts) + " des ouverts")}
+      ${chiffre(st("brouillon").paniers, "paniers en cours", eur(Number(st("brouillon").montant)) + " HT non transmis")}
+      ${chiffre(st("transmise").paniers, "à valider", eur(Number(st("transmise").montant_net)) + " HT net")}
+      ${chiffre(st("validee").paniers, "validés", eur(Number(st("validee").montant_net)) + " HT net")}
+      ${chiffre(st("integree").paniers, "intégrés Fastmag", eur(Number(st("integree").montant_net)) + " HT net")}
+      ${st("refusee").paniers ? chiffre(st("refusee").paniers, "refusés", eur(Number(st("refusee").montant_net)) + " HT net") : ""}
+    </div>
+    <div class="recap-chiffres" style="padding-top:8px; border-top:1px dashed var(--hairline)">
+      ${chiffre(eur(engage), "engagé HT brut", "transmis + validés + intégrés")}
+      ${chiffre(eur(engageNet), "engagé HT net", "remises déduites")}
+      ${chiffre(eur(valideNet), "validé HT net", "validés + intégrés")}
+      ${budget ? chiffre(eur(budget), "budget cumulé", `engagé net = ${tbPct(engageNet, budget)}`) : ""}
+      ${chiffre(tbNb(d.refs_offertes), "références offertes")}
+    </div>
+    ${tbEntonnoir([["ouverts", ouverts], ["ont commencé", d.magasins_saisi || 0], ["ont transmis", d.magasins_transmis || 0],
+      ["validés / intégrés", Math.max(Number(st("validee").magasins), Number(st("integree").magasins))]])}
+  </div>`;
+
+  /* 2. Le périmètre choisi en un coup d'œil. */
+  const perimetre = `<div class="bloc-clair tb-bloc">
+    <h3 class="titre-bloc">Périmètre analysé · ${TB_PRECO.statuts.map(s => (STATUTS_TB.find(x => x[0] === s) || [s, s])[1]).join(" + ")}</h3>
+    <div class="recap-chiffres">
+      ${chiffre(eur(Number(sc.montant)), "montant HT brut")}
+      ${chiffre(tbNb(sc.pieces), "pièces")}
+      ${chiffre(sc.magasins || 0, "magasins", `${sc.paniers || 0} panier${sc.paniers > 1 ? "s" : ""}`)}
+      ${chiffre(`${tbNb(sc.refs)} / ${tbNb(d.refs_offertes)}`, "références prises", tbPct(sc.refs, d.refs_offertes) + " de l'offre")}
+      ${chiffre(sc.magasins ? eur(Number(sc.montant) / sc.magasins) : "—", "panier moyen / magasin", sc.magasins ? tbNb(sc.pieces / sc.magasins) + " pièces" : "")}
+      ${chiffre(sc.pieces ? eur(Number(sc.montant) / sc.pieces) : "—", "prix moyen / pièce")}
+      ${chiffre(sc.magasins ? tbNb(sc.refs) : "—", "profondeur", sc.magasins ? `${(Number(sc.pieces) / Math.max(sc.refs, 1)).toFixed(1)} pièces par référence` : "")}
+    </div>
+    ${(d.par_reseau || []).length ? `<div class="tb-reseau">${(d.par_reseau || []).map(r => `<span class="badge-c">${echapperHTML(r.reseau)} · ${r.actifs}/${r.ouverts} magasins · ${eur(Number(r.montant))}</span>`).join("")}</div>` : ""}
+  </div>`;
+
+  if (!Number(sc.lignes)) {
+    corps.innerHTML = avancement + perimetre + `<div class="compte-produits">Aucune ligne dans ce périmètre : élargissez-le (les brouillons, par exemple).</div>`;
+    return;
+  }
+
+  /* 3. Cadencement, puis cadencement × catégorie. */
+  const livs = tbDim("livraison").sort((a, b) => (a.valeur || "").localeCompare(b.valeur || ""));
+  const cadencement = tbBarres("Par cadencement (date de livraison)", livs.map(l => ({ ...l, libelle: tbDate(l.valeur) })), sc, { ordre: false });
+  const matrice = tbMatrice(d.livraison_categorie || [], livs, sc);
+
+  /* 4. Les axes produit. */
+  const axes = [["Par catégorie", "categorie"], ["Par rayon", "rayon"], ["Par famille", "famille"], ["Par sous-famille", "sous_famille"]]
+    .map(([titre, dim]) => tbBarres(titre, tbDim(dim).map(x => ({ ...x, libelle: x.valeur })), sc, { limite: 12, cle: dim })).join("");
+
+  /* 5. Tops produits. */
+  const tops = tbTops(d.tops || [], sc);
+
+  /* 6. Profil de tailles par rayon. */
+  const tailles = tbTailles(d.tailles || [], tbDim("rayon"));
+
+  /* 7. Magasins. */
+  const magasins = tbMagasins(d.magasins || [], sc);
+
+  /* 8. Ce que personne ne prend. */
+  const sans = d.sans_commande || { total: 0, liste: [] };
+  const dormantes = `<div class="bloc-clair tb-bloc">
+    <h3 class="titre-bloc">Références sans aucune commande · ${tbNb(sans.total)} sur ${tbNb(d.refs_offertes)} (${tbPct(sans.total, d.refs_offertes)})</h3>
+    <div class="compte-produits" style="margin:0 0 10px">Dans ce périmètre, aucun magasin n'a pris ces références. Utile pour relancer, réassortir le merch ou retirer de l'offre.${
+      sans.total > (sans.liste || []).length ? ` Les ${(sans.liste || []).length} premières par référence :` : ""}</div>
+    <div class="tb-dormantes">${(sans.liste || []).map(r => `<span class="pa-mag" style="cursor:default" title="${echapperHTML(r.designation || "")}">${
+      r.photo ? `<img src="${echapperHTML(r.photo)}" loading="lazy" alt="">` : ""}<b>${echapperHTML(r.reference)}</b><span class="fin">${echapperHTML((r.designation || "").slice(0, 28))}${r.categorie ? " · " + echapperHTML(r.categorie) : ""}</span></span>`).join("")}</div>
+  </div>`;
+
+  corps.innerHTML = avancement + perimetre + `<div class="tb-grille">${cadencement}${matrice}</div>`
+    + `<div class="tb-grille">${axes}</div>` + tops + tailles + magasins + dormantes;
+}
+
+function tbEntonnoir(etapes) {
+  const max = Math.max(...etapes.map(e => Number(e[1]) || 0), 1);
+  return `<div class="tb-entonnoir">${etapes.map(([lib, v]) => `<div class="tb-etape">
+      <span class="lib">${lib}</span>
+      <span class="barre"><i style="width:${Math.round((Number(v) || 0) / max * 100)}%"></i></span>
+      <b>${tbNb(v)}</b><span class="part">${tbPct(v, etapes[0][1])}</span></div>`).join("")}</div>`;
+}
+
+/* Un tableau à barres : la part de chaque valeur dans le montant du périmètre,
+   avec pièces, références et magasins. Trié par montant, coupé à `limite`
+   avec un bouton pour tout voir. */
+function tbBarres(titre, lignes, sc, { ordre = true, limite = 0, cle = "" } = {}) {
+  const total = Number(sc.montant) || 0;
+  let rows = ordre ? lignes.slice().sort((a, b) => Number(b.montant) - Number(a.montant)) : lignes;
+  const max = Math.max(...rows.map(r => Number(r.montant) || 0), 1);
+  const tout = cle && TB_PRECO.tout[cle];
+  const coupe = limite && rows.length > limite && !tout;
+  const visibles = coupe ? rows.slice(0, limite) : rows;
+  const reste = coupe ? rows.slice(limite) : [];
+  const ligne = r => `<tr><td class="lib" title="${echapperHTML(r.libelle || "")}">${echapperHTML(r.libelle || "—")}</td>
+      <td class="barre"><span><i style="width:${Math.round(Number(r.montant) / max * 100)}%"></i></span><em>${tbPct(r.montant, total)}</em></td>
+      <td class="num">${eur(Number(r.montant))}</td><td class="num">${tbNb(r.pieces)}</td>
+      <td class="num">${tbNb(r.refs)}</td><td class="num">${tbNb(r.magasins)}</td></tr>`;
+  return `<div class="bloc-clair tb-bloc">
+    <h3 class="titre-bloc">${titre} · ${rows.length}</h3>
+    <table class="tb-table"><thead><tr><th></th><th>Part du montant</th><th class="num">Montant HT</th><th class="num">Pièces</th><th class="num">Réf.</th><th class="num">Mag.</th></tr></thead>
+    <tbody>${visibles.map(ligne).join("")}${reste.length ? `<tr class="tb-reste"><td colspan="6"><button class="puce-claire" onclick="TB_PRECO.tout['${cle}']=true; dessinerTableauBordPreco()">+ ${reste.length} autres (${eur(reste.reduce((s, r) => s + Number(r.montant), 0))})</button></td></tr>` : ""}</tbody></table></div>`;
+}
+
+/* Cadencement × catégorie : pour chaque catégorie, combien part à chaque date. Les
+   cases se teintent selon leur poids dans la ligne, pour lire d'un coup d'œil où se
+   concentre chaque catégorie. */
+function tbMatrice(cellules, livs, sc) {
+  if (!cellules.length || livs.length < 2) return "";
+  const cats = {};
+  for (const c of cellules) {
+    const e = (cats[c.categorie] ??= { total: 0, par: {} });
+    e.total += Number(c.montant); e.par[c.livraison || ""] = (e.par[c.livraison || ""] || 0) + Number(c.montant);
+  }
+  const lignes = Object.entries(cats).sort((a, b) => b[1].total - a[1].total);
+  const total = Number(sc.montant) || 0;
+  return `<div class="bloc-clair tb-bloc">
+    <h3 class="titre-bloc">Cadencement par catégorie · part de chaque date dans la catégorie</h3>
+    <table class="tb-table tb-matrice"><thead><tr><th></th>${livs.map(l => `<th class="num">${echapperHTML(jourCourt(l.valeur || null))}</th>`).join("")}<th class="num">Total</th><th class="num">Part</th></tr></thead>
+    <tbody>${lignes.map(([cat, e]) => `<tr><td class="lib">${echapperHTML(cat)}</td>${livs.map(l => {
+      const v = e.par[l.valeur || ""] || 0; const p = e.total ? v / e.total : 0;
+      return `<td class="num cell" style="background: rgba(17,17,17,${(p * 0.28).toFixed(3)})${p > 0.55 ? "; color:#fff" : ""}">${v ? `${eur(v)}<small>${pct(Math.round(p * 1000) / 10)} %</small>` : "<span style='opacity:.3'>—</span>"}</td>`;
+    }).join("")}<td class="num"><b>${eur(e.total)}</b></td><td class="num">${tbPct(e.total, total)}</td></tr>`).join("")}
+    <tr class="tb-total"><td class="lib">Total</td>${livs.map(l => `<td class="num">${eur(Number(l.montant))}<small>${tbPct(l.montant, total)}</small></td>`).join("")}<td class="num"><b>${eur(total)}</b></td><td></td></tr></tbody></table></div>`;
+}
+
+function tbTops(tops, sc) {
+  const tri = TB_PRECO.tri;
+  const rows = tops.slice().sort((a, b) => Number(b[tri]) - Number(a[tri])).slice(0, 25);
+  const total = Number(sc.montant) || 0, totalP = Number(sc.pieces) || 0;
+  const maxT = Math.max(...rows.map(r => Number(r[tri]) || 0), 1);
+  const bouton = (k, lib) => `<button class="puce-claire tb-chip${tri === k ? " on" : ""}" onclick="TB_PRECO.tri='${k}'; dessinerTableauBordPreco()">${lib}</button>`;
+  const tailles = r => Object.entries(r.tailles || {}).sort((a, b) => cleTaille(a[0]) - cleTaille(b[0]));
+  return `<div class="bloc-clair tb-bloc">
+    <div class="tb-tete"><h3 class="titre-bloc" style="margin:0">Tops produits · ${rows.length} premières références</h3>
+      <span class="compte-produits" style="margin:0 0 0 auto">Classer par</span>${bouton("montant", "Montant")}${bouton("pieces", "Pièces")}${bouton("magasins", "Magasins")}</div>
+    <table class="tb-table tb-tops"><thead><tr><th>#</th><th></th><th>Référence</th><th>Catégorie · famille</th><th>Répartition des tailles</th>
+      <th class="num">Mag.</th><th class="num">Pièces</th><th class="num">Montant HT</th><th class="num">Part</th></tr></thead>
+    <tbody>${rows.map((r, i) => `<tr>
+      <td class="rang">${i + 1}</td>
+      <td class="photo">${r.photo ? `<img src="${echapperHTML(r.photo)}" loading="lazy" alt="">` : ""}</td>
+      <td class="lib"><b>${echapperHTML(r.reference)}</b><br><span class="sous">${echapperHTML(r.designation || "")}${r.couleur ? " · " + echapperHTML(r.couleur) : ""}</span></td>
+      <td class="sous">${echapperHTML(r.categorie || "")}<br>${echapperHTML(r.rayon || "")}${r.famille ? " · " + echapperHTML(r.famille) : ""}</td>
+      <td class="tailles">${tailles(r).map(([t, q]) => `<span class="${t === r.taille_top ? "top" : ""}" title="${echapperHTML(t)} : ${q} pièces">${echapperHTML(t)}<b>${q}</b></span>`).join("")}</td>
+      <td class="num">${tbNb(r.magasins)}</td>
+      <td class="num">${tbNb(r.pieces)}${tri === "pieces" ? `<small>${tbPct(r.pieces, totalP)}</small>` : ""}</td>
+      <td class="num">${eur(Number(r.montant))}</td>
+      <td class="barre"><span><i style="width:${Math.round(Number(r[tri]) / maxT * 100)}%"></i></span><em>${tbPct(r.montant, total)}</em></td></tr>`).join("")}</tbody></table>
+    <div class="compte-produits" style="margin:10px 0 0">Les ${rows.length} premières pèsent ${eur(rows.reduce((s, r) => s + Number(r.montant), 0))}, soit ${tbPct(rows.reduce((s, r) => s + Number(r.montant), 0), total)} du périmètre.</div>
+  </div>`;
+}
+
+/* Le profil de tailles, rayon par rayon (les quatre premiers rayons en montant) :
+   ce que le réseau demande réellement, à comparer aux grilles d'achat. */
+function tbTailles(lignes, rayons) {
+  if (!lignes.length) return "";
+  const ordre = rayons.slice().sort((a, b) => Number(b.montant) - Number(a.montant)).map(r => r.valeur).slice(0, 4);
+  const blocs = ordre.map(rayon => {
+    const du = lignes.filter(l => l.rayon === rayon).sort((a, b) => cleTaille(a.taille) - cleTaille(b.taille));
+    if (!du.length) return "";
+    const total = du.reduce((s, l) => s + Number(l.pieces), 0);
+    const max = Math.max(...du.map(l => Number(l.pieces)), 1);
+    return `<div class="tb-tailles-bloc"><div class="titre">${echapperHTML(rayon)} · ${tbNb(total)} pièces</div>
+      <div class="tb-cols">${du.map(l => `<div class="tb-col" title="${echapperHTML(l.taille)} : ${l.pieces} pièces (${tbPct(l.pieces, total)})">
+        <small>${tbPct(l.pieces, total).replace(" %", "")}</small><i style="height:${Math.max(2, Math.round(Number(l.pieces) / max * 70))}px"></i><span>${echapperHTML(l.taille || "—")}</span></div>`).join("")}</div></div>`;
+  }).join("");
+  return `<div class="bloc-clair tb-bloc"><h3 class="titre-bloc">Profil de tailles par rayon · en % des pièces</h3><div class="tb-tailles">${blocs}</div></div>`;
+}
+
+function tbMagasins(mags, sc) {
+  if (!mags.length) return "";
+  const total = Number(sc.montant) || 0;
+  const max = Math.max(...mags.map(m => Number(m.montant) || 0), 1);
+  const generique = m => /^(FOOT ?KORNER|FK)?$/i.test((m.nom || "").trim()) || (m.nom || "").trim().toUpperCase() === m.compte;
+  const nomDe = m => `${m.id_fastmag ? m.id_fastmag + ") " : ""}${generique(m) ? (m.compte || "").replace(/^FK(?=[A-Z])/, "FK ") : m.nom}${m.ville ? " · " + m.ville : ""}`;
+  const budget = m => Number(m.budget) > 0 ? Number(m.budget) : 0;
+  return `<div class="bloc-clair tb-bloc">
+    <h3 class="titre-bloc">Classement des magasins · ${mags.length} actif${mags.length > 1 ? "s" : ""} dans ce périmètre</h3>
+    <table class="tb-table"><thead><tr><th>#</th><th>Magasin</th><th>Réseau</th><th>Part du montant</th><th class="num">Montant HT</th><th class="num">Pièces</th>
+      <th class="num">Réf.</th><th class="num">Paniers</th><th class="num">Budget</th><th class="num">Écart</th></tr></thead>
+    <tbody>${mags.map((m, i) => `<tr>
+      <td class="rang">${i + 1}</td>
+      <td class="lib"><a href="#/precommandes-admin/${encodeURIComponent(TB_PRECO.campagne)}" style="color:inherit">${echapperHTML(nomDe(m))}</a></td>
+      <td class="sous">${echapperHTML(m.reseau || "")}</td>
+      <td class="barre"><span><i style="width:${Math.round(Number(m.montant) / max * 100)}%"></i></span><em>${tbPct(m.montant, total)}</em></td>
+      <td class="num">${eur(Number(m.montant))}</td><td class="num">${tbNb(m.pieces)}</td><td class="num">${tbNb(m.refs)}</td><td class="num">${tbNb(m.paniers)}</td>
+      <td class="num">${budget(m) ? eur(budget(m)) : "—"}</td>
+      <td class="num">${budget(m) ? `<span class="badge-c ${Number(m.montant) > budget(m) ? "alerte" : "ok"}">${Number(m.montant) > budget(m) ? "+" : ""}${eur(Number(m.montant) - budget(m))}</span>` : ""}</td></tr>`).join("")}
+    <tr class="tb-total"><td></td><td class="lib">Total</td><td></td><td></td><td class="num"><b>${eur(total)}</b></td><td class="num">${tbNb(sc.pieces)}</td><td class="num">${tbNb(sc.refs)}</td><td class="num">${tbNb(sc.paniers)}</td>
+      <td class="num">${mags.some(budget) ? eur(mags.reduce((s, m) => s + budget(m), 0)) : ""}</td><td></td></tr></tbody></table></div>`;
+}
+
+/* Le même tableau de bord en Excel : une feuille par analyse, les montants en nombres. */
+function excelTableauBordPreco() {
+  const d = TB_PRECO.donnees;
+  if (!d) { alert("Rien à exporter : chargez d'abord le tableau de bord."); return; }
+  const r2 = n => Math.round(Number(n) * 100) / 100;
+  const sc = d.scope || {};
+  const lib = s => (STATUTS_TB.find(x => x[0] === s) || [s, s])[1];
+  const synthese = { nom: "Synthèse", gras: [1, 3, 10], largeurs: [34, 18, 18, 14, 14], lignes: [
+    ["Tableau de bord précommandes", d.campagne, new Date().toLocaleString("fr-FR")],
+    [],
+    ["Avancement", "Paniers", "Magasins", "Pièces", "Montant HT brut", "Montant HT net"],
+    ...(d.par_statut || []).map(s => [lib(s.statut), Number(s.paniers), Number(s.magasins), Number(s.pieces), r2(s.montant), r2(s.montant_net)]),
+    ["Magasins ouverts", Number(d.magasins_ouverts)], ["Ont commencé une saisie", Number(d.magasins_saisi || 0)], ["Ont transmis", Number(d.magasins_transmis || 0)],
+    ["Budget cumulé", r2(d.budget_total)], ["Références offertes", Number(d.refs_offertes)],
+    [],
+    ["Périmètre analysé", TB_PRECO.statuts.map(lib).join(" + ")],
+    ["Montant HT brut", r2(sc.montant)], ["Pièces", Number(sc.pieces)], ["Magasins", Number(sc.magasins)], ["Paniers", Number(sc.paniers)],
+    ["Références prises", Number(sc.refs)], ["Références sans commande", Number(d.sans_commande?.total || 0)],
+  ] };
+  const dim = (nom, cle, libelle = x => x) => ({ nom, gras: [1], figer: 1, largeurs: [30, 16, 10, 8, 8, 8],
+    lignes: [[nom, "Montant HT", "Part %", "Pièces", "Réf.", "Magasins"],
+      ...tbDim(cle).sort((a, b) => Number(b.montant) - Number(a.montant)).map(x => [libelle(x.valeur), r2(x.montant), tbPart(x.montant, sc.montant), Number(x.pieces), Number(x.refs), Number(x.magasins)])] });
+  const livs = tbDim("livraison").sort((a, b) => (a.valeur || "").localeCompare(b.valeur || ""));
+  const cats = {};
+  for (const c of d.livraison_categorie || []) { (cats[c.categorie] ??= {})[c.livraison || ""] = r2(c.montant); }
+  const matrice = { nom: "Cadencement x catégorie", gras: [1], figer: 1, largeurs: [30, ...livs.map(() => 14), 14],
+    lignes: [["Catégorie", ...livs.map(l => tbDate(l.valeur)), "Total"],
+      ...Object.entries(cats).map(([cat, par]) => [cat, ...livs.map(l => par[l.valeur || ""] || 0), r2(Object.values(par).reduce((s, v) => s + v, 0))])
+        .sort((a, b) => b[b.length - 1] - a[a.length - 1])] };
+  const tops = { nom: "Tops produits", gras: [1], figer: 1, largeurs: [14, 34, 12, 16, 16, 14, 8, 8, 14, 8, 10],
+    lignes: [["Référence", "Désignation", "Couleur", "Catégorie", "Rayon", "Famille", "Magasins", "Pièces", "Montant HT", "Part %", "Taille top"],
+      ...(d.tops || []).map(t => [t.reference, t.designation || "", t.couleur || "", t.categorie || "", t.rayon || "", t.famille || "", Number(t.magasins), Number(t.pieces), r2(t.montant), tbPart(t.montant, sc.montant), t.taille_top || ""])] };
+  const tailles = { nom: "Tailles", gras: [1], figer: 1, largeurs: [18, 10, 10],
+    lignes: [["Rayon", "Taille", "Pièces"], ...(d.tailles || []).sort((a, b) => (a.rayon || "").localeCompare(b.rayon || "") || cleTaille(a.taille) - cleTaille(b.taille)).map(t => [t.rayon, t.taille, Number(t.pieces)])] };
+  const magasins = { nom: "Magasins", gras: [1], figer: 1, largeurs: [10, 28, 14, 12, 14, 10, 8, 8, 12],
+    lignes: [["Code", "Magasin", "Ville", "Réseau", "Montant HT", "Part %", "Pièces", "Réf.", "Paniers", "Budget"],
+      ...(d.magasins || []).map(m => [m.id_fastmag || "", m.nom || m.compte || "", m.ville || "", m.reseau || "", r2(m.montant), tbPart(m.montant, sc.montant), Number(m.pieces), Number(m.refs), Number(m.paniers), Number(m.budget) > 0 ? r2(m.budget) : ""])] };
+  const sans = { nom: "Sans commande", gras: [1], figer: 1, largeurs: [14, 40, 18],
+    lignes: [["Référence", "Désignation", "Catégorie"], ...((d.sans_commande || {}).liste || []).map(r => [r.reference, r.designation || "", r.categorie || ""])] };
+  telechargerXlsx(`TABLEAU_BORD_${String(d.campagne).replace(/[^\w-]+/g, "_")}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`,
+    [synthese, dim("Cadencement", "livraison", tbDate), matrice, dim("Catégories", "categorie"), dim("Rayons", "rayon"), dim("Familles", "famille"), dim("Sous-familles", "sous_famille"), tops, tailles, magasins, sans]);
 }
 
 const jourCourt = (d) => d
