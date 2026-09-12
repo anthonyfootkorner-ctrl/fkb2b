@@ -1511,10 +1511,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789215109"></script>
-<script src="imports.js?v=1789215109"></script>
-<script src="merch-shopify.js?v=1789215109"></script>
-<script src="moteur-merch.js?v=1789215109"></script>
+<script src="config.js?v=1789216462"></script>
+<script src="imports.js?v=1789216462"></script>
+<script src="merch-shopify.js?v=1789216462"></script>
+<script src="moteur-merch.js?v=1789216462"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1982,7 +1982,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789215109";
+    v.src = "hero.mp4?v=1789216462";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3205,7 +3205,7 @@ async function basculerOuvertureCampagne(campagne, ouvrir) {
 async function supprimerCampagnePreco(campagne) {
   if (!confirm(`Supprimer toute la campagne « ${campagne} » ?\n\n`
     + "Toutes les références déposées et les accès magasins disparaissent. "
-    + "Les commandes déjà passées ne sont pas touchées.")) return;
+    + "Refusé automatiquement si un magasin a déjà saisi ou transmis un panier : dans ce cas, fermez la campagne.")) return;
   try {
     const n = await api("/rest/v1/rpc/supprimer_campagne_precommande", { corps: { p_campagne: campagne } });
     await rendreCampagnesPreco();
@@ -4559,6 +4559,7 @@ async function choisirPanierPreco(id) {
   if (!id) return;
   if (id === "__nouveau") { await nouveauPanierPreco(); return; }
   if (!PRECO_PANIERS.some(p => p.id === id)) return;
+  await viderSauvegardeAuto();
   PRECO_PANIER_ID = id;
   try { localStorage.setItem(clePanierActif(), id); } catch (e) { /* mémoire locale refusée */ }
   await relireSaisiePanier(PRECO_COURANTE);
@@ -4871,7 +4872,8 @@ async function rendrePanierPreco(campagne) {
         · ${rayons.length} rayon${rayons.length > 1 ? "s" : ""}
         · ${dates.length} date${dates.length > 1 ? "s" : ""} de livraison.
         Tapez un <b>total</b> sur une ligne : il se répartit sur les tailles selon la courbe de vente du réseau.
-        Ou collez une grille depuis Excel : cliquez la première case puis <kbd>⌘V</kbd>.</div>
+        Ou collez une grille depuis Excel : cliquez la première case puis <kbd>⌘V</kbd>.
+        <b>Tout s'enregistre automatiquement</b> quelques secondes après chaque saisie.</div>
     </div>
     <div id="preco-fusion"></div>
     ${verrou ? `<div class="pp-verrou">
@@ -5332,7 +5334,14 @@ function allerValiderPreco() {
   }
   const nonEnregistre = Object.entries(parRef).some(([ref, lignes]) =>
     lignes.some(l => (PRECO_SAISIE[cleSaisie(ref, l.taille, l.livraison)] || 0) !== l.quantite));
-  if (nonEnregistre && !confirm("Des quantités ne sont pas enregistrées : elles ne feront pas partie de la validation.\n\nContinuer sans les enregistrer ?")) return;
+  if (nonEnregistre || sauvegardeAutoEnAttente) {
+    const etat = document.getElementById("pp-etat"); if (etat) etat.textContent = "enregistrement avant validation…";
+    viderSauvegardeAuto().then(() => {
+      if (travailNonEnregistre && !confirm("Certaines quantités n'ont pas pu être enregistrées : elles ne feront pas partie de la validation.\n\nContinuer quand même ?")) return;
+      location.hash = `#/preco-validation/${encodeURIComponent(PRECO_COURANTE)}`;
+    });
+    return;
+  }
   location.hash = `#/preco-validation/${encodeURIComponent(PRECO_COURANTE)}`;
 }
 
@@ -5640,6 +5649,7 @@ function repartirLignePanier(inp) {
     if (base[i]) c.classList.add("rempli");
   });
   majTotauxGrillePreco();
+  planifierSauvegardeAuto();
 }
 
 function brancherGrillePanier() {
@@ -5648,7 +5658,7 @@ function brancherGrillePanier() {
   }
   const champs = [...document.querySelectorAll(".table-panier input[data-l]")];
   champs.forEach(inp => {
-    inp.addEventListener("input", majTotauxGrillePreco);
+    inp.addEventListener("input", () => { majTotauxGrillePreco(); planifierSauvegardeAuto(); });
     inp.addEventListener("paste", e => {
       const texte = (e.clipboardData || window.clipboardData).getData("text");
       if (!texte || !/[\t\n]/.test(texte)) return;   // une seule valeur : collage normal
@@ -5664,6 +5674,7 @@ function brancherGrillePanier() {
         });
       });
       majTotauxGrillePreco();
+      planifierSauvegardeAuto();
     });
   });
   majTotauxGrillePreco();
@@ -5712,9 +5723,42 @@ function majTotauxGrillePreco() {
 
 /* On n'envoie que les produits dont la grille a bougé : une campagne peut compter
    des centaines de références, et chaque référence est un aller-retour serveur. */
-async function enregistrerPanierPreco() {
+/* Enregistrement automatique : 1,5 s après la dernière frappe (ou une répartition, ou un
+   collage), les produits modifiés partent en base. Le bouton ENREGISTRER reste, mais rien
+   ne dépend plus de lui. Tant qu'une sauvegarde est en attente, quitter la page demande
+   confirmation, et un changement de page déclenche la sauvegarde avant de partir. */
+let sauvegardeAutoTimer = null, sauvegardeAutoEnAttente = false, sauvegardeEnCours = null;
+function planifierSauvegardeAuto() {
+  if (!document.querySelector(".table-panier input[data-l]:not(:disabled)")) return;   // grille verrouillée ou absente
+  sauvegardeAutoEnAttente = true;
+  travailNonEnregistre = true;
+  const etat = document.getElementById("pp-etat");
+  if (etat) etat.textContent = "enregistrement automatique dans un instant…";
+  clearTimeout(sauvegardeAutoTimer);
+  sauvegardeAutoTimer = setTimeout(() => enregistrerPanierPreco({ auto: true }), 1500);
+}
+async function viderSauvegardeAuto() {   // à appeler avant de quitter la grille
+  clearTimeout(sauvegardeAutoTimer);
+  if (sauvegardeEnCours) await sauvegardeEnCours;
+  if (sauvegardeAutoEnAttente) await enregistrerPanierPreco({ auto: true });
+}
+window.addEventListener("hashchange", () => { if (sauvegardeAutoEnAttente) enregistrerPanierPreco({ auto: true }); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && sauvegardeAutoEnAttente) enregistrerPanierPreco({ auto: true }); });
+
+async function enregistrerPanierPreco(options = {}) {
+  if (sauvegardeEnCours) { await sauvegardeEnCours; }   // une sauvegarde à la fois : on attend la précédente
+  const promesse = enregistrerPanierPrecoMaintenant(options);
+  sauvegardeEnCours = promesse;
+  try { await promesse; } finally { if (sauvegardeEnCours === promesse) sauvegardeEnCours = null; }
+}
+
+async function enregistrerPanierPrecoMaintenant(options = {}) {
+  const auto = !!options.auto;
+  clearTimeout(sauvegardeAutoTimer);
+  sauvegardeAutoEnAttente = false;
   const bouton = document.getElementById("pp-enregistrer");
   const etat = document.getElementById("pp-etat");
+  if (!bouton || !etat) { travailNonEnregistre = false; return; }
   const parRef = {};
   for (const inp of document.querySelectorAll(".table-panier input[data-l]")) {
     (parRef[inp.dataset.ref] ??= []).push({
@@ -5724,7 +5768,7 @@ async function enregistrerPanierPreco() {
   }
   const aEnvoyer = Object.entries(parRef).filter(([ref, lignes]) =>
     lignes.some(l => (PRECO_SAISIE[cleSaisie(ref, l.taille, l.livraison)] || 0) !== l.quantite));
-  if (!aEnvoyer.length) { etat.textContent = "rien de nouveau à enregistrer"; return; }
+  if (!aEnvoyer.length) { etat.textContent = auto ? "tout est enregistré ✓" : "rien de nouveau à enregistrer"; travailNonEnregistre = false; return; }
 
   bouton.disabled = true;
   let fait = 0, pieces = 0;
@@ -5740,9 +5784,13 @@ async function enregistrerPanierPreco() {
         if (l.quantite > 0) PRECO_SAISIE[c] = l.quantite; else delete PRECO_SAISIE[c];
       }
     }
-    etat.textContent = `enregistré ✓ — ${aEnvoyer.length} produit${aEnvoyer.length > 1 ? "s" : ""} mis à jour`;
+    const heure = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    etat.textContent = `${auto ? "enregistré automatiquement" : "enregistré"} ✓ ${heure} — ${aEnvoyer.length} produit${aEnvoyer.length > 1 ? "s" : ""}`;
+    if (!sauvegardeAutoEnAttente) travailNonEnregistre = false;
+    rafraichirPaniersPreco().catch(() => {});
   } catch (e) {
-    etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 160);
+    travailNonEnregistre = true;
+    etat.textContent = "⚠ non enregistré : " + String(e.donnees?.message || e.message).slice(0, 160) + " — réessayez avec ENREGISTRER";
   } finally {
     bouton.disabled = false;
   }
