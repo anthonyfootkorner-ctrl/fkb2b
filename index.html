@@ -1511,10 +1511,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789156209"></script>
-<script src="imports.js?v=1789156209"></script>
-<script src="merch-shopify.js?v=1789156209"></script>
-<script src="moteur-merch.js?v=1789156209"></script>
+<script src="config.js?v=1789214796"></script>
+<script src="imports.js?v=1789214796"></script>
+<script src="merch-shopify.js?v=1789214796"></script>
+<script src="moteur-merch.js?v=1789214796"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1982,7 +1982,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789156209";
+    v.src = "hero.mp4?v=1789214796";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4951,6 +4951,7 @@ function rendreMesPrecommandes(precos) {
           onclick="ouvrirPanierPreco(${arg(p.campagne)}, ${arg(p.panier_id || "")}, 'grille')">${b ? "Modifier la grille" : "Saisir"}</button>
         ${b && (!e || b.pieces !== e.pieces) ? `<button class="puce" onclick="ouvrirPanierPreco(${arg(p.campagne)}, ${arg(p.panier_id || "")}, 'validation')">Valider / transmettre</button>` : ""}` : ""}
       ${ouvrable && p.verrouille ? `<button class="puce" style="margin-left:12px" onclick="ouvrirPanierPreco(${arg(p.campagne)}, ${arg(p.panier_id || "")}, 'validation')">Voir</button>` : ""}
+      ${e && e.id ? `<button class="puce" onclick="excelPrecoEnvoi('${e.id}', ${arg(p.campagne)}, { panier: ${arg(p.panier || "")}, numero: ${Number(e.numero) || 0}, date: '${e.envoye_le || ""}', statut: '${e.statut}', remise: ${Number(e.remise_pct) || 0}, magasin: ${arg(libelleMagasinExcel(mag))}, compte: ${arg(mag?.compte || "")} })" title="Copie Excel façon bon de commande Nike">⬇ Excel</button>` : ""}
       ${e && e.par_livraison?.length ? `<div class="fin" style="margin-top:6px">${e.par_livraison.map(x =>
           `${jourCourt(x.livraison)} : ${x.pieces} pièces, ${eur(Number(x.montant))}`).join(" · ")}</div>` : ""}
     </div>`;
@@ -4988,6 +4989,7 @@ async function rendrePrecommandesAdmin(campagne) {
         <span class="compte-produits" style="margin:0">${info.deadline ? `date limite ${new Date(info.deadline).toLocaleDateString("fr-FR")}` : "sans date limite"}
           · ${info.references || 0} références</span>
         <button class="puce-claire" onclick="exporterPrecoAdmin()">Exporter le cumul (CSV)</button>
+        <button class="puce-claire" onclick="excelPrecoReseau()" title="Toutes les transmissions de la campagne : cumul réseau, récap par magasin, et un bon de commande par magasin et panier">⬇ Excel réseau</button>
         <button class="puce-claire" onclick="location.hash='#/merch-preco/'+encodeURIComponent(PRECO_ADMIN_CAMPAGNE)">Merch de la campagne →</button>
       </div>
     </div>
@@ -5225,6 +5227,8 @@ function rendrePanierAdmin(p, r) {
         <button class="puce-claire" onclick="detailPrecoAdmin('${e.id}','${e.id}')">Détail des lignes</button>
         <button class="puce-claire" style="border-color:#111; font-weight:600" title="Même format que les commandes B2B : une ligne par référence, taille et livraison ; date = cadencement ; critère = campagne + date"
                 onclick="fichierFastmagPreco('${e.id}','${e.id}')">⬇ Fichier Fastmag</button>
+        <button class="puce-claire" title="Copie Excel façon bon de commande Nike : une ligne par article et par livraison, les tailles en colonnes"
+                onclick="excelPrecoEnvoi('${e.id}', PRECO_ADMIN_CAMPAGNE, { panier: ${JSON.stringify(p.nom).replaceAll('"', "&quot;")}, numero: ${Number(e.numero) || 0}, date: '${e.envoye_le || ""}', statut: '${e.statut}', remise: ${Number(e.remise_pct) || 0}, magasin: ${JSON.stringify(libelleMagasinExcel(r)).replaceAll('"', "&quot;")}, compte: ${JSON.stringify(r.compte || r.nom || "").replaceAll('"', "&quot;")} })">⬇ Excel</button>
         <span class="compte-produits" style="margin:0" id="pa-etat-${e.id}"></span>
       </span>
       <div id="pa-detail-${e.id}" style="flex-basis:100%"></div>` : ""}
@@ -5350,6 +5354,7 @@ async function rendreValidationPreco(campagne) {
     return;
   }
   lignes = (lignes || []).filter(l => Number(l.quantite) > 0);
+  PRECO_VALID_LIGNES = lignes;
   const produit = ref => PRECO_PRODUITS.find(p => p.reference === ref);
   const prixDe = l => Number(l.prix) || prixMini(produit(l.reference) || { tailles: [] }) || 0;
 
@@ -5390,7 +5395,8 @@ async function rendreValidationPreco(campagne) {
     <div class="valid-preco">
       ${verrou ? `<div class="valid-info verrou"><b>Précommande n° ${envoi.numero} ${envoi.statut === "integree" ? "intégrée en Fastmag" : "validée par Footkorner"}</b>
           le ${dateHeure(envoi.validee_le || envoi.integree_le || envoi.envoye_le)} — ${envoi.pieces} pièces, ${eur(Number(envoi.total_net))} HT${Number(envoi.remise_pct) > 0 ? " net" : ""}.
-          Elle n'est plus modifiable ni retransmissible. Pour la retoucher, contactez votre commercial, qui peut la remettre en attente.</div>`
+          Elle n'est plus modifiable ni retransmissible. Pour la retoucher, contactez votre commercial, qui peut la remettre en attente.
+          <div style="margin-top:8px"><button class="puce-claire" onclick="excelPrecoEnvoi('${envoi.id}', PRECO_COURANTE, { panier: panierActif()?.nom, numero: ${Number(envoi.numero) || 0}, date: '${envoi.envoye_le || ""}', statut: '${envoi.statut}', remise: ${Number(envoi.remise_pct) || 0} })">⬇ Excel (bon de commande)</button></div></div>`
       : envoi ? `<div class="valid-info">Une précommande a déjà été transmise le
           <b>${new Date(envoi.envoye_le).toLocaleString("fr-FR", { day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}</b>
           (n° ${envoi.numero} — ${envoi.pieces} pièces, ${eur(Number(envoi.total_net))} HT net)${envoi.statut === "refusee" ? `, puis <b>refusée</b> par Footkorner${envoi.commentaire ? ` : <i>${echapperHTML(envoi.commentaire)}</i>` : ""}` : ""}.
@@ -5428,6 +5434,7 @@ async function rendreValidationPreco(campagne) {
       </label>
       <div class="valid-actions">
         <button class="btn-noir" id="valid-bouton" disabled onclick="transmettrePreco()">TRANSMETTRE LA PRÉCOMMANDE</button>
+        <button class="puce-claire" onclick="excelPrecoBrouillon()" title="Copie Excel de ce panier, façon bon de commande Nike : une ligne par article et par livraison, les tailles en colonnes">⬇ Excel (bon de commande)</button>
         <span class="compte-produits" id="valid-etat" style="margin:0"></span>
       </div>
       <div id="preco-dupli"></div>`}`}
@@ -5548,6 +5555,7 @@ async function transmettrePreco() {
         <p class="sous">Vous pouvez encore retoucher ce panier et le transmettre à nouveau tant qu'il n'est pas validé par votre commercial : la dernière transmission fait foi.
           Pour une autre commande, ouvrez un nouveau panier.</p>
         <button class="puce-claire" onclick="location.hash='#/precommande/${encodeURIComponent(PRECO_COURANTE)}'">Retour à la campagne</button>
+        <button class="puce-claire" onclick="excelPrecoEnvoi('${r.id}', PRECO_COURANTE, { panier: ${JSON.stringify(r.panier || "").replaceAll('"', "&quot;")}, numero: ${Number(r.numero) || 0}, date: '${r.envoye_le || ""}', statut: 'transmise', remise: ${Number(r.remise_pct) || 0} })">⬇ Excel (bon de commande)</button>
       </div>
       <div id="preco-dupli"></div>`;
     rendreDupliPreco(PRECO_COURANTE);
@@ -5747,6 +5755,151 @@ async function enregistrerPanierPreco() {
 let PRECO_LIVRAISONS = [];   // les fenêtres de la campagne
 let PRECO_SAISIE = {};       // ce que le magasin a déjà enregistré
 let PRECO_OUVERT = null;     // référence en cours de saisie
+
+/* ---- export Excel façon bon de commande Nike ----
+   Anthony veut garder une copie de chaque commande sous la forme du planner Nike :
+   une ligne par article et par date de livraison, les tailles en colonnes. Trois
+   feuilles : le bon de commande, le récap par livraison, le détail ligne à ligne. */
+let PRECO_VALID_LIGNES = [];   // la saisie affichée sur la page de validation (brouillon)
+
+async function infosProduitsPreco(campagne, refs) {
+  let base = (PRECO_COURANTE === campagne && PRECO_PRODUITS.length) ? PRECO_PRODUITS : (MERCH_PRECO[campagne] || []);
+  const manquantes = refs.filter(r => !base.some(p => p.reference === r));
+  if (manquantes.length) {
+    try {
+      const lot = await api("/rest/v1/rpc/catalogue_precommande",
+        { corps: { p_campagne: campagne, limite: 1000, p_references: manquantes, p_societe: clientActif?.id ?? null } });
+      base = base.concat(lot || []);
+    } catch (e) { /* sans fiche, la référence seule figurera */ }
+  }
+  return Object.fromEntries(base.map(p => [p.reference, p]));
+}
+
+const libelleMagasinExcel = m => m ? `${m.id_fastmag ? m.id_fastmag + ") " : ""}${m.nom || m.compte || ""}${m.ville ? " · " + m.ville : ""}` : "";
+const nomFichierExcel = (campagne, compte, panier, numero) =>
+  `PRECO_${String(campagne).replace(/[^\w-]+/g, "_")}_${String(compte || "MAGASIN").replace(/[^\w-]+/g, "_")}_${String(panier || "panier").replace(/[^\w-]+/g, "_")}_${numero ? "N" + numero : "BROUILLON"}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`;
+
+function feuillesBonDeCommande({ campagne, magasin, panier, numero, date, statut, lignes, produits, remise }) {
+  lignes = (lignes || []).filter(l => Number(l.quantite) > 0);
+  const info = r => produits[r] || {};
+  const dateFr = d => d ? new Date(d).toLocaleDateString("fr-FR") : "";
+  const r2 = n => Math.round(n * 100) / 100;
+  const tailles = [...new Set(lignes.map(l => l.taille))].sort((a, b) => cleTaille(a) - cleTaille(b));
+  const parCle = {};
+  for (const l of lignes) {
+    const k = l.reference + "|" + (l.livraison || "");
+    const e = (parCle[k] ??= { ref: l.reference, liv: l.livraison || "", tailles: {}, pieces: 0, montant: 0, pu: Number(l.prix) || 0 });
+    e.tailles[l.taille] = (e.tailles[l.taille] || 0) + Number(l.quantite);
+    e.pieces += Number(l.quantite);
+    e.montant += Number(l.quantite) * (Number(l.prix) || 0);
+  }
+  const ordreCat = ["Footwear", "Sportswear", "Running", "Training", "Jordan", "Football", "Jeunes athlètes", "Accessoires", "Golf", "Autre"];
+  const rangCat = r => { const i = ordreCat.indexOf(categorieDe(info(r))); return i < 0 ? 99 : i; };
+  const rangs = Object.values(parCle).sort((a, b) => a.liv.localeCompare(b.liv) || rangCat(a.ref) - rangCat(b.ref)
+    || (info(a.ref).designation || "").localeCompare(info(b.ref).designation || "") || a.ref.localeCompare(b.ref));
+  const totalPieces = rangs.reduce((s, e) => s + e.pieces, 0);
+  const totalHT = rangs.reduce((s, e) => s + e.montant, 0);
+  const bloc = [
+    ["FKB2B — Bon de commande précommande"],
+    ["Campagne", campagne],
+    ["Magasin", magasin || ""],
+    ["Panier", panier || ""],
+    ["Transmission", numero ? `n° ${numero}${statut ? " — " + statut : ""}` : "brouillon, non transmis"],
+    ["Date", date ? new Date(date).toLocaleString("fr-FR") : new Date().toLocaleString("fr-FR")],
+    ["Pièces", totalPieces],
+    ["Total HT", r2(totalHT)],
+    ...(remise > 0 ? [["Remise compte", `${remise} %`], ["Net HT", r2(totalHT * (1 - remise / 100))]] : []),
+    [],
+  ];
+  const entete = ["Nom du produit", "Article-Couleur", "Couleur", "Coloris fournisseur", "Catégorie", "Famille", "Livraison (CRD)",
+                  "Prix unitaire HT", "Quantité totale", "Montant HT", ...tailles];
+  const corps = rangs.map(e => { const p = info(e.ref); return [p.designation || "", e.ref, p.couleur || "", p.coloris || "",
+    categorieDe(p) || "", p.famille || "", dateFr(e.liv), e.pu, e.pieces, r2(e.montant), ...tailles.map(t => e.tailles[t] || "")]; });
+  const totalLigne = ["TOTAL", "", "", "", "", "", "", "", totalPieces, r2(totalHT), ...tailles.map(t => rangs.reduce((s, e) => s + (e.tailles[t] || 0), 0))];
+  const bon = { nom: "Bon de commande", lignes: [...bloc, entete, ...corps, [], totalLigne],
+    gras: [1, bloc.length + 1, bloc.length + corps.length + 3], figer: bloc.length + 1,
+    largeurs: [34, 14, 10, 30, 14, 16, 14, 12, 12, 12, ...tailles.map(() => 7)] };
+  const livraisons = [...new Set(rangs.map(e => e.liv))].sort();
+  const parLiv = { nom: "Par livraison", gras: [1], largeurs: [16, 12, 10, 14],
+    lignes: [["Livraison", "Références", "Pièces", "Montant HT"], ...livraisons.map(liv => {
+      const rs = rangs.filter(e => e.liv === liv);
+      return [dateFr(liv) || "sans date", rs.length, rs.reduce((s, e) => s + e.pieces, 0), r2(rs.reduce((s, e) => s + e.montant, 0))]; }),
+      ["TOTAL", rangs.length, totalPieces, r2(totalHT)]] };
+  const detail = { nom: "Détail", gras: [1], figer: 1, largeurs: [14, 34, 10, 8, 12, 10, 14, 12],
+    lignes: [["Article-Couleur", "Nom du produit", "Couleur", "Taille", "Livraison", "Quantité", "Prix unitaire HT", "Montant HT"],
+      ...[...lignes].sort((a, b) => (a.livraison || "").localeCompare(b.livraison || "") || a.reference.localeCompare(b.reference) || cleTaille(a.taille) - cleTaille(b.taille))
+        .map(l => [l.reference, info(l.reference).designation || "", info(l.reference).couleur || "", l.taille, dateFr(l.livraison),
+                   Number(l.quantite), Number(l.prix) || 0, r2(Number(l.quantite) * (Number(l.prix) || 0))])] };
+  return [bon, parLiv, detail];
+}
+
+// La saisie en cours du panier ouvert (page de validation, avant transmission).
+async function excelPrecoBrouillon() {
+  const lignes = PRECO_VALID_LIGNES || [];
+  if (!lignes.length) { alert("Rien à exporter : ce panier est vide."); return; }
+  const produits = await infosProduitsPreco(PRECO_COURANTE, [...new Set(lignes.map(l => l.reference))]);
+  const pa = panierActif();
+  telechargerXlsx(nomFichierExcel(PRECO_COURANTE, clientActif?.compte, pa?.nom, null),
+    feuillesBonDeCommande({ campagne: PRECO_COURANTE, magasin: libelleMagasinExcel(clientActif), panier: pa?.nom,
+                            lignes, produits, remise: remiseCompte() }));
+}
+
+// Une transmission (magasin ou back-office) : les lignes figées à la transmission.
+async function excelPrecoEnvoi(envoiId, campagne, options = {}) {
+  let lignes = [];
+  try { lignes = await api("/rest/v1/rpc/precommande_envoi_lignes", { corps: { p_id: envoiId } }) || []; }
+  catch (e) { alert("Export impossible : " + (e.donnees?.message || e.message)); return; }
+  const produits = await infosProduitsPreco(campagne, [...new Set(lignes.map(l => l.reference))]);
+  const magasin = options.magasin || libelleMagasinExcel(clientActif);
+  telechargerXlsx(nomFichierExcel(campagne, options.compte || clientActif?.compte, options.panier, options.numero),
+    feuillesBonDeCommande({ campagne, magasin, panier: options.panier, numero: options.numero, date: options.date,
+                            statut: options.statut ? (LIBELLES_PRECO[options.statut] || [options.statut])[0] : "",
+                            lignes, produits, remise: Number(options.remise) || 0 }));
+}
+
+// Back-office : toutes les transmissions de la campagne (hors refusées), une feuille
+// par magasin et panier, plus le cumul réseau par référence, taille et livraison.
+async function excelPrecoReseau() {
+  const envois = PRECO_ADMIN_RANGS.flatMap(r => (r.paniers || []).filter(p => p.envoi && p.envoi.statut !== "refusee")
+    .map(p => ({ magasin: r, panier: p, envoi: p.envoi })));
+  if (!envois.length) { alert("Aucune transmission à exporter sur cette campagne."); return; }
+  const etat = document.getElementById("pa-chiffres");
+  const toutes = [];
+  for (const e of envois) {
+    const lignes = await api("/rest/v1/rpc/precommande_envoi_lignes", { corps: { p_id: e.envoi.id } }).catch(() => []);
+    e.lignes = lignes || [];
+    toutes.push(...e.lignes);
+  }
+  const produits = await infosProduitsPreco(PRECO_ADMIN_CAMPAGNE, [...new Set(toutes.map(l => l.reference))]);
+  const r2 = n => Math.round(n * 100) / 100;
+  const dateFr = d => d ? new Date(d).toLocaleDateString("fr-FR") : "";
+  // cumul réseau
+  const cumul = {};
+  for (const l of toutes) {
+    const k = `${l.reference}|${l.taille}|${l.livraison || ""}`;
+    const c = (cumul[k] ??= { reference: l.reference, taille: l.taille, livraison: l.livraison || "", pieces: 0, magasins: new Set() });
+    c.pieces += Number(l.quantite);
+  }
+  envois.forEach(e => e.lignes.forEach(l => { const k = `${l.reference}|${l.taille}|${l.livraison || ""}`; cumul[k].magasins.add(e.magasin.societe_id); }));
+  const info = r => produits[r] || {};
+  const feuilleCumul = { nom: "Cumul réseau", gras: [1], figer: 1, largeurs: [14, 34, 10, 8, 12, 10, 10],
+    lignes: [["Article-Couleur", "Nom du produit", "Couleur", "Taille", "Livraison", "Pièces", "Magasins"],
+      ...Object.values(cumul).sort((a, b) => a.reference.localeCompare(b.reference) || cleTaille(a.taille) - cleTaille(b.taille) || a.livraison.localeCompare(b.livraison))
+        .map(c => [c.reference, info(c.reference).designation || "", info(c.reference).couleur || "", c.taille, dateFr(c.livraison), c.pieces, c.magasins.size])] };
+  const feuilleMagasins = { nom: "Par magasin", gras: [1], largeurs: [30, 18, 12, 18, 10, 14],
+    lignes: [["Magasin", "Panier", "N°", "Statut", "Pièces", "Total HT net"],
+      ...envois.map(e => [libelleMagasinExcel(e.magasin), e.panier.nom, e.envoi.numero, (LIBELLES_PRECO[e.envoi.statut] || [e.envoi.statut])[0], Number(e.envoi.pieces), r2(Number(e.envoi.total_net))]),
+      ["TOTAL", "", "", "", envois.reduce((s, e) => s + Number(e.envoi.pieces), 0), r2(envois.reduce((s, e) => s + Number(e.envoi.total_net), 0))]] };
+  const feuilles = [feuilleMagasins, feuilleCumul];
+  for (const e of envois) {
+    const f = feuillesBonDeCommande({ campagne: PRECO_ADMIN_CAMPAGNE, magasin: libelleMagasinExcel(e.magasin), panier: e.panier.nom,
+      numero: e.envoi.numero, date: e.envoi.envoye_le, statut: (LIBELLES_PRECO[e.envoi.statut] || [e.envoi.statut])[0],
+      lignes: e.lignes, produits, remise: Number(e.envoi.remise_pct) || 0 })[0];
+    f.nom = `${e.magasin.id_fastmag ? e.magasin.id_fastmag + " " : ""}${e.magasin.nom || ""} ${e.panier.nom}`.slice(0, 31);
+    feuilles.push(f);
+  }
+  telechargerXlsx(`PRECO_${String(PRECO_ADMIN_CAMPAGNE).replace(/[^\w-]+/g, "_")}_RESEAU_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`, feuilles);
+}
 
 const jourCourt = (d) => d
   ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })

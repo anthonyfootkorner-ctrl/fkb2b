@@ -235,3 +235,93 @@ async function base64VersTexte(b64) {
   const flux = new Blob([octets]).stream().pipeThrough(new DecompressionStream("gzip"));
   return await new Response(flux).text();
 }
+
+/* ---- classeur Excel minimal, sans bibliothèque ----
+   Un .xlsx est un ZIP de XML : on l'écrit à la main (ZIP « store », chaînes en ligne).
+   Suffisant pour un bon de commande : texte, nombres, largeurs de colonnes, lignes en
+   gras, première ligne figée. feuilles = [{ nom, lignes: [[...]], gras: [n° de lignes],
+   largeurs: [...], figer: n° de ligne }]. */
+function crc32Table() {
+  if (crc32Table.t) return crc32Table.t;
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return (crc32Table.t = t);
+}
+function crc32(octets) {
+  const t = crc32Table();
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < octets.length; i++) c = t[(c ^ octets[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function zipperStore(entrees) {   // [{ nom, texte }] → Uint8Array
+  const enc = new TextEncoder();
+  const parts = [], central = [];
+  let offset = 0;
+  const d = new Date();
+  const heure = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+  const date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  const u16 = v => [v & 0xFF, (v >>> 8) & 0xFF];
+  const u32 = v => [v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF];
+  for (const e of entrees) {
+    const nom = enc.encode(e.nom), data = enc.encode(e.texte), crc = crc32(data);
+    const local = new Uint8Array([...u32(0x04034b50), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(heure), ...u16(date),
+      ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nom.length), ...u16(0), ...nom]);
+    parts.push(local, data);
+    central.push(new Uint8Array([...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(heure), ...u16(date),
+      ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nom.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+      ...u32(0), ...u32(offset), ...nom]));
+    offset += local.length + data.length;
+  }
+  const tailleCentral = central.reduce((s, c) => s + c.length, 0);
+  const fin = new Uint8Array([...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(entrees.length), ...u16(entrees.length),
+    ...u32(tailleCentral), ...u32(offset), ...u16(0)]);
+  const total = offset + tailleCentral + fin.length;
+  const sortie = new Uint8Array(total);
+  let p = 0;
+  for (const x of [...parts, ...central, fin]) { sortie.set(x, p); p += x.length; }
+  return sortie;
+}
+function fabriquerXlsx(feuilles) {
+  const xml = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const col = i => { let s = ""; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = (i - m - 1) / 26; } return s; };
+  const nomFeuille = n => String(n || "Feuille").replace(/[\\/?*[\]:]/g, " ").slice(0, 31);
+  const feuillesXml = feuilles.map((f, idx) => {
+    const gras = new Set(f.gras || []);
+    const nbCols = Math.max(...f.lignes.map(l => l.length), 1);
+    const largeurs = f.largeurs || [];
+    const auto = i => Math.min(50, Math.max(8, ...f.lignes.map(l => String(l[i] ?? "").length + 2)));
+    const cols = `<cols>${Array.from({ length: nbCols }, (_, i) => `<col min="${i + 1}" max="${i + 1}" width="${largeurs[i] || auto(i)}" customWidth="1"/>`).join("")}</cols>`;
+    const rows = f.lignes.map((l, r) => {
+      const cells = l.map((v, c) => {
+        if (v === null || v === undefined || v === "") return "";
+        const ref = `${col(c)}${r + 1}`, s = gras.has(r + 1) ? ' s="1"' : "";
+        return typeof v === "number" && isFinite(v) ? `<c r="${ref}"${s}><v>${v}</v></c>`
+          : `<c r="${ref}" t="inlineStr"${s}><is><t xml:space="preserve">${xml(v)}</t></is></c>`;
+      }).join("");
+      return `<row r="${r + 1}">${cells}</row>`;
+    }).join("");
+    const figer = f.figer ? `<sheetViews><sheetView workbookViewId="0"${idx === 0 ? ' tabSelected="1"' : ""}><pane ySplit="${f.figer}" topLeftCell="A${f.figer + 1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` : "";
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${figer}${cols}<sheetData>${rows}</sheetData></worksheet>`;
+  });
+  const entrees = [
+    { nom: "[Content_Types].xml", texte: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${feuilles.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}</Types>` },
+    { nom: "_rels/.rels", texte: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+    { nom: "xl/workbook.xml", texte: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${feuilles.map((f, i) => `<sheet name="${xml(nomFeuille(f.nom))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("")}</sheets></workbook>` },
+    { nom: "xl/_rels/workbook.xml.rels", texte: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${feuilles.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("")}<Relationship Id="rId${feuilles.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
+    { nom: "xl/styles.xml", texte: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>` },
+    ...feuillesXml.map((texte, i) => ({ nom: `xl/worksheets/sheet${i + 1}.xml`, texte })),
+  ];
+  return zipperStore(entrees);
+}
+function telechargerXlsx(nomFichier, feuilles) {
+  const octets = fabriquerXlsx(feuilles);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([octets], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  a.download = nomFichier;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
