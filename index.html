@@ -1511,10 +1511,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789214796"></script>
-<script src="imports.js?v=1789214796"></script>
-<script src="merch-shopify.js?v=1789214796"></script>
-<script src="moteur-merch.js?v=1789214796"></script>
+<script src="config.js?v=1789215109"></script>
+<script src="imports.js?v=1789215109"></script>
+<script src="merch-shopify.js?v=1789215109"></script>
+<script src="moteur-merch.js?v=1789215109"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1982,7 +1982,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789214796";
+    v.src = "hero.mp4?v=1789215109";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -5779,7 +5779,36 @@ const libelleMagasinExcel = m => m ? `${m.id_fastmag ? m.id_fastmag + ") " : ""}
 const nomFichierExcel = (campagne, compte, panier, numero) =>
   `PRECO_${String(campagne).replace(/[^\w-]+/g, "_")}_${String(compte || "MAGASIN").replace(/[^\w-]+/g, "_")}_${String(panier || "panier").replace(/[^\w-]+/g, "_")}_${numero ? "N" + numero : "BROUILLON"}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`;
 
-function feuillesBonDeCommande({ campagne, magasin, panier, numero, date, statut, lignes, produits, remise }) {
+/* Les vignettes : la première photo Shopify de chaque référence, réduite dans le
+   navigateur (le CDN Shopify autorise la lecture), en JPEG ~90 px. Sans photo, la
+   case reste vide. Un échec réseau n'empêche pas l'export. */
+const PHOTO_EXCEL_PX = 90;
+async function miniaturesPreco(produits, refs) {
+  const sortie = {};
+  const canvas = document.createElement("canvas");
+  canvas.width = PHOTO_EXCEL_PX; canvas.height = PHOTO_EXCEL_PX;
+  const ctx = canvas.getContext("2d");
+  const une = async ref => {
+    const url = produits[ref]?.photo;
+    if (!url) return;
+    try {
+      const rep = await fetch(url, { mode: "cors" });
+      if (!rep.ok) return;
+      const bitmap = await createImageBitmap(await rep.blob());
+      const k = Math.min(PHOTO_EXCEL_PX / bitmap.width, PHOTO_EXCEL_PX / bitmap.height);
+      const w = Math.max(1, Math.round(bitmap.width * k)), h = Math.max(1, Math.round(bitmap.height * k));
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, PHOTO_EXCEL_PX, PHOTO_EXCEL_PX);
+      ctx.drawImage(bitmap, (PHOTO_EXCEL_PX - w) / 2, (PHOTO_EXCEL_PX - h) / 2, w, h);
+      const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.82));
+      sortie[ref] = { octets: new Uint8Array(await blob.arrayBuffer()), type: "jpeg", largeur: PHOTO_EXCEL_PX, hauteur: PHOTO_EXCEL_PX };
+    } catch (e) { /* photo illisible : case vide */ }
+  };
+  const file = [...new Set(refs)];
+  for (let i = 0; i < file.length; i += 6) await Promise.all(file.slice(i, i + 6).map(une));
+  return sortie;
+}
+
+function feuillesBonDeCommande({ campagne, magasin, panier, numero, date, statut, lignes, produits, remise, miniatures = {} }) {
   lignes = (lignes || []).filter(l => Number(l.quantite) > 0);
   const info = r => produits[r] || {};
   const dateFr = d => d ? new Date(d).toLocaleDateString("fr-FR") : "";
@@ -5811,14 +5840,22 @@ function feuillesBonDeCommande({ campagne, magasin, panier, numero, date, statut
     ...(remise > 0 ? [["Remise compte", `${remise} %`], ["Net HT", r2(totalHT * (1 - remise / 100))]] : []),
     [],
   ];
-  const entete = ["Nom du produit", "Article-Couleur", "Couleur", "Coloris fournisseur", "Catégorie", "Famille", "Livraison (CRD)",
+  const entete = ["Photo", "Nom du produit", "Article-Couleur", "Couleur", "Coloris fournisseur", "Catégorie", "Famille", "Livraison (CRD)",
                   "Prix unitaire HT", "Quantité totale", "Montant HT", ...tailles];
-  const corps = rangs.map(e => { const p = info(e.ref); return [p.designation || "", e.ref, p.couleur || "", p.coloris || "",
+  const corps = rangs.map(e => { const p = info(e.ref); return ["", p.designation || "", e.ref, p.couleur || "", p.coloris || "",
     categorieDe(p) || "", p.famille || "", dateFr(e.liv), e.pu, e.pieces, r2(e.montant), ...tailles.map(t => e.tailles[t] || "")]; });
-  const totalLigne = ["TOTAL", "", "", "", "", "", "", "", totalPieces, r2(totalHT), ...tailles.map(t => rangs.reduce((s, e) => s + (e.tailles[t] || 0), 0))];
+  const totalLigne = ["TOTAL", "", "", "", "", "", "", "", "", totalPieces, r2(totalHT), ...tailles.map(t => rangs.reduce((s, e) => s + (e.tailles[t] || 0), 0))];
+  const images = [], hauteurs = {};
+  rangs.forEach((e, i) => {
+    const m = miniatures[e.ref];
+    if (!m) return;
+    const ligne = bloc.length + 2 + i;
+    images.push({ ligne, colonne: 0, cle: e.ref, octets: m.octets, type: m.type, largeur: m.largeur, hauteur: m.hauteur });
+    hauteurs[ligne] = Math.round(m.hauteur * 0.75) + 4;
+  });
   const bon = { nom: "Bon de commande", lignes: [...bloc, entete, ...corps, [], totalLigne],
-    gras: [1, bloc.length + 1, bloc.length + corps.length + 3], figer: bloc.length + 1,
-    largeurs: [34, 14, 10, 30, 14, 16, 14, 12, 12, 12, ...tailles.map(() => 7)] };
+    gras: [1, bloc.length + 1, bloc.length + corps.length + 3], figer: bloc.length + 1, images, hauteurs,
+    largeurs: [14, 34, 14, 10, 30, 14, 16, 14, 12, 12, 12, ...tailles.map(() => 7)] };
   const livraisons = [...new Set(rangs.map(e => e.liv))].sort();
   const parLiv = { nom: "Par livraison", gras: [1], largeurs: [16, 12, 10, 14],
     lignes: [["Livraison", "Références", "Pièces", "Montant HT"], ...livraisons.map(liv => {
@@ -5837,11 +5874,15 @@ function feuillesBonDeCommande({ campagne, magasin, panier, numero, date, statut
 async function excelPrecoBrouillon() {
   const lignes = PRECO_VALID_LIGNES || [];
   if (!lignes.length) { alert("Rien à exporter : ce panier est vide."); return; }
-  const produits = await infosProduitsPreco(PRECO_COURANTE, [...new Set(lignes.map(l => l.reference))]);
+  const etat = document.getElementById("valid-etat"); if (etat) etat.textContent = "préparation de l'Excel (photos)…";
+  const refs = [...new Set(lignes.map(l => l.reference))];
+  const produits = await infosProduitsPreco(PRECO_COURANTE, refs);
+  const miniatures = await miniaturesPreco(produits, refs);
   const pa = panierActif();
   telechargerXlsx(nomFichierExcel(PRECO_COURANTE, clientActif?.compte, pa?.nom, null),
     feuillesBonDeCommande({ campagne: PRECO_COURANTE, magasin: libelleMagasinExcel(clientActif), panier: pa?.nom,
-                            lignes, produits, remise: remiseCompte() }));
+                            lignes, produits, remise: remiseCompte(), miniatures }));
+  if (etat) etat.textContent = "Excel téléchargé ✓";
 }
 
 // Une transmission (magasin ou back-office) : les lignes figées à la transmission.
@@ -5849,12 +5890,14 @@ async function excelPrecoEnvoi(envoiId, campagne, options = {}) {
   let lignes = [];
   try { lignes = await api("/rest/v1/rpc/precommande_envoi_lignes", { corps: { p_id: envoiId } }) || []; }
   catch (e) { alert("Export impossible : " + (e.donnees?.message || e.message)); return; }
-  const produits = await infosProduitsPreco(campagne, [...new Set(lignes.map(l => l.reference))]);
+  const refs = [...new Set(lignes.map(l => l.reference))];
+  const produits = await infosProduitsPreco(campagne, refs);
+  const miniatures = await miniaturesPreco(produits, refs);
   const magasin = options.magasin || libelleMagasinExcel(clientActif);
   telechargerXlsx(nomFichierExcel(campagne, options.compte || clientActif?.compte, options.panier, options.numero),
     feuillesBonDeCommande({ campagne, magasin, panier: options.panier, numero: options.numero, date: options.date,
                             statut: options.statut ? (LIBELLES_PRECO[options.statut] || [options.statut])[0] : "",
-                            lignes, produits, remise: Number(options.remise) || 0 }));
+                            lignes, produits, remise: Number(options.remise) || 0, miniatures }));
 }
 
 // Back-office : toutes les transmissions de la campagne (hors refusées), une feuille
@@ -5870,7 +5913,9 @@ async function excelPrecoReseau() {
     e.lignes = lignes || [];
     toutes.push(...e.lignes);
   }
-  const produits = await infosProduitsPreco(PRECO_ADMIN_CAMPAGNE, [...new Set(toutes.map(l => l.reference))]);
+  const refsToutes = [...new Set(toutes.map(l => l.reference))];
+  const produits = await infosProduitsPreco(PRECO_ADMIN_CAMPAGNE, refsToutes);
+  const miniatures = await miniaturesPreco(produits, refsToutes);
   const r2 = n => Math.round(n * 100) / 100;
   const dateFr = d => d ? new Date(d).toLocaleDateString("fr-FR") : "";
   // cumul réseau
@@ -5894,7 +5939,7 @@ async function excelPrecoReseau() {
   for (const e of envois) {
     const f = feuillesBonDeCommande({ campagne: PRECO_ADMIN_CAMPAGNE, magasin: libelleMagasinExcel(e.magasin), panier: e.panier.nom,
       numero: e.envoi.numero, date: e.envoi.envoye_le, statut: (LIBELLES_PRECO[e.envoi.statut] || [e.envoi.statut])[0],
-      lignes: e.lignes, produits, remise: Number(e.envoi.remise_pct) || 0 })[0];
+      lignes: e.lignes, produits, remise: Number(e.envoi.remise_pct) || 0, miniatures })[0];
     f.nom = `${e.magasin.id_fastmag ? e.magasin.id_fastmag + " " : ""}${e.magasin.nom || ""} ${e.panier.nom}`.slice(0, 31);
     feuilles.push(f);
   }

@@ -240,7 +240,10 @@ async function base64VersTexte(b64) {
    Un .xlsx est un ZIP de XML : on l'écrit à la main (ZIP « store », chaînes en ligne).
    Suffisant pour un bon de commande : texte, nombres, largeurs de colonnes, lignes en
    gras, première ligne figée. feuilles = [{ nom, lignes: [[...]], gras: [n° de lignes],
-   largeurs: [...], figer: n° de ligne }]. */
+   largeurs: [...], figer: n° de ligne, hauteurs: { n° de ligne: points },
+   images: [{ ligne, colonne (0-based), cle, octets (Uint8Array), type: "png"|"jpeg", largeur, hauteur (px) }] }].
+   Les images sont incrustées via une « drawing » ancrée à la cellule ; la même clé
+   ne stocke le fichier qu'une fois. */
 function crc32Table() {
   if (crc32Table.t) return crc32Table.t;
   const t = new Uint32Array(256);
@@ -267,7 +270,7 @@ function zipperStore(entrees) {   // [{ nom, texte }] → Uint8Array
   const u16 = v => [v & 0xFF, (v >>> 8) & 0xFF];
   const u32 = v => [v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF];
   for (const e of entrees) {
-    const nom = enc.encode(e.nom), data = enc.encode(e.texte), crc = crc32(data);
+    const nom = enc.encode(e.nom), data = e.octets || enc.encode(e.texte), crc = crc32(data);
     const local = new Uint8Array([...u32(0x04034b50), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(heure), ...u16(date),
       ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nom.length), ...u16(0), ...nom]);
     parts.push(local, data);
@@ -289,8 +292,16 @@ function fabriquerXlsx(feuilles) {
   const xml = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const col = i => { let s = ""; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = (i - m - 1) / 26; } return s; };
   const nomFeuille = n => String(n || "Feuille").replace(/[\\/?*[\]:]/g, " ").slice(0, 31);
+  const medias = [];                         // { cle, octets, type, nom }
+  const mediaPour = im => {
+    let m = medias.find(x => x.cle === im.cle);
+    if (!m) { m = { cle: im.cle, octets: im.octets, type: im.type === "png" ? "png" : "jpeg" }; m.nom = `image${medias.length + 1}.${m.type}`; medias.push(m); }
+    return m;
+  };
+  const dessins = [];                        // par feuille : { xml, rels } ou null
   const feuillesXml = feuilles.map((f, idx) => {
     const gras = new Set(f.gras || []);
+    const hauteurs = f.hauteurs || {};
     const nbCols = Math.max(...f.lignes.map(l => l.length), 1);
     const largeurs = f.largeurs || [];
     const auto = i => Math.min(50, Math.max(8, ...f.lignes.map(l => String(l[i] ?? "").length + 2)));
@@ -302,18 +313,42 @@ function fabriquerXlsx(feuilles) {
         return typeof v === "number" && isFinite(v) ? `<c r="${ref}"${s}><v>${v}</v></c>`
           : `<c r="${ref}" t="inlineStr"${s}><is><t xml:space="preserve">${xml(v)}</t></is></c>`;
       }).join("");
-      return `<row r="${r + 1}">${cells}</row>`;
+      const ht = hauteurs[r + 1] ? ` ht="${hauteurs[r + 1]}" customHeight="1"` : "";
+      return `<row r="${r + 1}"${ht}>${cells}</row>`;
     }).join("");
+    let dessin = "";
+    if ((f.images || []).length) {
+      const EMU = 9525;
+      const rels = [];
+      const ancres = f.images.map((im, k) => {
+        const m = mediaPour(im);
+        let rid = rels.find(r => r.cible === m.nom);
+        if (!rid) { rid = { id: `rId${rels.length + 1}`, cible: m.nom }; rels.push(rid); }
+        const cx = Math.round((im.largeur || 96) * EMU), cy = Math.round((im.hauteur || 96) * EMU);
+        return `<xdr:oneCellAnchor><xdr:from><xdr:col>${im.colonne}</xdr:col><xdr:colOff>${2 * EMU}</xdr:colOff><xdr:row>${im.ligne - 1}</xdr:row><xdr:rowOff>${2 * EMU}</xdr:rowOff></xdr:from><xdr:ext cx="${cx}" cy="${cy}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${k + 2}" name="Image ${k + 1}"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${rid.id}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`;
+      }).join("");
+      dessins[idx] = {
+        xml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${ancres}</xdr:wsDr>`,
+        rels: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.map(r => `<Relationship Id="${r.id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/${r.cible}"/>`).join("")}</Relationships>`,
+      };
+      dessin = `<drawing r:id="rId1"/>`;
+    }
     const figer = f.figer ? `<sheetViews><sheetView workbookViewId="0"${idx === 0 ? ' tabSelected="1"' : ""}><pane ySplit="${f.figer}" topLeftCell="A${f.figer + 1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` : "";
-    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${figer}${cols}<sheetData>${rows}</sheetData></worksheet>`;
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${figer}${cols}<sheetData>${rows}</sheetData>${dessin}</worksheet>`;
   });
   const entrees = [
-    { nom: "[Content_Types].xml", texte: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${feuilles.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}</Types>` },
+    { nom: "[Content_Types].xml", texte: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${feuilles.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}${dessins.map((d, i) => d ? `<Override PartName="/xl/drawings/drawing${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>` : "").join("")}</Types>` },
     { nom: "_rels/.rels", texte: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
     { nom: "xl/workbook.xml", texte: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${feuilles.map((f, i) => `<sheet name="${xml(nomFeuille(f.nom))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("")}</sheets></workbook>` },
     { nom: "xl/_rels/workbook.xml.rels", texte: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${feuilles.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("")}<Relationship Id="rId${feuilles.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
     { nom: "xl/styles.xml", texte: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>` },
     ...feuillesXml.map((texte, i) => ({ nom: `xl/worksheets/sheet${i + 1}.xml`, texte })),
+    ...dessins.flatMap((d, i) => d ? [
+      { nom: `xl/worksheets/_rels/sheet${i + 1}.xml.rels`, texte: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${i + 1}.xml"/></Relationships>` },
+      { nom: `xl/drawings/drawing${i + 1}.xml`, texte: d.xml },
+      { nom: `xl/drawings/_rels/drawing${i + 1}.xml.rels`, texte: d.rels },
+    ] : []),
+    ...medias.map(m => ({ nom: `xl/media/${m.nom}`, octets: m.octets })),
   ];
   return zipperStore(entrees);
 }
