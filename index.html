@@ -371,7 +371,10 @@
   .pa-mag b { font-weight: 600; }
   .pa-mag .fin { opacity: .65; }
   /* Tableau de bord précommandes : cartes, tableaux à barres, matrice, colonnes de tailles. */
-  .tb-perimetre { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  .tb-perimetre { display: grid; gap: 8px; margin-top: 12px; }
+  .tb-perimetre .ligne { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .tb-perimetre .suggestions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tb-perimetre .suggestions:empty { display: none; }
   .tb-sep { width: 1px; height: 18px; background: var(--hairline); margin: 0 4px; }
   .puce-claire.tb-chip.on { background: #111; color: #fff; border-color: #111; }
   .tb-bloc { margin-bottom: 18px; }
@@ -1564,10 +1567,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789234446"></script>
-<script src="imports.js?v=1789234446"></script>
-<script src="merch-shopify.js?v=1789234446"></script>
-<script src="moteur-merch.js?v=1789234446"></script>
+<script src="config.js?v=1789290369"></script>
+<script src="imports.js?v=1789290369"></script>
+<script src="merch-shopify.js?v=1789290369"></script>
+<script src="moteur-merch.js?v=1789290369"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2039,7 +2042,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789234446";
+    v.src = "hero.mp4?v=1789290369";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -6059,7 +6062,7 @@ async function excelPrecoReseau() {
    catégorie, rayon, famille, sous-famille, les tops produits, le profil de tailles, le
    classement des magasins et les références que personne n'a prises. Tout est agrégé
    côté serveur (tableau_bord_precommande) : la page ne reçoit que des totaux. */
-let TB_PRECO = { campagne: null, statuts: ["transmise", "validee", "integree"], donnees: null, tri: "montant", tout: {} };
+let TB_PRECO = { campagne: null, statuts: ["transmise", "validee", "integree"], reseaux: [], societes: [], ouverts: [], donnees: null, tri: "montant", tout: {} };
 const STATUTS_TB = [["brouillon", "Brouillons", "en cours, non transmis"], ["transmise", "Transmis", "à valider"],
   ["validee", "Validés", "à intégrer"], ["integree", "Intégrés", "Fastmag"], ["refusee", "Refusés", ""]];
 const tbNb = n => Math.round(Number(n) || 0).toLocaleString("fr-FR");
@@ -6093,6 +6096,7 @@ async function rendreTableauBordPreco(campagne) {
       <div class="tb-perimetre" id="tb-perimetre"></div>
     </div>
     <div id="tb-corps" style="margin: 0 22px 60px"><div class="compte-produits">Chargement…</div></div>`;
+  TB_PRECO.ouverts = []; TB_PRECO.societes = []; TB_PRECO.reseaux = [];
   rendrePerimetreTB();
   await chargerTableauBordPreco();
 }
@@ -6102,14 +6106,65 @@ async function rendreTableauBordPreco(campagne) {
 function rendrePerimetreTB() {
   const zone = document.getElementById("tb-perimetre");
   if (!zone) return;
-  zone.innerHTML = `<span class="compte-produits" style="margin:0">Périmètre analysé :</span>
+  const ouverts = TB_PRECO.ouverts || [];
+  const reseaux = [...new Set(ouverts.map(m => m.reseau || "?"))].sort((a, b) => (RESEAU_PRECOMMANDES.indexOf(b) - RESEAU_PRECOMMANDES.indexOf(a)) || a.localeCompare(b));
+  const choisis = TB_PRECO.societes.map(id => ouverts.find(m => m.societe_id === id)).filter(Boolean);
+  zone.innerHTML = `<div class="ligne"><span class="compte-produits" style="margin:0">Statuts :</span>
     ${STATUTS_TB.map(([s, lib, sous]) => `<button class="puce-claire tb-chip${TB_PRECO.statuts.includes(s) ? " on" : ""}"
         onclick="basculerStatutTB('${s}')" title="${sous ? echapperHTML(sous) : lib}">${lib}</button>`).join("")}
     <span class="tb-sep"></span>
     <button class="puce-claire" onclick="definirStatutsTB(['transmise','validee','integree'])">Engagé</button>
     <button class="puce-claire" onclick="definirStatutsTB(['validee','integree'])">Validé seulement</button>
-    <button class="puce-claire" onclick="definirStatutsTB(['brouillon','transmise','validee','integree'])">Tout sauf refusés</button>`;
+    <button class="puce-claire" onclick="definirStatutsTB(['brouillon','transmise','validee','integree'])">Tout sauf refusés</button></div>
+    ${ouverts.length ? `<div class="ligne"><span class="compte-produits" style="margin:0">Réseau :</span>
+    <button class="puce-claire tb-chip${!TB_PRECO.reseaux.length ? " on" : ""}" onclick="definirReseauxTB([])">Tous · ${ouverts.length}</button>
+    ${reseaux.map(r => `<button class="puce-claire tb-chip${TB_PRECO.reseaux.includes(r) ? " on" : ""}" onclick="basculerReseauTB('${echapperHTML(r)}')">${
+      echapperHTML(r)} · ${ouverts.filter(m => (m.reseau || "?") === r).length}</button>`).join("")}
+    <span class="tb-sep"></span>
+    <span class="compte-produits" style="margin:0">Magasins :</span>
+    ${choisis.map(m => `<span class="pa-mag ouvert" onclick="retirerMagasinTB('${m.societe_id}')" title="retirer du filtre"><b>${echapperHTML(nomMagasinTB(m))}</b><span class="fin">✕</span></span>`).join("")}
+    ${choisis.length ? `<button class="puce-claire" onclick="definirMagasinsTB([])">Tous les magasins</button>` : ""}
+    <input class="qte-claire" id="tb-mag-recherche" style="width:260px; text-align:left" placeholder="${choisis.length ? "ajouter un magasin…" : "filtrer sur un ou plusieurs magasins…"}"
+           oninput="suggererMagasinsTB(this.value)" onkeydown="if (event.key === 'Enter') { event.preventDefault(); ajouterPremierMagasinTB(); } if (event.key === 'Escape') { this.value = ''; suggererMagasinsTB(''); }">
+    </div><div class="suggestions" id="tb-mag-suggestions"></div>` : ""}`;
 }
+
+/* Filtres réseau et magasins : la liste des magasins ouverts vient avec les données ;
+   la recherche propose ceux qui ne sont pas encore retenus, Entrée prend le premier. */
+const generiqueMagasinTB = m => /^(FOOT ?KORNER|FK)?$/i.test((m.nom || "").trim()) || (m.nom || "").trim().toUpperCase() === m.compte;
+const nomMagasinTB = m => `${m.id_fastmag ? m.id_fastmag + ") " : ""}${generiqueMagasinTB(m) ? (m.compte || "").replace(/^FK(?=[A-Z])/, "FK ") : m.nom}${m.ville ? " · " + m.ville : ""}`;
+function basculerReseauTB(r) {
+  TB_PRECO.reseaux = TB_PRECO.reseaux.includes(r) ? TB_PRECO.reseaux.filter(x => x !== r) : TB_PRECO.reseaux.concat(r);
+  // un magasin choisi hors du réseau retenu sortirait du périmètre : on le retire
+  if (TB_PRECO.reseaux.length) TB_PRECO.societes = TB_PRECO.societes.filter(id => TB_PRECO.reseaux.includes((TB_PRECO.ouverts.find(m => m.societe_id === id) || {}).reseau || "?"));
+  rendrePerimetreTB(); chargerTableauBordPreco();
+}
+function definirReseauxTB(liste) { TB_PRECO.reseaux = liste.slice(); rendrePerimetreTB(); chargerTableauBordPreco(); }
+function definirMagasinsTB(liste) { TB_PRECO.societes = liste.slice(); rendrePerimetreTB(); chargerTableauBordPreco(); }
+function retirerMagasinTB(id) { definirMagasinsTB(TB_PRECO.societes.filter(x => x !== id)); }
+function ajouterMagasinTB(id) {
+  if (!TB_PRECO.societes.includes(id)) TB_PRECO.societes = TB_PRECO.societes.concat(id);
+  rendrePerimetreTB(); chargerTableauBordPreco();
+  const champ = document.getElementById("tb-mag-recherche"); if (champ) champ.focus();
+}
+function suggererMagasinsTB(valeur) {
+  const zone = document.getElementById("tb-mag-suggestions");
+  if (!zone) return;
+  const q = (valeur || "").trim().toLowerCase();
+  if (!q) { zone.innerHTML = ""; return; }
+  const candidats = (TB_PRECO.ouverts || []).filter(m => !TB_PRECO.societes.includes(m.societe_id)
+      && (!TB_PRECO.reseaux.length || TB_PRECO.reseaux.includes(m.reseau || "?"))
+      && [m.id_fastmag, m.nom, m.ville, m.compte].filter(Boolean).join(" ").toLowerCase().includes(q))
+    .sort((a, b) => nomMagasinTB(a).localeCompare(nomMagasinTB(b), "fr")).slice(0, 24);
+  zone.innerHTML = candidats.length
+    ? candidats.map(m => `<span class="pa-mag" data-id="${m.societe_id}" onclick="ajouterMagasinTB('${m.societe_id}')"><b>${echapperHTML(nomMagasinTB(m))}</b><span class="fin">${echapperHTML(m.reseau || "")}</span></span>`).join("")
+    : `<span class="compte-produits" style="margin:0">Aucun magasin ouvert ne correspond.</span>`;
+}
+function ajouterPremierMagasinTB() {
+  const premier = document.querySelector("#tb-mag-suggestions .pa-mag");
+  if (premier) ajouterMagasinTB(premier.dataset.id);
+}
+
 function basculerStatutTB(s) {
   TB_PRECO.statuts = TB_PRECO.statuts.includes(s) ? TB_PRECO.statuts.filter(x => x !== s) : TB_PRECO.statuts.concat(s);
   if (!TB_PRECO.statuts.length) TB_PRECO.statuts = [s];
@@ -6122,7 +6177,8 @@ async function chargerTableauBordPreco() {
   if (!corps) return;
   corps.style.opacity = ".5";
   try {
-    TB_PRECO.donnees = await api("/rest/v1/rpc/tableau_bord_precommande", { corps: { p_campagne: TB_PRECO.campagne, p_statuts: TB_PRECO.statuts } });
+    TB_PRECO.donnees = await api("/rest/v1/rpc/tableau_bord_precommande", { corps: { p_campagne: TB_PRECO.campagne, p_statuts: TB_PRECO.statuts,
+      p_reseaux: TB_PRECO.reseaux.length ? TB_PRECO.reseaux : null, p_societes: TB_PRECO.societes.length ? TB_PRECO.societes : null } });
   } catch (e) {
     corps.style.opacity = "1";
     corps.innerHTML = `<div class="compte-produits">Impossible de charger : ${echapperHTML(String(e.donnees?.message || e.message))}</div>`;
@@ -6130,10 +6186,20 @@ async function chargerTableauBordPreco() {
   }
   corps.style.opacity = "1";
   if (!TB_PRECO.donnees) { corps.innerHTML = `<div class="compte-produits">Réservé aux comptes internes.</div>`; return; }
+  if (!TB_PRECO.ouverts.length && (TB_PRECO.donnees.ouverts || []).length) {   // première réponse : les filtres réseau et magasins apparaissent
+    TB_PRECO.ouverts = TB_PRECO.donnees.ouverts;
+    rendrePerimetreTB();
+  }
   dessinerTableauBordPreco();
 }
 
 const tbDim = nom => (TB_PRECO.donnees?.dims || []).filter(d => d.dim === nom);
+function libellePerimetreTB() {
+  const statuts = TB_PRECO.statuts.map(s => (STATUTS_TB.find(x => x[0] === s) || [s, s])[1]).join(" + ");
+  const mags = TB_PRECO.societes.map(id => TB_PRECO.ouverts.find(m => m.societe_id === id)).filter(Boolean);
+  return statuts + (TB_PRECO.reseaux.length ? " · " + TB_PRECO.reseaux.join(" + ") : "")
+    + (mags.length ? " · " + (mags.length > 3 ? `${mags.length} magasins` : mags.map(nomMagasinTB).join(", ")) : "");
+}
 
 function dessinerTableauBordPreco() {
   const d = TB_PRECO.donnees;
@@ -6173,7 +6239,7 @@ function dessinerTableauBordPreco() {
 
   /* 2. Le périmètre choisi en un coup d'œil. */
   const perimetre = `<div class="bloc-clair tb-bloc">
-    <h3 class="titre-bloc">Périmètre analysé · ${TB_PRECO.statuts.map(s => (STATUTS_TB.find(x => x[0] === s) || [s, s])[1]).join(" + ")}</h3>
+    <h3 class="titre-bloc">Périmètre analysé · ${libellePerimetreTB()}</h3>
     <div class="recap-chiffres">
       ${chiffre(eur(Number(sc.montant)), "montant HT brut")}
       ${chiffre(tbNb(sc.pieces), "pièces")}
@@ -6355,7 +6421,7 @@ function excelTableauBordPreco() {
     ["Magasins ouverts", Number(d.magasins_ouverts)], ["Ont commencé une saisie", Number(d.magasins_saisi || 0)], ["Ont transmis", Number(d.magasins_transmis || 0)],
     ["Budget cumulé", r2(d.budget_total)], ["Références offertes", Number(d.refs_offertes)],
     [],
-    ["Périmètre analysé", TB_PRECO.statuts.map(lib).join(" + ")],
+    ["Périmètre analysé", libellePerimetreTB()],
     ["Montant HT brut", r2(sc.montant)], ["Pièces", Number(sc.pieces)], ["Magasins", Number(sc.magasins)], ["Paniers", Number(sc.paniers)],
     ["Références prises", Number(sc.refs)], ["Références sans commande", Number(d.sans_commande?.total || 0)],
   ] };
