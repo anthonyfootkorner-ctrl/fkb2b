@@ -715,6 +715,10 @@
   .prod-infos .refline { font-size: 12px; color: var(--encre2); margin-top: 10px; letter-spacing: .06em; }
   .prod-infos .prixgros { font-size: 19px; font-weight: 600; margin-top: 18px; }
   .prod-infos .prixgros span { font-size: 11.5px; color: var(--encre2); font-weight: 400; margin-left: 8px; }
+  .prod-infos .pvc { margin-top: 6px; font-size: 13px; color: var(--encre2); }
+  .prod-infos .pvc b { color: var(--encre); font-weight: 600; }
+  .prod-infos .pvc span { margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: #f2f2f0; font-size: 11px; }
+  .carte .prix.pvc-court { margin-top: 2px; opacity: .8; }
 
   .repartition { display: flex; align-items: center; gap: 10px; margin-top: 30px; flex-wrap: wrap; }
   .repartition label { font-size: 10.5px; color: var(--encre2); letter-spacing: .12em; text-transform: uppercase; }
@@ -1567,10 +1571,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789290369"></script>
-<script src="imports.js?v=1789290369"></script>
-<script src="merch-shopify.js?v=1789290369"></script>
-<script src="moteur-merch.js?v=1789290369"></script>
+<script src="config.js?v=1789321842"></script>
+<script src="imports.js?v=1789321842"></script>
+<script src="merch-shopify.js?v=1789321842"></script>
+<script src="moteur-merch.js?v=1789321842"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1653,6 +1657,13 @@ function cleTaille(taille) {
 const trierTailles = p => p.tailles.sort((a, b) => cleTaille(a.taille) - cleTaille(b.taille));
 const prixDe = t => t.prix.CLIENT;   // les prix arrivent déjà filtrés par la famille de la société (RLS)
 const prixMini = p => Math.min(...p.tailles.filter(t => t.prix?.CLIENT != null).map(prixDe));
+/* Prix de vente conseillé (TTC, fiche Fastmag) et coefficient sur le tarif d'achat HT :
+   le magasin voit d'un coup d'œil la marge que lui laisse la référence. */
+const pvcDe = p => Number(p.pvc) > 0 ? Number(p.pvc) : null;
+const coefDe = p => { const pvc = pvcDe(p), pa = prixMini(p); return pvc && pa > 0 && isFinite(pa) ? Math.round(pvc / pa * 100) / 100 : null; };
+const lignePVC = (p, court = false) => pvcDe(p)
+  ? (court ? `PVC ${eur(pvcDe(p))}` : `PVC ${eur(pvcDe(p))} TTC`) + (coefDe(p) ? ` · coef ${pct(coefDe(p))}` : "")
+  : "";
 
 async function init() {
   if (!sessionCourante()) { location.href = "login.html"; return; }
@@ -2042,7 +2053,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789290369";
+    v.src = "hero.mp4?v=1789321842";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4490,6 +4501,7 @@ function rendreGrillePreco() {
         <div class="sousnom">${echapperHTML(p.marque || "")} · ${echapperHTML(p.reference)}${
           categorieDe(p) ? ` · ${echapperHTML(categorieDe(p))}` : ""}</div>
         <div class="prix">dès ${eur(prixMini(p))} HT</div>
+        ${pvcDe(p) ? `<div class="prix pvc-court">PVC ${eur(pvcDe(p))} TTC</div>` : ""}
         <div class="sousnom" style="margin-top:6px; color:${saisi ? "#2e9e4f" : "var(--encre2)"}">${
           saisi ? `${saisi} pièce${saisi > 1 ? "s" : ""} précommandée${saisi > 1 ? "s" : ""}`
                 : "à compléter"}</div>
@@ -4882,7 +4894,7 @@ async function rendrePanierPreco(campagne) {
               <span>
                 <div class="pp-nom" title="${echapperHTML(p.designation || p.reference)}">${
                   echapperHTML(p.designation || p.reference)}</div>
-                <div class="pp-ref">${echapperHTML(p.reference)}${categorieDe(p) ? " · " + echapperHTML(categorieDe(p)) : ""} · ${eur(prixMini(p))} HT</div>
+                <div class="pp-ref">${echapperHTML(p.reference)}${categorieDe(p) ? " · " + echapperHTML(categorieDe(p)) : ""} · ${eur(prixMini(p))} HT${pvcDe(p) ? ` · ${lignePVC(p, true)}` : ""}</div>
               </span>
               <button class="pp-retirer" title="retirer de ma sélection"
                       onclick="retirerDuPanierPreco(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">✕</button>
@@ -6516,6 +6528,7 @@ async function rendreProduitPreco(campagne, reference) {
         <div class="refline">${echapperHTML(p.reference)}${p.couleur ? " · " + echapperHTML(p.couleur) : ""}${
           p.coloris ? " · " + echapperHTML(p.coloris) : ""} · Saison ${echapperHTML(p.saison || "—")}</div>
         <div class="prixgros">dès ${eur(prixMini(p))} HT<span>votre tarif</span></div>
+        ${pvcDe(p) ? `<div class="pvc"><b>${eur(pvcDe(p))}</b> TTC prix de vente conseillé${coefDe(p) ? `<span>coef ${pct(coefDe(p))}</span>` : ""}</div>` : ""}
         <div class="legende">
           <span><i class="pastille bleu"></i><b>Précommande</b> — quantité libre, livraison à la date choisie</span>
         </div>

@@ -333,7 +333,10 @@ function mapperVersTables(analyse) {
         id_fastmag: l.Produit, reference: l.Reference_Article, couleur: l.Couleur,
         taille: l.Taille, ean: l.Gencod || null, designation: l.Designation,
         coloris_fournisseur: l.Designation2, marque: l.Marque, famille: l.Famille,
-        sous_famille: l.Sous_Famille, rayon: l.Rayon, saison: l.Saison })) }];
+        sous_famille: l.Sous_Famille, rayon: l.Rayon, saison: l.Saison,
+        // prix de vente conseillé TTC (Prix_vente Fastmag) ; vide ou 0 = inconnu
+        prix_vente: parseFloat(String(l.Prix_vente || "").replace(",", ".")) > 0
+          ? parseFloat(String(l.Prix_vente || "").replace(",", ".")) : null })) }];
     }
     case "stock":
       return [{ table: "stocks", vider: true, activer: true,
