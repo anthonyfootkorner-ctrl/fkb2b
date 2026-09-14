@@ -1573,10 +1573,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789374578"></script>
-<script src="imports.js?v=1789374578"></script>
-<script src="merch-shopify.js?v=1789374578"></script>
-<script src="moteur-merch.js?v=1789374578"></script>
+<script src="config.js?v=1789391596"></script>
+<script src="imports.js?v=1789391596"></script>
+<script src="merch-shopify.js?v=1789391596"></script>
+<script src="moteur-merch.js?v=1789391596"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2055,7 +2055,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789374578";
+    v.src = "hero.mp4?v=1789391596";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3047,8 +3047,9 @@ async function exporterStockB2B() {
     ["1. Corrigez la colonne « Quantité » : c'est le stock physique de l'emplacement. Une ligne à 0 disparaît du catalogue."],
     ["2. Pour ajouter une taille ou une référence, ajoutez une ligne : référence et taille doivent exister dans les fiches produits Fastmag."],
     ["3. « Précommande » = oui pour une quantité libre (stock illimité). Les colonnes Réservé et Disponible net sont indicatives : ne les modifiez pas, elles ne sont pas relues."],
-    ["4. Enregistrez en .xlsx (gardez cette feuille en première position), puis déposez le fichier dans le Centre d'import."],
-    ["   Le dépôt REMPLACE tout le stock B2B et solde les commandes en attente (elles passent « intégrées ») : à faire une fois ces commandes intégrées dans Fastmag."],
+    ["4. Enregistrez en .xlsx (gardez cette feuille en première position), puis déposez le fichier dans le Centre d'import et choisissez :"],
+    ["   « remplace tout » : le fichier devient tout le stock B2B et les commandes en attente sont soldées (à faire une fois intégrées dans Fastmag) ;"],
+    ["   « complète » : seules les lignes du fichier sont créées ou corrigées (vous pouvez ne garder que les lignes à changer), le reste est conservé."],
   ] };
   telechargerXlsx(`STOCK_B2B_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`, [stock, aide]);
   etat.textContent = `export téléchargé ✓ — ${rangs.length} lignes, ${refs.length} références`;
@@ -3349,11 +3350,16 @@ function destinationImport() {
 }
 
 function majDestinationImport() {
-  const preco = destinationImport() === "preco";
+  const dest = destinationImport();
+  const preco = dest === "preco";
   const bloc = document.getElementById("bloc-campagne");
   if (bloc) bloc.style.display = preco ? "" : "none";
   const btn = document.getElementById("btn-executer-import");
-  if (btn) btn.textContent = preco ? "AJOUTER À LA CAMPAGNE" : "EXÉCUTER L'IMPORT";
+  if (btn) btn.textContent = preco ? "AJOUTER À LA CAMPAGNE" : dest === "completer" ? "COMPLÉTER LE STOCK" : "EXÉCUTER L'IMPORT";
+  const chip = document.getElementById("chip-remplacement");
+  if (chip) chip.textContent = dest === "completer" ? "complément : lignes du fichier créées ou corrigées, le reste conservé, commandes en attente intactes"
+    : dest === "preco" ? "ajout à une campagne, ligne à ligne"
+    : (analyseCourante?.spec?.remplacement_libelle || "remplacement complet du stock + recalcul des actifs");
 }
 
 async function chargerCampagnesPreco() {
@@ -3426,7 +3432,7 @@ async function traiterFichier(fichier) {
         a.livraisons.map(d => new Date(d).toLocaleDateString("fr-FR")).join(" · ")}</span>` : ""}
       ${a.sansDate ? `<span class="chip">${a.sansDate} ligne${a.sansDate > 1 ? "s" : ""} sans date lisible</span>` : ""}
       ${a.stats.prix_zero ? `<span class="chip">${a.stats.prix_zero} ligne${a.stats.prix_zero > 1 ? "s" : ""} à 0 € rejetée${a.stats.prix_zero > 1 ? "s" : ""}</span>` : ""}
-      ${a.spec.remplacement_complet ? `<span class="chip">${a.spec.remplacement_libelle || "remplacement complet du stock + recalcul des actifs"}</span>` : ""}
+      ${a.spec.remplacement_complet ? `<span class="chip" id="chip-remplacement">${a.spec.remplacement_libelle || "remplacement complet du stock + recalcul des actifs"}</span>` : ""}
     </div>
     ${a.stats.prix_zero ? `<div class="cmd-note erreur" style="margin-top:12px">
       <b>${a.stats.prix_zero} tarif${a.stats.prix_zero > 1 ? "s" : ""} à 0 € écarté${a.stats.prix_zero > 1 ? "s" : ""}</b>
@@ -3442,6 +3448,8 @@ async function traiterFichier(fichier) {
         <div class="formu">
           <label class="cmd-coche"><input type="radio" name="destination-b2b" value="stock" checked
                  onchange="majDestinationImport()"> Stock B2B — <b>remplace tout</b> le stock vendable</label>
+          <label class="cmd-coche" title="Les références et tailles du fichier sont créées ou corrigées ; tout le reste du stock est conservé, les commandes en attente ne sont pas soldées"><input type="radio" name="destination-b2b" value="completer"
+                 onchange="majDestinationImport()"> Stock B2B — <b>complète</b> : ajoute ou corrige seulement les lignes du fichier</label>
           <label class="cmd-coche"><input type="radio" name="destination-b2b" value="preco"
                  onchange="majDestinationImport()"> Précommande — <b>s'ajoute</b> à une campagne</label>
         </div>
@@ -3470,8 +3478,9 @@ async function traiterFichier(fichier) {
     btn.disabled = true;
     const progres = document.getElementById("progres-import");
     try {
-      const total = a.modele === "stock_b2b" && destinationImport() === "preco"
-        ? await executerPrecommande(a, msg => progres.textContent = msg)
+      const dest = a.modele === "stock_b2b" ? destinationImport() : "";
+      const total = dest === "preco" ? await executerPrecommande(a, msg => progres.textContent = msg)
+        : dest === "completer" ? await executerStockB2BComplement(a, msg => progres.textContent = msg)
         : await executerImport(a, msg => progres.textContent = msg);
       progres.innerHTML = a.resultatsComptes
         ? `<b>Terminé ✓</b> — ${total} compte${total > 1 ? "s" : ""} créé${total > 1 ? "s" : ""}.`

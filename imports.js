@@ -284,7 +284,7 @@ async function verifierReferences(analyse) {
 // Transforme les lignes analysées en enregistrements pour la base.
 // Fichier de stock B2B → lignes prêtes pour la base, avec le détail de ce qui a été lu
 // (les colonnes ayant été reconnues à l'intitulé, autant les montrer avant d'exécuter).
-function preparerStockB2B(analyse) {
+function preparerStockB2B(analyse, options = {}) {
   const { ref, taille, qte, preco, magasin, gencod, livraison } = analyse.spec.colonnes;
   const parCle = new Map();
   let precommandes = 0, ignorees = 0, inconnus = new Set();
@@ -299,7 +299,7 @@ function preparerStockB2B(analyse) {
     if (!emplacement) { inconnus.add(brut); ignorees++; continue; }
     const illimite = preco ? estVrai(l[preco]) : false;
     const q = qte ? (parseInt(parseFloat((l[qte] || "0").replace(",", ".")), 10) || 0) : 0;
-    if (!illimite && q <= 0) { ignorees++; continue; }
+    if (!illimite && q <= 0 && !options.garderZeros) { ignorees++; continue; }
     const jour = livraison ? dateISO(l[livraison]) : null;
     if (livraison) { if (jour) dates.add(jour); else sansDate++; }
     const cle = emplacement + "|" + reference + "|" + t + "|" + (jour || "");
@@ -617,6 +617,38 @@ async function executerPrecommande(analyse, surProgres) {
     empreinte: analyse.empreinte, lignes_lues: analyse.lues, crees: envoyees, maj: 0, inchanges: 0,
     quarantaine: analyse.quarantaine.length, statut: "OK" } });
   return envoyees;
+}
+
+/* Dépôt en mode « compléter » : seules les lignes du fichier sont créées ou corrigées, le
+   reste du stock reste tel quel et les commandes en attente ne sont pas soldées. Une
+   quantité à 0 est bien envoyée : c'est la façon de mettre une ligne à zéro. */
+async function executerStockB2BComplement(analyse, surProgres) {
+  const prepare = preparerStockB2B(analyse, { garderZeros: true });
+  const { rows, precommandes, ignorees } = prepare;
+  if (!rows.length) throw new Error("aucune ligne de stock exploitable dans ce fichier");
+  const bilan = { lignes: 0, creees: 0, maj: 0, inchangees: 0, ignorees: 0, central: 0, web: 0, inconnues: 0, exemples_inconnues: "" };
+  for (let i = 0; i < rows.length; i += 2000) {
+    const lot = rows.slice(i, i + 2000);
+    surProgres(`complément du stock B2B : ${Math.min(i + lot.length, rows.length)}/${rows.length} lignes…`);
+    const b = await api("/rest/v1/rpc/stock_b2b_completer", { corps: { p_rows: lot, p_dernier: i + 2000 >= rows.length } });
+    for (const k of ["lignes", "creees", "maj", "inchangees", "ignorees", "central", "web", "inconnues"]) bilan[k] += Number(b[k]) || 0;
+    if (b.exemples_inconnues && !bilan.exemples_inconnues) bilan.exemples_inconnues = b.exemples_inconnues;
+  }
+  const mots = [`${bilan.creees} ligne(s) créée(s)`, `${bilan.maj} corrigée(s)`, `${bilan.inchangees} inchangée(s)`];
+  if (bilan.central || bilan.web) mots.push(`${bilan.central} au central · ${bilan.web} au web`);
+  if (prepare.emplacementsInconnus?.length) mots.push(`⚠ emplacement inconnu ignoré : ${prepare.emplacementsInconnus.join(", ")}`);
+  if (precommandes) mots.push(`${precommandes} en précommande`);
+  if (ignorees) mots.push(`${ignorees} ligne(s) ignorée(s) (sans référence)`);
+  surProgres("✓ " + mots.join(" · "));
+  if (bilan.inconnues) {
+    surProgres(`⚠ ${bilan.inconnues} ligne(s) sans fiche produit correspondante — invisibles au catalogue`
+      + (bilan.exemples_inconnues ? ` (ex. ${bilan.exemples_inconnues})` : ""));
+  }
+  await apiFonction("journal", { entree: {
+    fichier: analyse.fichier + " (complément)", modele: analyse.modele, empreinte: analyse.empreinte,
+    lignes_lues: analyse.lues, crees: bilan.creees, maj: bilan.maj, inchanges: bilan.inchangees,
+    quarantaine: analyse.quarantaine.length, statut: "OK" } });
+  return bilan.creees + bilan.maj;
 }
 
 // Dépôt du stock B2B : préparation, envoi par lots, puis bascule côté serveur
