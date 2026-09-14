@@ -1257,6 +1257,7 @@
         <input class="qte-claire" style="width:300px; text-align:left" id="stock-q"
                placeholder="référence, désignation ou gencod…" autocomplete="off">
         <button class="puce-claire" id="btn-stock-chercher">Chercher</button>
+        <button class="puce-claire" onclick="exporterStockB2B()" title="Tout le stock B2B en Excel, au format que le Centre d'import accepte : corrigez les quantités et redéposez le fichier">⬇ Exporter le stock B2B (Excel)</button>
         <span class="compte-produits" id="stock-etat"></span>
       </div>
       <div id="stock-resultats" style="margin-top:14px; overflow-x:auto"></div>
@@ -1572,10 +1573,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789363661"></script>
-<script src="imports.js?v=1789363661"></script>
-<script src="merch-shopify.js?v=1789363661"></script>
-<script src="moteur-merch.js?v=1789363661"></script>
+<script src="config.js?v=1789374578"></script>
+<script src="imports.js?v=1789374578"></script>
+<script src="merch-shopify.js?v=1789374578"></script>
+<script src="moteur-merch.js?v=1789374578"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2054,7 +2055,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789363661";
+    v.src = "hero.mp4?v=1789374578";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3007,6 +3008,50 @@ async function chercherStock() {
       document.getElementById(`stk-${i}`).querySelectorAll("input").forEach(x => x.value = 0);
     };
   });
+}
+
+/* Le stock B2B en Excel, dans le format que le Centre d'import reconnaît (colonnes Magasin,
+   Référence, Taille, Gencod, Quantité, Précommande) : on corrige dans Excel et on redépose
+   le fichier, qui remplace tout le stock. La première feuille porte les données (l'import
+   ne lit que celle-là), la seconde le mode d'emploi. Le réservé des commandes en cours est
+   donné à titre indicatif : le fichier redéposé doit contenir le stock physique. */
+async function exporterStockB2B() {
+  const etat = document.getElementById("stock-etat");
+  etat.textContent = "export du stock…";
+  let lignes;
+  try { lignes = await api("/rest/v1/rpc/stock_b2b_recherche", { corps: { p_texte: null, p_limite: 200000 } }); }
+  catch (e) { etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 140); return; }
+  if (!lignes?.length) { etat.textContent = "stock vide : rien à exporter"; return; }
+  const refs = [...new Set(lignes.map(l => l.reference))];
+  const couleurs = {};
+  for (let i = 0; i < refs.length; i += 150) {
+    const lot = refs.slice(i, i + 150);
+    const v = await api(`/rest/v1/variantes?select=reference,couleur&reference=in.(${lot.map(r => '"' + encodeURIComponent(r) + '"').join(",")})`).catch(() => []);
+    for (const x of v || []) couleurs[x.reference] ??= x.couleur || "";
+  }
+  lignes.sort((a, b) => a.reference.localeCompare(b.reference) || cleTaille(a.taille) - cleTaille(b.taille));
+  const rangs = [];
+  for (const l of lignes) {
+    const reserve = Number(l.reserve) || 0;
+    const base = [l.reference, l.designation || "", couleurs[l.reference] || "", l.taille, l.gencod || ""];
+    const dispo = l.precommande ? "illimité" : Math.max(Number(l.physique) - reserve, 0);
+    if (Number(l.central) > 0 || Number(l.web) <= 0) rangs.push(["CENTRAL", ...base, Number(l.central) || 0, l.precommande ? "oui" : "", reserve, dispo]);
+    if (Number(l.web) > 0) rangs.push(["WEB", ...base, Number(l.web) || 0, "", reserve, dispo]);
+  }
+  const stock = { nom: "Stock B2B", gras: [1], figer: 1, largeurs: [10, 14, 36, 12, 8, 16, 10, 12, 12, 12],
+    lignes: [["Magasin", "Référence", "Désignation", "Couleur", "Taille", "Gencod", "Quantité", "Précommande", "Réservé (commandes en cours)", "Disponible net"], ...rangs] };
+  const aide = { nom: "Mode d'emploi", gras: [1], largeurs: [120], lignes: [
+    ["Stock B2B — export du " + new Date().toLocaleString("fr-FR")],
+    [`${lignes.length} référence-taille, ${rangs.length} lignes (CENTRAL sert en premier, WEB en dernier recours).`],
+    [],
+    ["1. Corrigez la colonne « Quantité » : c'est le stock physique de l'emplacement. Une ligne à 0 disparaît du catalogue."],
+    ["2. Pour ajouter une taille ou une référence, ajoutez une ligne : référence et taille doivent exister dans les fiches produits Fastmag."],
+    ["3. « Précommande » = oui pour une quantité libre (stock illimité). Les colonnes Réservé et Disponible net sont indicatives : ne les modifiez pas, elles ne sont pas relues."],
+    ["4. Enregistrez en .xlsx (gardez cette feuille en première position), puis déposez le fichier dans le Centre d'import."],
+    ["   Le dépôt REMPLACE tout le stock B2B et solde les commandes en attente (elles passent « intégrées ») : à faire une fois ces commandes intégrées dans Fastmag."],
+  ] };
+  telechargerXlsx(`STOCK_B2B_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`, [stock, aide]);
+  etat.textContent = `export téléchargé ✓ — ${rangs.length} lignes, ${refs.length} références`;
 }
 
 // Le catalogue ne lit que le stock B2B : s'il est vide, tout s'affiche à 0 sans que rien
