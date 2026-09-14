@@ -41,6 +41,16 @@ const MODELES_IMPORT = {
     signature: ["E-mail (identifiant)", "Mot de passe", "Codes Fastmag"],
     sans_apercu: true,
   },
+  stock_fastmag: {
+    // Export « état de stock » Fastmag (valorisation) : le stock physique par magasin.
+    // Repère pour le back-office (ajout rapide, consultation) — ce n'est PAS le stock
+    // B2B vendable, qui reste alimenté par le fichier stock B2B.
+    libelle: "État de stock Fastmag (stock physique par magasin)",
+    sep: "\t", encodage: "windows-1252",
+    signature: ["Référence", "Taille", "Magasin", "Stock", "Valeur_Stock"],
+    remplacement_complet: true,
+    remplacement_libelle: "remplace l'état de stock Fastmag connu — le stock B2B vendable n'est pas touché",
+  },
   ventes: {
     libelle: "Ventes quotidiennes (journal VENTE)",
     sep: ",", encodage: "utf-8",
@@ -553,6 +563,7 @@ async function executerImport(analyse, surProgres) {
   // Le stock B2B passe par ses propres fonctions : il ne doit toucher que ses lignes
   // (le stock Duhamel reste en base pour le merch) et il solde les commandes en attente.
   if (analyse.modele === "stock_b2b") return executerStockB2B(analyse, surProgres);
+  if (analyse.modele === "stock_fastmag") return executerStockFastmag(analyse, surProgres);
   if (analyse.modele === "comptes") return executerComptes(analyse, surProgres);
 
   const plans = mapperVersTables(analyse);
@@ -585,6 +596,32 @@ async function executerImport(analyse, surProgres) {
     lignes_lues: analyse.lues, crees: total, maj: 0, inchanges: 0,
     quarantaine: analyse.quarantaine.length, statut: "OK" } });
   return total;
+}
+
+// État de stock Fastmag : on garde toutes les lignes (un 0 est une information), le
+// premier lot remplace l'état précédent. Les tailles arrivent avec des espaces devant.
+async function executerStockFastmag(analyse, surProgres) {
+  const nombre = v => parseFloat(String(v || "0").replace(/\s/g, "").replace(",", ".")) || 0;
+  const rows = analyse.lignes
+    .filter(l => (l["Référence"] || "").trim())
+    .map(l => ({ magasin: (l.Magasin || "CENTRAL").trim(), reference: l["Référence"].trim(), taille: (l.Taille || "").trim(),
+                 quantite: Math.round(nombre(l.Stock)), gencod: (l.gencod || "").trim() || null,
+                 prix_vente: l.Prix_vente ? nombre(l.Prix_vente) : null }));
+  if (!rows.length) throw new Error("aucune ligne de stock exploitable dans ce fichier");
+  let envoyees = 0, bilan = null;
+  for (let i = 0; i < rows.length; i += 2000) {
+    const lot = rows.slice(i, i + 2000);
+    bilan = await api("/rest/v1/rpc/stock_fastmag_lot", { corps: { p_rows: lot, p_premier: i === 0 } });
+    envoyees += lot.length;
+    surProgres(`état de stock Fastmag : ${envoyees}/${rows.length} lignes…`);
+  }
+  const magasins = [...new Set(rows.map(r => r.magasin))];
+  surProgres(`✓ ${bilan?.total ?? envoyees} lignes d'état de stock (${magasins.join(", ")}) · ${rows.reduce((s, r) => s + r.quantite, 0)} pièces`);
+  await apiFonction("journal", { entree: {
+    fichier: analyse.fichier, modele: analyse.modele, empreinte: analyse.empreinte,
+    lignes_lues: analyse.lues, crees: envoyees, maj: 0, inchanges: 0,
+    quarantaine: analyse.quarantaine.length, statut: "OK" } });
+  return envoyees;
 }
 
 // Dépôt de précommande : même fichier que le stock B2B, mais rangé dans une campagne

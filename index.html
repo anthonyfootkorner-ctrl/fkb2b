@@ -254,6 +254,7 @@
   .ajout-tailles label { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--encre2); }
   .ajout-tailles input { width: 62px; text-align: center; border: 1px solid #d8d8d5; border-radius: 7px; padding: 7px 6px; font-family: inherit; font-size: 13px; }
   .ajout-tailles input:focus { border-color: #111; outline: none; }
+  .ajout-tailles small { font-size: 10px; color: var(--encre2); white-space: nowrap; }
 
   /* Saisie d'une précommande : tailles en lignes, fenêtres de livraison en colonnes. */
   /* Sélection puis saisie en grille : le planner fournisseur, repris tel quel. */
@@ -1246,7 +1247,7 @@
       <label id="zone-depot" style="display:block; border:2px dashed #ccc; border-radius:12px; padding:38px;
              text-align:center; cursor:pointer; color:var(--encre2); font-size:13.5px; transition:border-color 150ms ease">
         Glissez un fichier ici ou cliquez pour choisir<br>
-        <span style="font-size:11px">fiches produits · stock · tarifs · clients — .csv, .xls, .xlsx, .txt ou .zip</span>
+        <span style="font-size:11px">fiches produits · stock B2B · état de stock Fastmag · tarifs · clients — .csv, .xls, .xlsx, .txt ou .zip</span>
         <input id="fichier-import" type="file" style="display:none">
       </label>
       <div id="rapport-import" style="margin-top:18px"></div>
@@ -1579,10 +1580,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789393239"></script>
-<script src="imports.js?v=1789393239"></script>
-<script src="merch-shopify.js?v=1789393239"></script>
-<script src="moteur-merch.js?v=1789393239"></script>
+<script src="config.js?v=1789393931"></script>
+<script src="imports.js?v=1789393931"></script>
+<script src="merch-shopify.js?v=1789393931"></script>
+<script src="moteur-merch.js?v=1789393931"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2061,7 +2062,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789393239";
+    v.src = "hero.mp4?v=1789393931";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -2966,6 +2967,7 @@ async function chercherStock() {
   zone.innerHTML = `<table class="table-stock">
     <thead><tr>
       <th>Référence</th><th>Taille</th>
+      <th class="num" title="Stock physique au central d'après le dernier état de stock Fastmag déposé">Fastmag</th>
       <th class="num">Central</th><th class="num">Web</th>
       <th class="num">Réservé</th><th class="num">Disponible</th><th></th>
     </tr></thead>
@@ -2975,6 +2977,7 @@ async function chercherStock() {
         <td><span class="ref">${echapperHTML(l.reference)}</span>
           <div class="des">${echapperHTML(l.designation || "")}</div></td>
         <td>${echapperHTML(l.taille)}</td>
+        <td class="num" style="color:var(--encre2)">${l.fastmag ?? "—"}</td>
         <td class="num"><input type="number" min="0" value="${l.central}"
               data-part="CENTRAL" data-i="${i}"></td>
         <td class="num"><input type="number" min="0" value="${l.web}"
@@ -3057,6 +3060,8 @@ async function chargerFicheAjoutStock() {
   etat.textContent = "";
   const tailles = (f.tailles || []).slice().sort((a, b) => cleTaille(a.taille) - cleTaille(b.taille));
   const enStock = tailles.some(t => t.central > 0 || t.web > 0);
+  const fastmagConnu = tailles.some(t => t.fastmag !== null && t.fastmag !== undefined);
+  const fastmagDate = f.fastmag_maj ? new Date(f.fastmag_maj).toLocaleDateString("fr-FR") : "";
   fiche.innerHTML = `
     <div><span class="ref" style="font-weight:600">${echapperHTML(f.reference)}</span> — ${echapperHTML(f.designation || "")}${f.couleur ? " · " + echapperHTML(f.couleur) : ""}
       <span class="compte-produits" style="margin:0 0 0 8px">${echapperHTML([f.marque, f.famille].filter(Boolean).join(" · "))}</span>
@@ -3067,11 +3072,14 @@ async function chargerFicheAjoutStock() {
         <select class="qte-claire" id="ajout-magasin" style="width:130px" onchange="majPlaceholdersAjoutStock()">
           <option value="CENTRAL">CENTRAL</option><option value="WEB">WEB</option></select></label>
       <span class="compte-produits" style="margin:0">Laissez vide pour ne pas toucher une taille.</span>
+      ${fastmagConnu ? `<button class="puce-claire" onclick="reprendreStockFastmag()" title="Copie le stock physique Fastmag du central dans chaque case">Reprendre le stock Fastmag${fastmagDate ? ` (au ${fastmagDate})` : ""}</button>`
+        : `<span class="compte-produits" style="margin:0; color:#8a6414">Stock Fastmag inconnu : déposez un état de stock Fastmag dans le Centre d'import pour le voir ici.</span>`}
     </div>
     <div class="ajout-tailles" style="margin-top:10px">
       ${tailles.map(t => `<label><span>${echapperHTML(t.taille || "—")}</span>
-        <input type="number" min="0" inputmode="numeric" data-taille="${echapperHTML(t.taille)}" data-central="${t.central}" data-web="${t.web}" placeholder="${t.central || ""}"
-               onkeydown="if (event.key === 'Enter') { event.preventDefault(); enregistrerAjoutStock(); }"></label>`).join("")}
+        <input type="number" min="0" inputmode="numeric" data-taille="${echapperHTML(t.taille)}" data-central="${t.central}" data-web="${t.web}" data-fastmag="${t.fastmag ?? ""}" placeholder="${t.central || ""}"
+               onkeydown="if (event.key === 'Enter') { event.preventDefault(); enregistrerAjoutStock(); }">
+        ${fastmagConnu ? `<small title="stock physique Fastmag au central">FM ${t.fastmag ?? "—"}</small>` : ""}</label>`).join("")}
     </div>
     <div class="formu" style="margin-top:12px">
       <button class="btn-noir" onclick="enregistrerAjoutStock()">ENREGISTRER LE STOCK</button>
@@ -3079,6 +3087,12 @@ async function chargerFicheAjoutStock() {
       <span class="compte-produits" id="ajout-resultat" style="margin:0"></span>
     </div>`;
   const premier = fiche.querySelector("input[data-taille]");
+  if (premier) premier.focus();
+}
+
+function reprendreStockFastmag() {
+  document.querySelectorAll("#ajout-fiche input[data-taille]").forEach(i => { if (i.dataset.fastmag !== "") i.value = i.dataset.fastmag; });
+  const premier = document.querySelector("#ajout-fiche input[data-taille]");
   if (premier) premier.focus();
 }
 
@@ -3166,15 +3180,18 @@ async function exporterStockB2B() {
 async function rendreEtatStockB2B() {
   const el = document.getElementById("etat-stock-b2b");
   if (!el) return;
-  const [dispo, journal] = await Promise.all([
+  const [dispo, journal, fm] = await Promise.all([
     api("/rest/v1/stock_disponible?select=reference&limit=1").catch(() => null),
     api("/rest/v1/journal_imports?modele=eq.stock_b2b&select=horodatage,fichier&order=horodatage.desc&limit=1").catch(() => []),
+    api("/rest/v1/rpc/stock_fastmag_etat", { corps: {} }).catch(() => null),
   ]);
   if (dispo === null) { el.innerHTML = ""; return; }
   const d = journal[0];
   const quand = d ? `${new Date(d.horodatage).toLocaleString("fr-FR")} · ${d.fichier}` : "origine inconnue";
+  const etatFm = fm && Number(fm.lignes) ? ` État de stock Fastmag : ${Number(fm.lignes).toLocaleString("fr-FR")} lignes, ${Number(fm.pieces).toLocaleString("fr-FR")} pièces, déposé le ${new Date(fm.maj_le).toLocaleString("fr-FR")}.`
+    : ` <span style="color:#8a6414">Aucun état de stock Fastmag déposé : le repère « Fastmag » de l'ajout rapide restera vide.</span>`;
   el.innerHTML = dispo.length
-    ? `<div class="compte-produits">Stock du catalogue en place — dernier dépôt : ${quand}.</div>`
+    ? `<div class="compte-produits">Stock du catalogue en place — dernier dépôt : ${quand}.${etatFm}</div>`
     : `<div class="compte-produits" style="color:#a33"><b>Aucun stock B2B en base : le catalogue affiche 0 partout.</b>
        Déposez un export stock B2B pour le rétablir${d ? ` (le dernier remonte au ${quand})` : ""}.</div>`;
 }
@@ -7031,7 +7048,7 @@ function tuileCalendrier(c) {
 // noms de dépôts lisibles : le tableau de bord n'a pas à parler comme la base
 const LIBELLES_MODELE = { stock_b2b: "Stock B2B", stock_shopify: "Stock web Shopify",
   tarifs: "Tarifs", clients: "Comptes clients", fiches_produits: "Fiches produits",
-  ventes: "Ventes", stock: "Stock (ancien modèle)" };
+  ventes: "Ventes", stock: "Stock (ancien modèle)", stock_fastmag: "État de stock Fastmag" };
 const nomModele = (m) => LIBELLES_MODELE[m] || m;
 
 const dateCourte = (iso) => iso
