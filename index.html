@@ -1264,6 +1264,7 @@
         <button class="puce-claire" id="btn-stock-chercher">Chercher</button>
         <button class="puce-claire" onclick="ouvrirAjoutRapideStock()" title="Une référence qui n'est pas encore en stock : ses tailles s'affichent, vous tapez les quantités">➕ Ajout rapide</button>
         <button class="puce-claire" onclick="exporterStockB2B()" title="Tout le stock B2B en Excel, au format que le Centre d'import accepte : corrigez les quantités et redéposez le fichier">⬇ Exporter le stock B2B (Excel)</button>
+        <button class="puce-claire" onclick="plafonnerStockB2B(true)" title="Compare le stock B2B au stock physique (état Fastmag pour le central, stock web Shopify pour le web) et propose de baisser ce qui dépasse">⤓ Plafonner sur le physique</button>
         <span class="compte-produits" id="stock-etat"></span>
       </div>
       <div id="stock-ajout" style="margin-top:14px"></div>
@@ -1580,10 +1581,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789393931"></script>
-<script src="imports.js?v=1789393931"></script>
-<script src="merch-shopify.js?v=1789393931"></script>
-<script src="moteur-merch.js?v=1789393931"></script>
+<script src="config.js?v=1789394311"></script>
+<script src="imports.js?v=1789394311"></script>
+<script src="merch-shopify.js?v=1789394311"></script>
+<script src="moteur-merch.js?v=1789394311"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2062,7 +2063,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789393931";
+    v.src = "hero.mp4?v=1789394311";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3128,6 +3129,36 @@ async function enregistrerAjoutStock() {
   } catch (e) {
     res.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 140);
   }
+}
+
+/* Plafonnement : simulation d'abord, rien n'est écrit sans confirmation. Le rapport
+   liste ce qui dépasse le physique (central = état Fastmag, web = stock Shopify). */
+async function plafonnerStockB2B(simuler) {
+  const zone = document.getElementById("stock-ajout");
+  const etat = document.getElementById("stock-etat");
+  if (!zone) return;
+  etat.textContent = simuler ? "comparaison au stock physique…" : "plafonnement…";
+  let r;
+  try { r = await api("/rest/v1/rpc/stock_b2b_plafonner", { corps: { p_simuler: !!simuler } }); }
+  catch (e) { etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 140); return; }
+  etat.textContent = "";
+  if (r.erreur) { zone.innerHTML = `<div class="preco-fusion" style="margin:0"><b>Plafonnement impossible</b><div class="compte-produits">${echapperHTML(r.erreur)} — déposez d'abord un état de stock Fastmag.</div>
+    <div class="formu"><button class="puce-claire" onclick="document.getElementById('stock-ajout').innerHTML = ''">Fermer</button></div></div>`; return; }
+  const parMag = Object.entries(r.par_magasin || {}).map(([m, n]) => `${m} : ${n}`).join(" · ");
+  const source = r.source_web === "FASTMAG_WEB" ? "état Fastmag (magasin WEB)" : r.source_web === "DUHAMEL" ? "stock web Shopify (Duhamel)" : "aucune source : les lignes WEB ne sont pas comparées";
+  zone.innerHTML = `<div class="preco-fusion" style="margin:0">
+    <b>${r.simulation ? "Plafonnement — simulation" : "Plafonnement appliqué ✓"}</b>
+    <div class="compte-produits">Central comparé à l'état Fastmag du ${r.etat_fastmag_du ? new Date(r.etat_fastmag_du).toLocaleString("fr-FR") : "—"} · web comparé à : ${source}.
+      ${r.references_hors_source ? `${r.references_hors_source} ligne${r.references_hors_source > 1 ? "s" : ""} B2B dont la référence est absente de la source : laissée${r.references_hors_source > 1 ? "s" : ""} telle${r.references_hors_source > 1 ? "s" : ""} quelle${r.references_hors_source > 1 ? "s" : ""}.` : ""}</div>
+    <div style="margin:10px 0"><b>${r.lignes}</b> ligne${r.lignes > 1 ? "s" : ""} ${r.simulation ? "dépassent" : "abaissées"} le stock physique${parMag ? ` (${parMag})` : ""} — <b>${Number(r.pieces_retirees).toLocaleString("fr-FR")}</b> pièces ${r.simulation ? "à retirer" : "retirées"}.</div>
+    ${(r.details || []).length ? `<div style="max-height:260px; overflow:auto"><table class="table-stock"><thead><tr><th>Emplacement</th><th>Référence</th><th>Taille</th><th class="num">B2B</th><th class="num">Physique</th></tr></thead>
+      <tbody>${r.details.map(d => `<tr><td>${echapperHTML(d.magasin)}</td><td class="ref">${echapperHTML(d.reference)}</td><td>${echapperHTML(d.taille)}</td><td class="num">${d.avant}</td><td class="num"><b>${d.apres}</b></td></tr>`).join("")}</tbody></table>
+      ${r.lignes > r.details.length ? `<div class="compte-produits">… et ${r.lignes - r.details.length} autres.</div>` : ""}</div>` : ""}
+    <div class="formu" style="margin-top:10px">
+      ${r.simulation && r.lignes ? `<button class="btn-noir" onclick="if (confirm('Abaisser ${r.lignes} ligne(s) de stock B2B au niveau du stock physique ?')) plafonnerStockB2B(false)">APPLIQUER LE PLAFONNEMENT</button>` : ""}
+      <button class="puce-claire" onclick="document.getElementById('stock-ajout').innerHTML = ''">Fermer</button>
+    </div></div>`;
+  if (!r.simulation) { chercherStock(); rendreEtatStockB2B(); }
 }
 
 /* Le stock B2B en Excel, dans le format que le Centre d'import reconnaît (colonnes Magasin,
