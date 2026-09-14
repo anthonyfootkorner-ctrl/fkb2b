@@ -1,0 +1,187 @@
+{
+  "name": "FKB2B — état de stock Fastmag → portail (plafonnement B2B)",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyHour"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "sender": "planificateur@fastmag.fr",
+          "q": "subject:\"Stock Theorique\" has:attachment"
+        },
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "name": "Mail du planificateur Fastmag",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Boîte anthony.poignard@footkorner.com : identifiant Gmail (OAuth) à choisir dans le nœud. Ne prend que les mails du planificateur Fastmag avec pièce jointe."
+    },
+    {
+      "parameters": {
+        "jsCode": "// La pièce jointe Fastmag (CSV) passe en base64 telle quelle : le portail la décode (windows-1252).\nconst sortie = [];\nfor (const item of $input.all()) {\n  const cle = Object.keys(item.binary || {}).find(k => /\\.(csv|xls|txt|tsv)$/i.test(item.binary[k].fileName || '')) || Object.keys(item.binary || {})[0];\n  if (!cle) continue;\n  const octets = await this.helpers.getBinaryDataBuffer($input.all().indexOf(item), cle);\n  sortie.push({ json: {\n    action: 'stock_fastmag',\n    fichier: `${item.json.subject || 'Stock Theorique'} — ${item.binary[cle].fileName || 'piece jointe'}`,\n    fichier_base64: octets.toString('base64'),\n    plafonner: true,\n    simuler: false\n  } });\n}\nif (!sortie.length) throw new Error('aucune pièce jointe dans ce mail');\nreturn sortie;"
+      },
+      "name": "Pièce jointe → base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://jklubjblmqwlhiumnlet.supabase.co/functions/v1/import-donnees",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "name": "Portail FKB2B — dépôt + plafonnement",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        0
+      ],
+      "notes": "Identifiant « Header Auth » : Name = x-import-token, Value = la clé jeton_import (table config_privee du projet Supabase)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.plafonnement ? $json.plafonnement.lignes : 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Des lignes plafonnées ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        780,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compte rendu lisible (à envoyer par mail, Slack, WhatsApp… au choix).\nconst r = $input.first().json;\nconst p = r.plafonnement || {};\nconst lignes = (p.details || []).slice(0, 40).map(d => `${d.magasin} ${d.reference} ${d.taille} : ${d.avant} → ${d.apres}`).join('\\n');\nreturn [{ json: {\n  sujet: `FKB2B stock : ${p.lignes} ligne(s) B2B abaissée(s), ${p.pieces_retirees} pièces`,\n  texte: `État Fastmag chargé : ${r.lignes} lignes (${(r.magasins || []).join(', ')}).\\nPlafonnement : ${p.lignes} lignes, ${p.pieces_retirees} pièces retirées ${JSON.stringify(p.par_magasin)}.\\n\\n${lignes}${p.lignes > 40 ? '\\n…' : ''}`\n} }];"
+      },
+      "name": "Compte rendu",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "anthony.poignard@footkorner.com",
+        "subject": "={{ $json.sujet }}",
+        "emailType": "text",
+        "message": "={{ $json.texte }}",
+        "options": {}
+      },
+      "name": "Compte rendu par mail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1300,
+        -120
+      ],
+      "notes": "Même identifiant Gmail que le déclencheur."
+    }
+  ],
+  "connections": {
+    "Mail du planificateur Fastmag": {
+      "main": [
+        [
+          {
+            "node": "Pièce jointe → base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pièce jointe → base64": {
+      "main": [
+        [
+          {
+            "node": "Portail FKB2B — dépôt + plafonnement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Portail FKB2B — dépôt + plafonnement": {
+      "main": [
+        [
+          {
+            "node": "Des lignes plafonnées ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Des lignes plafonnées ?": {
+      "main": [
+        [
+          {
+            "node": "Compte rendu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Compte rendu": {
+      "main": [
+        [
+          {
+            "node": "Compte rendu par mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
