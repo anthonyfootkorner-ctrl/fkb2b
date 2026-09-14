@@ -250,6 +250,10 @@
   .table-stock .zero { border: 0; background: none; color: #c0504d; font-size: 11.5px;
     cursor: pointer; font-family: inherit; text-decoration: underline; text-underline-offset: 2px; }
   .table-stock tr.modifiee td { background: #fdf6ea; }
+  .ajout-tailles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ajout-tailles label { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--encre2); }
+  .ajout-tailles input { width: 62px; text-align: center; border: 1px solid #d8d8d5; border-radius: 7px; padding: 7px 6px; font-family: inherit; font-size: 13px; }
+  .ajout-tailles input:focus { border-color: #111; outline: none; }
 
   /* Saisie d'une précommande : tailles en lignes, fenêtres de livraison en colonnes. */
   /* Sélection puis saisie en grille : le planner fournisseur, repris tel quel. */
@@ -1257,9 +1261,11 @@
         <input class="qte-claire" style="width:300px; text-align:left" id="stock-q"
                placeholder="référence, désignation ou gencod…" autocomplete="off">
         <button class="puce-claire" id="btn-stock-chercher">Chercher</button>
+        <button class="puce-claire" onclick="ouvrirAjoutRapideStock()" title="Une référence qui n'est pas encore en stock : ses tailles s'affichent, vous tapez les quantités">➕ Ajout rapide</button>
         <button class="puce-claire" onclick="exporterStockB2B()" title="Tout le stock B2B en Excel, au format que le Centre d'import accepte : corrigez les quantités et redéposez le fichier">⬇ Exporter le stock B2B (Excel)</button>
         <span class="compte-produits" id="stock-etat"></span>
       </div>
+      <div id="stock-ajout" style="margin-top:14px"></div>
       <div id="stock-resultats" style="margin-top:14px; overflow-x:auto"></div>
     </div>
 
@@ -1573,10 +1579,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789391596"></script>
-<script src="imports.js?v=1789391596"></script>
-<script src="merch-shopify.js?v=1789391596"></script>
-<script src="moteur-merch.js?v=1789391596"></script>
+<script src="config.js?v=1789393239"></script>
+<script src="imports.js?v=1789393239"></script>
+<script src="merch-shopify.js?v=1789393239"></script>
+<script src="moteur-merch.js?v=1789393239"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2055,7 +2061,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789391596";
+    v.src = "hero.mp4?v=1789393239";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -2951,7 +2957,9 @@ async function chercherStock() {
   }
   if (!lignes?.length) {
     etat.textContent = texte ? "aucune ligne de stock pour cette recherche" : "stock vide";
-    zone.innerHTML = ""; return;
+    zone.innerHTML = texte ? `<div class="compte-produits">Cette référence n'a pas de stock B2B.
+      <button class="puce-claire" onclick="ouvrirAjoutRapideStock(${JSON.stringify(texte).replaceAll('"', "&quot;")})">➕ L'ajouter</button></div>` : "";
+    return;
   }
   etat.textContent = `${lignes.length} ligne${lignes.length > 1 ? "s" : ""}`
     + (lignes.length === 120 ? " (les 120 premières)" : "");
@@ -3008,6 +3016,104 @@ async function chercherStock() {
       document.getElementById(`stk-${i}`).querySelectorAll("input").forEach(x => x.value = 0);
     };
   });
+}
+
+/* Ajout rapide : on tape une référence, la fiche Fastmag donne ses tailles, on choisit
+   l'emplacement (central par défaut) et on saisit les quantités. Même trace que la
+   correction ligne à ligne ; la référence devient visible au catalogue dès qu'elle a
+   du stock et un tarif. */
+let AJOUT_STOCK = null;
+function ouvrirAjoutRapideStock(reference) {
+  const zone = document.getElementById("stock-ajout");
+  if (!zone) return;
+  const q = reference || document.getElementById("stock-q").value.trim();
+  zone.innerHTML = `<div class="preco-fusion" style="margin:0">
+    <b>Ajout rapide de stock</b>
+    <div class="formu" style="margin-top:10px">
+      <input class="qte-claire" style="width:220px; text-align:left" id="ajout-ref" placeholder="référence (ex. HV4544-010)" value="${echapperHTML(q)}"
+             onkeydown="if (event.key === 'Enter') { event.preventDefault(); chargerFicheAjoutStock(); }">
+      <button class="puce-claire" onclick="chargerFicheAjoutStock()">Charger la fiche</button>
+      <button class="puce-claire" onclick="document.getElementById('stock-ajout').innerHTML = ''">Fermer</button>
+      <span class="compte-produits" id="ajout-etat" style="margin:0"></span>
+    </div>
+    <div id="ajout-fiche" style="margin-top:12px"></div></div>`;
+  const champ = document.getElementById("ajout-ref");
+  champ.focus();
+  if (q) chargerFicheAjoutStock();
+}
+
+async function chargerFicheAjoutStock() {
+  const ref = document.getElementById("ajout-ref").value.trim();
+  const etat = document.getElementById("ajout-etat");
+  const fiche = document.getElementById("ajout-fiche");
+  if (!ref) { etat.textContent = "tapez une référence"; return; }
+  etat.textContent = "lecture de la fiche…";
+  let f;
+  try { f = await api("/rest/v1/rpc/stock_b2b_fiche", { corps: { p_reference: ref } }); }
+  catch (e) { etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 120); return; }
+  if (!f) { etat.textContent = "réservé à l'administration"; return; }
+  if (!f.trouvee) { etat.textContent = ""; fiche.innerHTML = `<div class="compte-produits" style="color:#a33">Référence <b>${echapperHTML(ref)}</b> inconnue des fiches produits : créez-la dans Fastmag, puis déposez l'export des fiches.</div>`; return; }
+  AJOUT_STOCK = f;
+  etat.textContent = "";
+  const tailles = (f.tailles || []).slice().sort((a, b) => cleTaille(a.taille) - cleTaille(b.taille));
+  const enStock = tailles.some(t => t.central > 0 || t.web > 0);
+  fiche.innerHTML = `
+    <div><span class="ref" style="font-weight:600">${echapperHTML(f.reference)}</span> — ${echapperHTML(f.designation || "")}${f.couleur ? " · " + echapperHTML(f.couleur) : ""}
+      <span class="compte-produits" style="margin:0 0 0 8px">${echapperHTML([f.marque, f.famille].filter(Boolean).join(" · "))}</span>
+      ${!f.tarif ? `<span class="badge-c alerte" style="margin-left:8px">sans tarif — invisible au catalogue tant qu'un prix manque</span>` : ""}
+      ${enStock ? `<span class="badge-c attente" style="margin-left:8px">déjà en stock : les quantités saisies remplacent l'actuel</span>` : ""}</div>
+    <div class="formu" style="margin-top:10px">
+      <label class="pa-budget">Emplacement
+        <select class="qte-claire" id="ajout-magasin" style="width:130px" onchange="majPlaceholdersAjoutStock()">
+          <option value="CENTRAL">CENTRAL</option><option value="WEB">WEB</option></select></label>
+      <span class="compte-produits" style="margin:0">Laissez vide pour ne pas toucher une taille.</span>
+    </div>
+    <div class="ajout-tailles" style="margin-top:10px">
+      ${tailles.map(t => `<label><span>${echapperHTML(t.taille || "—")}</span>
+        <input type="number" min="0" inputmode="numeric" data-taille="${echapperHTML(t.taille)}" data-central="${t.central}" data-web="${t.web}" placeholder="${t.central || ""}"
+               onkeydown="if (event.key === 'Enter') { event.preventDefault(); enregistrerAjoutStock(); }"></label>`).join("")}
+    </div>
+    <div class="formu" style="margin-top:12px">
+      <button class="btn-noir" onclick="enregistrerAjoutStock()">ENREGISTRER LE STOCK</button>
+      <button class="puce-claire" onclick="document.querySelectorAll('#ajout-fiche input[data-taille]').forEach(i => i.value = i.value || 0)" title="Met 0 dans toutes les cases vides">Vides → 0</button>
+      <span class="compte-produits" id="ajout-resultat" style="margin:0"></span>
+    </div>`;
+  const premier = fiche.querySelector("input[data-taille]");
+  if (premier) premier.focus();
+}
+
+function majPlaceholdersAjoutStock() {
+  const mag = document.getElementById("ajout-magasin").value;
+  document.querySelectorAll("#ajout-fiche input[data-taille]").forEach(i => {
+    const actuel = Number(mag === "WEB" ? i.dataset.web : i.dataset.central) || 0;
+    i.placeholder = actuel || "";
+  });
+}
+
+async function enregistrerAjoutStock() {
+  const f = AJOUT_STOCK;
+  const res = document.getElementById("ajout-resultat");
+  if (!f || !res) return;
+  const magasin = document.getElementById("ajout-magasin").value;
+  const lignes = [...document.querySelectorAll("#ajout-fiche input[data-taille]")]
+    .filter(i => i.value.trim() !== "")
+    .map(i => ({ taille: i.dataset.taille, quantite: Math.max(parseInt(i.value, 10) || 0, 0) }));
+  if (!lignes.length) { res.textContent = "saisissez au moins une quantité"; return; }
+  res.textContent = "enregistrement…";
+  try {
+    const r = await api("/rest/v1/rpc/stock_b2b_ajout_rapide", { corps: { p_reference: f.reference, p_magasin: magasin, p_lignes: lignes } });
+    // la fiche se recharge avec le stock à jour ; on garde l'emplacement choisi et on confirme
+    await chargerFicheAjoutStock();
+    const sel = document.getElementById("ajout-magasin");
+    if (sel) { sel.value = magasin; majPlaceholdersAjoutStock(); }
+    const res2 = document.getElementById("ajout-resultat");
+    if (res2) res2.innerHTML = `enregistré ✓ — ${r.lignes} taille${r.lignes > 1 ? "s" : ""}, ${r.pieces} pièces au ${magasin}${r.tarif ? "" : " · <span style='color:#a33'>sans tarif : invisible au catalogue</span>"}`;
+    document.getElementById("stock-q").value = f.reference;
+    chercherStock();
+    rendreEtatStockB2B();
+  } catch (e) {
+    res.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 140);
+  }
 }
 
 /* Le stock B2B en Excel, dans le format que le Centre d'import reconnaît (colonnes Magasin,
