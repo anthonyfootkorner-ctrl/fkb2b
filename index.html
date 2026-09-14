@@ -441,6 +441,7 @@
   .preco-fusion .liste { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
   .preco-fusion label.mag { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--hairline); border-radius: 10px; cursor: pointer; font-size: 13px; }
   .preco-fusion label.mag input { width: 16px; height: 16px; accent-color: #111; }
+  .pp-excel { margin-top: 10px; gap: 8px; align-items: center; }
   .pa-panier { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-top: 1px dashed var(--hairline); font-size: 13px; }
   .pa-panier .nom { font-weight: 600; }
   .pa-panier .meta { flex-basis: 100%; color: var(--encre2); font-size: 12px; }
@@ -1571,10 +1572,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789321842"></script>
-<script src="imports.js?v=1789321842"></script>
-<script src="merch-shopify.js?v=1789321842"></script>
-<script src="moteur-merch.js?v=1789321842"></script>
+<script src="config.js?v=1789363661"></script>
+<script src="imports.js?v=1789363661"></script>
+<script src="merch-shopify.js?v=1789363661"></script>
+<script src="moteur-merch.js?v=1789363661"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2053,7 +2054,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789321842";
+    v.src = "hero.mp4?v=1789363661";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4851,7 +4852,9 @@ async function rendrePanierPreco(campagne) {
         <h1>MA PRÉCOMMANDE${pa ? ` <span style="font-weight:400; color:var(--encre2)">· ${echapperHTML(pa.nom)}</span>` : ""}</h1>
         <div style="margin:8px 0 10px">${rendreSelecteurPanierPreco({ actions: true })}</div>
         <div class="compte-produits">Ce panier est vide. Ajoutez des produits depuis la campagne
-          avec le bouton <b>+</b> en haut de chaque visuel.</div>
+          avec le bouton <b>+</b> en haut de chaque visuel — ou remplissez-le dans Excel :
+          téléchargez le modèle, saisissez vos quantités, réimportez-le.</div>
+        ${barreExcelPreco(verrou)}
       </div>
       <div id="preco-fusion"></div>`;
     return;
@@ -4946,6 +4949,7 @@ async function rendrePanierPreco(campagne) {
         Tapez un <b>total</b> sur une ligne : il se répartit sur les tailles selon la courbe de vente du réseau.
         Ou collez une grille depuis Excel : cliquez la première case puis <kbd>⌘V</kbd>.
         <b>Tout s'enregistre automatiquement</b> quelques secondes après chaque saisie.</div>
+      ${barreExcelPreco(verrou)}
     </div>
     <div id="preco-fusion"></div>
     ${verrou ? `<div class="pp-verrou">
@@ -6459,6 +6463,261 @@ function excelTableauBordPreco() {
     lignes: [["Référence", "Désignation", "Catégorie"], ...((d.sans_commande || {}).liste || []).map(r => [r.reference, r.designation || "", r.categorie || ""])] };
   telechargerXlsx(`TABLEAU_BORD_${String(d.campagne).replace(/[^\w-]+/g, "_")}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`,
     [synthese, dim("Cadencement", "livraison", tbDate), matrice, dim("Catégories", "categorie"), dim("Rayons", "rayon"), dim("Familles", "famille"), dim("Sous-familles", "sous_famille"), tops, tailles, magasins, sans]);
+}
+
+
+/* ---------------- aller-retour Excel : un modèle à remplir, puis l'import des quantités ----------------
+   Certains magasins préfèrent travailler dans Excel. Le modèle reprend la grille de saisie :
+   une feuille par rayon, une ligne par référence et date de livraison, les tailles en
+   colonnes, déjà rempli de ce que contient le panier. Le même fichier revient par
+   « Importer » ; un bon de commande exporté du portail se réimporte aussi (ses feuilles
+   « Bon de commande » et « Détail » ont les mêmes repères : référence, livraison, tailles). */
+const ORDRE_RAYONS_PRECO = ["SPORTSWEAR", "FOOTWEAR", "FOOTBALL", "ACCESSOIRES", "KIDS", "YOUTH"];
+let IMPORT_PRECO = null;
+
+function barreExcelPreco(verrou) {
+  if (verrou) return "";
+  return `<div class="formu pp-excel">
+    <button class="puce-claire" onclick="excelModelePreco()" title="Toute la campagne, une feuille par rayon, avec ce qui est déjà saisi dans ce panier">⬇ Excel à remplir</button>
+    <button class="puce-claire" onclick="document.getElementById('pp-fichier').click()" title="Le modèle rempli, ou un bon de commande exporté du portail (.xlsx ou .csv)">⬆ Importer un Excel rempli</button>
+    <input type="file" id="pp-fichier" hidden accept=".xlsx,.csv,.txt" onchange="importerExcelPreco(this.files[0]); this.value = ''">
+    <span class="compte-produits" id="pp-import-etat" style="margin:0"></span>
+  </div>`;
+}
+
+const datesCampagnePreco = () => PRECO_LIVRAISONS.length ? PRECO_LIVRAISONS
+  : [...new Set(PRECO_PRODUITS.flatMap(p => (p.tailles || []).flatMap(t => (t.offres || []).map(o => o.livraison || ""))))].sort();
+const offrePreco = (p, taille, d) => ((p.tailles || []).find(t => t.taille === taille)?.offres || []).some(o => (o.livraison || "") === (d || ""));
+const dateFrPreco = d => d ? new Date(d + (d.length === 10 ? "T00:00:00" : "")).toLocaleDateString("fr-FR") : "";
+
+function excelModelePreco() {
+  if (!PRECO_PRODUITS.length) { alert("La campagne n'est pas chargée."); return; }
+  const dates = datesCampagnePreco();
+  const rangRayon = r => { const i = ORDRE_RAYONS_PRECO.indexOf(r); return i < 0 ? 99 : i; };
+  const parRayon = {};
+  for (const p of PRECO_PRODUITS) (parRayon[rayonDe(p) || "AUTRES"] ??= []).push(p);
+  const pa = panierActif();
+  const feuilles = [{ nom: "Mode d'emploi", largeurs: [110], gras: [1], lignes: [
+    ["FKB2B — précommande à remplir dans Excel"],
+    [`Campagne ${PRECO_COURANTE} · magasin ${libelleMagasinExcel(clientActif)} · panier « ${pa?.nom || ""} »`],
+    [],
+    ["1. Une feuille par rayon. Chaque ligne = une référence et une date de livraison ; les tailles sont en colonnes."],
+    ["2. Tapez vos quantités dans les cases des tailles. Une case « · » est une taille non proposée sur cette date : elle sera ignorée."],
+    ["3. Les quantités déjà saisies dans ce panier sont préremplies : modifiez-les, videz-les, ou laissez-les."],
+    ["4. Ne renommez pas les colonnes « Référence » et « Livraison », et ne changez pas les dates : ce sont les repères de l'import."],
+    ["5. Enregistrez (format .xlsx), puis dans le portail : Ma précommande → « Importer un Excel rempli »."],
+    ["   Vous choisirez alors de remplacer la saisie du panier par le fichier, ou d'ajouter ses quantités à celles déjà saisies."],
+    [],
+    ["Astuce : un bon de commande exporté du portail (bouton Excel) se réimporte de la même façon."],
+  ] }];
+  for (const rayon of Object.keys(parRayon).sort((x, y) => rangRayon(x) - rangRayon(y) || x.localeCompare(y))) {
+    const groupe = parRayon[rayon].sort((x, y) => categorieDe(x).localeCompare(categorieDe(y))
+      || (x.designation || "").localeCompare(y.designation || "") || x.reference.localeCompare(y.reference));
+    const tailles = [...new Set(groupe.flatMap(p => (p.tailles || []).filter(t => (t.offres || []).length).map(t => t.taille)))]
+      .sort((x, y) => cleTaille(x) - cleTaille(y));
+    const lignes = [["Référence", "Nom du produit", "Couleur", "Catégorie", "Famille", "Tarif HT", "PVC TTC", "Livraison", ...tailles]];
+    for (const p of groupe) {
+      for (const d of dates) {
+        if (!tailles.some(t => offrePreco(p, t, d))) continue;
+        lignes.push([p.reference, p.designation || "", p.couleur || "", categorieDe(p) || "", p.famille || "",
+          Number.isFinite(prixMini(p)) ? prixMini(p) : "", pvcDe(p) || "", dateFrPreco(d),
+          ...tailles.map(t => offrePreco(p, t, d) ? (PRECO_SAISIE[cleSaisie(p.reference, t, d)] || "") : "·")]);
+      }
+    }
+    feuilles.push({ nom: rayon.slice(0, 31), lignes, gras: [1], figer: 1, largeurs: [13, 32, 10, 14, 16, 9, 9, 12, ...tailles.map(() => 6)] });
+  }
+  telechargerXlsx(`PRECO_${String(PRECO_COURANTE).replace(/[^\w-]+/g, "_")}_${String(clientActif?.compte || "MAGASIN").replace(/[^\w-]+/g, "_")}_A_REMPLIR_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`, feuilles);
+  const etat = document.getElementById("pp-import-etat");
+  if (etat) etat.textContent = `modèle téléchargé ✓ — ${PRECO_PRODUITS.length} références, ${feuilles.length - 1} rayon${feuilles.length > 2 ? "s" : ""}`;
+}
+
+// Une date lue dans Excel : texte français, ISO, ou numéro de série. "" = sans date ; null = illisible.
+function dateImportExcel(v) {
+  if (v === null || v === undefined || v === "") return "";
+  if (typeof v === "number") return new Date(Date.UTC(1899, 11, 30) + Math.round(v) * 86400000).toISOString().slice(0, 10);
+  const s = String(v).trim();
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/.exec(s);
+  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  return null;
+}
+
+async function importerExcelPreco(fichier) {
+  if (!fichier) return;
+  const etat = document.getElementById("pp-import-etat");
+  if (!PRECO_PRODUITS.length) { if (etat) etat.textContent = "la campagne n'est pas chargée"; return; }
+  if (etat) etat.textContent = `lecture de ${fichier.name}…`;
+  let feuilles;
+  try {
+    if (/\.xlsx$/i.test(fichier.name)) feuilles = await lireXlsx(await fichier.arrayBuffer());
+    else {
+      const tampon = await fichier.arrayBuffer();
+      let texte = new TextDecoder("utf-8", { fatal: false }).decode(tampon);
+      if (texte.includes("�")) texte = new TextDecoder("windows-1252").decode(tampon);
+      feuilles = lireCsvTexte(texte);
+    }
+  } catch (e) {
+    if (etat) etat.textContent = "fichier illisible : " + (e.message || e);
+    return;
+  }
+  const analyse = analyserFeuillesPreco(feuilles);
+  analyse.fichier = fichier.name;
+  IMPORT_PRECO = analyse;
+  if (etat) etat.textContent = "";
+  rendreImportPreco(analyse);
+}
+
+/* Repérage : dans chaque feuille, la première ligne qui contient à la fois une colonne
+   « Référence » (ou « Article-Couleur ») et une colonne « Livraison » est l'en-tête. Les
+   autres colonnes dont l'intitulé est une taille du produit portent les quantités ; une
+   feuille avec des colonnes « Taille » et « Quantité » est lue en format long (une ligne
+   par taille). Tout ce qui ne colle pas à la campagne est compté, jamais deviné. */
+function analyserFeuillesPreco(feuilles) {
+  const norm = v => String(v ?? "").trim().toUpperCase().replace(",", ".");
+  const parRef = {};
+  for (const p of PRECO_PRODUITS) parRef[norm(p.reference)] = p;
+  const dates = datesCampagnePreco();
+  const quantites = {};                    // clé référence|taille|livraison → quantité lue (0 compris)
+  const rejets = { refs: new Set(), tailles: new Set(), dates: new Set() };
+  const feuillesLues = [];
+  const lireQte = v => {
+    if (v === null || v === undefined || v === "") return null;
+    if (typeof v === "number") return Number.isFinite(v) ? Math.max(0, Math.round(v)) : null;
+    const s = String(v).trim().replace(/\s/g, "");
+    return /^\d+$/.test(s) ? parseInt(s, 10) : null;
+  };
+  const poser = (p, taille, liv, q) => {
+    if (q === null) return;
+    const t = (p.tailles || []).find(x => norm(x.taille) === norm(taille));
+    if (!t || !offrePreco(p, t.taille, liv)) { if (q > 0) rejets.tailles.add(`${p.reference} ${taille}${liv ? " " + dateFrPreco(liv) : ""}`); return; }
+    quantites[cleSaisie(p.reference, t.taille, liv || null)] = q;
+  };
+  for (const f of feuilles) {
+    const lignes = f.lignes || [];
+    let iTete = -1, cRef = -1, cLiv = -1, cTaille = -1, cQte = -1;
+    for (let i = 0; i < Math.min(lignes.length, 60); i++) {
+      const cells = (lignes[i] || []).map(norm);
+      const r = cells.findIndex(x => /^(RÉFÉRENCE|REFERENCE|REF|ARTICLE-COULEUR|ARTICLE)$/.test(x));
+      const l = cells.findIndex(x => /^LIVRAISON/.test(x));
+      if (r >= 0 && l >= 0) {
+        iTete = i; cRef = r; cLiv = l;
+        cTaille = cells.findIndex(x => x === "TAILLE");
+        cQte = cells.findIndex(x => /^QUANTIT[ÉE]$/.test(x));
+        break;
+      }
+    }
+    if (iTete < 0) continue;
+    feuillesLues.push(f.nom);
+    const tete = lignes[iTete] || [];
+    const long = cTaille >= 0 && cQte >= 0;
+    for (let i = iTete + 1; i < lignes.length; i++) {
+      const row = lignes[i] || [];
+      const ref = norm(row[cRef]);
+      if (!ref) continue;
+      const p = parRef[ref];
+      if (!p) { if (!/^TOTAL/.test(ref)) rejets.refs.add(ref); continue; }
+      const liv = dateImportExcel(row[cLiv]);
+      const livOk = liv !== null && (dates.length ? dates.includes(liv) : true);
+      if (!livOk) { rejets.dates.add(`${p.reference} : ${row[cLiv] ?? "(vide)"}`); continue; }
+      const livCle = dates.length ? liv : "";
+      if (long) poser(p, row[cTaille], livCle, lireQte(row[cQte]));
+      else for (let ci = 0; ci < tete.length; ci++) {
+        if (ci === cRef || ci === cLiv || tete[ci] === null || tete[ci] === undefined || tete[ci] === "") continue;
+        if (!(p.tailles || []).some(x => norm(x.taille) === norm(tete[ci]))) continue;   // colonne qui n'est pas une taille
+        poser(p, tete[ci], livCle, lireQte(row[ci]));
+      }
+    }
+  }
+  const refs = new Set(Object.keys(quantites).filter(k => quantites[k] > 0).map(k => k.split("|")[0]));
+  const pieces = Object.values(quantites).reduce((s, q) => s + q, 0);
+  return { quantites, refs, pieces, lignes: Object.values(quantites).filter(q => q > 0).length, feuillesLues, rejets };
+}
+
+function rendreImportPreco(a) {
+  const zone = document.getElementById("preco-fusion");
+  if (!zone) return;
+  const pa = panierActif();
+  const liste = (s, n = 8) => [...s].slice(0, n).map(echapperHTML).join(", ") + (s.size > n ? ` … (+${s.size - n})` : "");
+  const dejaSaisi = Object.values(PRECO_SAISIE).reduce((s, q) => s + (Number(q) || 0), 0);
+  const rien = !a.feuillesLues.length;
+  zone.innerHTML = `<div class="preco-fusion">
+    <b>Import de « ${echapperHTML(a.fichier)} » dans le panier « ${echapperHTML(pa?.nom || "")} »</b>
+    ${rien ? `<div class="compte-produits" style="color:#a33">Aucune feuille exploitable : il faut une ligne d'en-tête avec une colonne « Référence » et une colonne « Livraison », comme dans le modèle « Excel à remplir ».</div>`
+    : `<div class="compte-produits">Feuille${a.feuillesLues.length > 1 ? "s" : ""} lue${a.feuillesLues.length > 1 ? "s" : ""} : ${a.feuillesLues.map(echapperHTML).join(", ")}.
+      <b>${a.pieces.toLocaleString("fr-FR")} pièces</b> sur ${a.refs.size} référence${a.refs.size > 1 ? "s" : ""} (${a.lignes} case${a.lignes > 1 ? "s" : ""} remplie${a.lignes > 1 ? "s" : ""}).</div>
+    ${a.rejets.refs.size ? `<div class="compte-produits" style="color:#8a6414">Ignoré — ${a.rejets.refs.size} référence${a.rejets.refs.size > 1 ? "s" : ""} hors campagne : ${liste(a.rejets.refs)}</div>` : ""}
+    ${a.rejets.tailles.size ? `<div class="compte-produits" style="color:#8a6414">Ignoré — ${a.rejets.tailles.size} quantité${a.rejets.tailles.size > 1 ? "s" : ""} sur une taille non proposée : ${liste(a.rejets.tailles)}</div>` : ""}
+    ${a.rejets.dates.size ? `<div class="compte-produits" style="color:#8a6414">Ignoré — ${a.rejets.dates.size} ligne${a.rejets.dates.size > 1 ? "s" : ""} avec une date de livraison inconnue : ${liste(a.rejets.dates, 5)}</div>` : ""}
+    <div class="liste">
+      <label class="mag"><input type="radio" name="pp-import-mode" value="remplacer" checked>
+        <span><b>Remplacer</b> <span style="color:var(--encre2)">— le panier devient exactement le contenu du fichier${dejaSaisi ? ` (les ${dejaSaisi.toLocaleString("fr-FR")} pièces déjà saisies sont remplacées)` : ""}</span></span></label>
+      <label class="mag"><input type="radio" name="pp-import-mode" value="ajouter">
+        <span><b>Ajouter</b> <span style="color:var(--encre2)">— les quantités du fichier s'ajoutent à celles déjà saisies</span></span></label>
+    </div>`}
+    <div class="formu">
+      ${rien ? "" : `<button class="btn-noir" onclick="appliquerImportPreco()">IMPORTER</button>`}
+      <button class="puce-claire" onclick="document.getElementById('preco-fusion').innerHTML = ''">Annuler</button>
+      <span class="compte-produits" id="preco-import-etat" style="margin:0"></span>
+    </div></div>`;
+  zone.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+async function appliquerImportPreco() {
+  const a = IMPORT_PRECO;
+  const etat = document.getElementById("preco-import-etat");
+  if (!a || !etat) return;
+  const remplacer = (document.querySelector("input[name='pp-import-mode']:checked") || {}).value !== "ajouter";
+  const dates = datesCampagnePreco();
+  const parRef = {};
+  for (const p of PRECO_PRODUITS) parRef[p.reference] = p;
+  const refs = new Set(Object.keys(a.quantites).map(k => k.split("|")[0]));
+  if (remplacer) for (const k of Object.keys(PRECO_SAISIE)) refs.add(k.split("|")[0]);
+  const travaux = [];
+  for (const ref of refs) {
+    const p = parRef[ref];
+    if (!p) continue;
+    const lignes = [];
+    let change = false;
+    for (const t of (p.tailles || [])) for (const d of (dates.length ? dates : [""])) {
+      if (!offrePreco(p, t.taille, d)) continue;
+      const cle = cleSaisie(ref, t.taille, d || null);
+      const avant = PRECO_SAISIE[cle] || 0;
+      const lu = a.quantites[cle];
+      const apres = remplacer ? (lu ?? 0) : avant + (lu || 0);
+      if (apres !== avant) change = true;
+      lignes.push({ taille: t.taille, livraison: d || null, quantite: apres });
+    }
+    if (change) travaux.push({ ref, lignes });
+  }
+  if (!travaux.length) { etat.textContent = "rien à changer : le panier contient déjà ces quantités"; return; }
+  document.querySelectorAll("#preco-fusion button").forEach(b => b.disabled = true);
+  let fait = 0, pieces = 0;
+  try {
+    for (const { ref, lignes } of travaux) {
+      etat.textContent = `import… ${++fait}/${travaux.length}`;
+      const r = await api("/rest/v1/rpc/enregistrer_precommande", { corps: {
+        p_campagne: PRECO_COURANTE, p_societe: clientActif?.id ?? null, p_reference: ref, p_lignes: lignes, p_panier: PRECO_PANIER_ID } });
+      pieces += r.pieces || 0;
+      for (const l of lignes) {
+        const c = cleSaisie(ref, l.taille, l.livraison);
+        if (l.quantite > 0) PRECO_SAISIE[c] = l.quantite; else delete PRECO_SAISIE[c];
+      }
+    }
+  } catch (e) {
+    etat.textContent = "⚠ import interrompu à " + fait + "/" + travaux.length + " : " + String(e.donnees?.message || e.message).slice(0, 160);
+    document.querySelectorAll("#preco-fusion button").forEach(b => b.disabled = false);
+    return;
+  }
+  // la sélection suit la saisie : tout ce qui a des pièces est dans le panier
+  if (remplacer) PRECO_PANIER = new Set();
+  for (const c of Object.keys(PRECO_SAISIE)) PRECO_PANIER.add(c.split("|")[0]);
+  memoriserPanierPreco();
+  IMPORT_PRECO = null;
+  rafraichirPaniersPreco().catch(() => {});
+  await rendrePanierPreco(PRECO_COURANTE);
+  const e2 = document.getElementById("pp-etat");
+  if (e2) e2.textContent = `import terminé ✓ — ${travaux.length} référence${travaux.length > 1 ? "s" : ""} mise${travaux.length > 1 ? "s" : ""} à jour, ${pieces.toLocaleString("fr-FR")} pièces sur celles-ci`;
 }
 
 const jourCourt = (d) => d

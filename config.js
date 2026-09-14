@@ -360,3 +360,114 @@ function telechargerXlsx(nomFichier, feuilles) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
+
+/* ---- lecture d'un classeur .xlsx (aller-retour Excel) ----
+   Le strict nécessaire, sans bibliothèque : le ZIP (entrées stockées ou deflate, que le
+   navigateur décompresse lui-même), les chaînes partagées, puis les cellules de chaque
+   feuille dans l'ordre du classeur. Une date qu'Excel a convertie en nombre revient
+   telle quelle (numéro de série) : c'est à l'appelant de la reconnaître. */
+async function lireXlsx(tampon) {
+  const octets = new Uint8Array(tampon);
+  const vue = new DataView(tampon);
+  let fin = -1;                                  // fin du répertoire central, cherchée depuis la fin
+  for (let i = octets.length - 22; i >= Math.max(0, octets.length - 70000); i--) {
+    if (vue.getUint32(i, true) === 0x06054b50) { fin = i; break; }
+  }
+  if (fin < 0) throw new Error("ce fichier n'est pas un classeur Excel (.xlsx)");
+  const nb = vue.getUint16(fin + 10, true), debutCD = vue.getUint32(fin + 16, true);
+  const entrees = {};
+  let p = debutCD;
+  for (let k = 0; k < nb; k++) {
+    if (vue.getUint32(p, true) !== 0x02014b50) break;
+    const methode = vue.getUint16(p + 10, true), tailleComp = vue.getUint32(p + 20, true);
+    const ln = vue.getUint16(p + 28, true), le = vue.getUint16(p + 30, true), lc = vue.getUint16(p + 32, true);
+    const offset = vue.getUint32(p + 42, true);
+    entrees[new TextDecoder().decode(octets.subarray(p + 46, p + 46 + ln))] = { methode, tailleComp, offset };
+    p += 46 + ln + le + lc;
+  }
+  const lire = async nom => {
+    const e = entrees[nom]; if (!e) return null;
+    const ln = vue.getUint16(e.offset + 26, true), le = vue.getUint16(e.offset + 28, true);
+    const debut = e.offset + 30 + ln + le;
+    const brut = octets.subarray(debut, debut + e.tailleComp);
+    let data;
+    if (e.methode === 0) data = brut;
+    else if (e.methode === 8) {
+      const flux = new Blob([brut]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      data = new Uint8Array(await new Response(flux).arrayBuffer());
+    } else throw new Error("compression inconnue dans le classeur");
+    return new TextDecoder().decode(data);
+  };
+  const xml = t => new DOMParser().parseFromString(t, "application/xml");
+  const partagees = [];
+  const ss = await lire("xl/sharedStrings.xml");
+  if (ss) for (const si of xml(ss).getElementsByTagName("si")) {
+    partagees.push([...si.getElementsByTagName("t")].map(t => t.textContent).join(""));
+  }
+  const wb = xml((await lire("xl/workbook.xml")) || "<workbook/>");
+  const rels = xml((await lire("xl/_rels/workbook.xml.rels")) || "<Relationships/>");
+  const cible = {};
+  for (const r of rels.getElementsByTagName("Relationship")) cible[r.getAttribute("Id")] = r.getAttribute("Target");
+  const feuilles = [];
+  for (const s of wb.getElementsByTagName("sheet")) {
+    const rid = s.getAttribute("r:id") || s.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
+    let chemin = cible[rid] || "";
+    if (!chemin) continue;
+    chemin = chemin.startsWith("/") ? chemin.slice(1) : "xl/" + chemin.replace(/^\.\//, "");
+    const t = await lire(chemin);
+    if (!t) continue;
+    feuilles.push({ nom: s.getAttribute("name") || `Feuille ${feuilles.length + 1}`, lignes: lireFeuilleXml(xml(t), partagees) });
+  }
+  return feuilles;
+}
+
+// Les cellules d'une feuille : un tableau de lignes, chaque ligne un tableau indexé par colonne.
+function lireFeuilleXml(doc, partagees) {
+  const lignes = [];
+  const colonne = ref => { let n = 0; for (const ch of ref) { if (ch >= "A" && ch <= "Z") n = n * 26 + (ch.charCodeAt(0) - 64); else break; } return n - 1; };
+  let suivante = 0;
+  for (const row of doc.getElementsByTagName("row")) {
+    const r = row.hasAttribute("r") ? parseInt(row.getAttribute("r"), 10) - 1 : suivante;
+    suivante = r + 1;
+    const ligne = [];
+    let ci = -1;
+    for (const c of row.getElementsByTagName("c")) {
+      ci = c.hasAttribute("r") ? colonne(c.getAttribute("r")) : ci + 1;
+      const type = c.getAttribute("t") || "n";
+      let val = null;
+      if (type === "inlineStr") {
+        val = [...c.getElementsByTagName("t")].map(t => t.textContent).join("");
+      } else {
+        const v = c.getElementsByTagName("v")[0];
+        if (v) {
+          const s = v.textContent;
+          val = type === "s" ? (partagees[+s] ?? "") : type === "b" ? (s === "1") : (type === "str" || type === "e") ? s : (s === "" ? null : Number(s));
+        }
+      }
+      if (ci >= 0) ligne[ci] = val;
+    }
+    if (r >= 0) lignes[r] = ligne;
+  }
+  for (let i = 0; i < lignes.length; i++) if (!lignes[i]) lignes[i] = [];
+  return lignes;
+}
+
+// Un fichier texte (CSV Excel « ; », tabulations ou virgules) lu comme une feuille unique.
+function lireCsvTexte(texte) {
+  texte = texte.replace(/^﻿/, "");
+  const brutes = texte.split(/\r?\n/).filter(l => l.trim() !== "");
+  const tete = brutes[0] || "";
+  const sep = [";", "\t", ","].map(s => [s, tete.split(s).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const decouper = l => {
+    const cellules = []; let cour = "", entre = false;
+    for (let i = 0; i < l.length; i++) {
+      const ch = l[i];
+      if (ch === '"') { if (entre && l[i + 1] === '"') { cour += '"'; i++; } else entre = !entre; }
+      else if (ch === sep && !entre) { cellules.push(cour); cour = ""; }
+      else cour += ch;
+    }
+    cellules.push(cour);
+    return cellules.map(x => { const t = x.trim(); return t !== "" && /^-?\d+([.,]\d+)?$/.test(t) ? Number(t.replace(",", ".")) : t; });
+  };
+  return [{ nom: "CSV", lignes: brutes.map(decouper) }];
+}
