@@ -1581,10 +1581,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789463218"></script>
-<script src="imports.js?v=1789463218"></script>
-<script src="merch-shopify.js?v=1789463218"></script>
-<script src="moteur-merch.js?v=1789463218"></script>
+<script src="config.js?v=1789487075"></script>
+<script src="imports.js?v=1789487075"></script>
+<script src="merch-shopify.js?v=1789487075"></script>
+<script src="moteur-merch.js?v=1789487075"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2063,7 +2063,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789463218";
+    v.src = "hero.mp4?v=1789487075";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -5187,7 +5187,9 @@ async function rendrePanierPreco(campagne) {
       <span class="pp-rayons" id="pp-rayons"></span>
       <span class="sous" id="pp-etat">${verrou ? "validée — lecture seule" : ""}</span>
       ${verrou ? `<button class="btn-blanc" style="margin-left:auto" onclick="allerValiderPreco()">VOIR LE RÉCAPITULATIF →</button>`
-      : `<button class="btn-blanc" style="margin-left:auto" id="pp-enregistrer"
+      : `<button class="btn-blanc" style="margin-left:auto" id="pp-ajuster" title="Multiplie toutes les quantités de ce panier par un pourcentage (ex. 80 % pour baisser d'un cinquième)"
+              onclick="ajusterQuantitesPreco()">AJUSTER ×%</button>
+      <button class="btn-blanc" id="pp-enregistrer"
               onclick="enregistrerPanierPreco()">ENREGISTRER</button>
       <button class="btn-blanc" id="pp-valider" title="Récapitulatif par date, puis transmission ferme"
               onclick="allerValiderPreco()">VALIDER MA PRÉCOMMANDE →</button>`}
@@ -5761,10 +5763,10 @@ async function rendreDupliPreco(campagne, magasins) {
   zone.innerHTML = `
     <div class="preco-dupli">
       <h3>Mes autres magasins sur cette campagne</h3>
-      <div class="compte-produits">Reprenez ce panier tel quel pour d'autres magasins : chacun reçoit un <b>nouveau panier</b>
-        du même nom, avec les mêmes références, tailles, quantités et dates, aux prix de sa grille tarifaire. Ses autres
-        paniers ne bougent pas. Chaque magasin reste ensuite à transmettre depuis son propre compte, sauf si vous cochez
-        « transmettre aussitôt ».</div>
+      <div class="compte-produits">Reprenez ce panier pour d'autres magasins : chacun reçoit un <b>nouveau panier</b>
+        du même nom, avec les mêmes références, tailles et dates, aux prix de sa grille tarifaire, et les quantités au
+        pourcentage choisi. Ses autres paniers ne bougent pas. Pour un seul magasin, sa grille de saisie s'ouvre aussitôt
+        pour retoucher les quantités à la main ; pour plusieurs, un bouton par magasin y mène.</div>
       <div class="liste">${autres.map(m => `<label class="mag">
           <input type="checkbox" value="${m.id}" onchange="majBoutonDupliPreco()">
           <b>${echapperHTML(m.id_fastmag ? m.id_fastmag + ") " : "")}${echapperHTML(m.nom || m.compte)}</b>
@@ -5776,6 +5778,10 @@ async function rendreDupliPreco(campagne, magasins) {
         <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer">
           <input type="checkbox" id="dupli-transmettre" style="width:16px; height:16px; accent-color:#111">
           Transmettre aussitôt pour ces magasins — j'accepte les conditions ci-dessus pour chacun d'eux
+        </label>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px" title="Toutes les quantités recopiées sont multipliées par ce pourcentage, arrondies à l'unité ; une ligne qui tombe à 0 n'est pas recopiée">
+          Quantités à <input class="qte-claire" id="dupli-coef" type="number" min="1" max="500" step="5" value="100" style="width:74px"> % de ce panier
+          <span class="compte-produits" style="margin:0">(80 % = commande réduite d'un cinquième ; vous pourrez ensuite retoucher la grille magasin par magasin)</span>
         </label>
       </div>
       <div class="valid-actions" style="margin-top:12px">
@@ -5799,21 +5805,29 @@ async function dupliquerPreco() {
   const cibles = coches.map(i => i.value);
   if (!cibles.length) return;
   const transmettre = document.getElementById("dupli-transmettre")?.checked || false;
+  const pourcent = Math.min(500, Math.max(1, parseFloat(document.getElementById("dupli-coef")?.value) || 100));
   const bouton = document.getElementById("dupli-bouton"), etat = document.getElementById("dupli-etat");
   bouton.disabled = true; etat.textContent = transmettre ? "duplication et transmission…" : "duplication…";
   try {
     const bilan = await api("/rest/v1/rpc/dupliquer_precommande", { corps: {
-      p_campagne: PRECO_COURANTE, p_source: clientActif?.id ?? null, p_cibles: cibles, p_transmettre: transmettre, p_panier: PRECO_PANIER_ID } });
+      p_campagne: PRECO_COURANTE, p_source: clientActif?.id ?? null, p_cibles: cibles, p_transmettre: transmettre, p_panier: PRECO_PANIER_ID,
+      p_coef: Math.round(pourcent * 100) / 10000 } });
+    // un seul magasin, rien de transmis : on l'emmène directement sur sa grille pour retoucher
+    if (bilan.length === 1 && !bilan[0].envoi) {
+      await allerPagePourMagasin(bilan[0].societe_id, bilan[0].panier_id, "panier");
+      return;
+    }
     // la liste se redessine avec les nouveaux états, puis le bilan de ce qui vient d'être fait
     await rendreDupliPreco(PRECO_COURANTE);
     const etat2 = document.getElementById("dupli-etat");
-    if (etat2) etat2.textContent = `fait ✓ — ${bilan.length} magasin${bilan.length > 1 ? "s" : ""}`;
+    if (etat2) etat2.textContent = `fait ✓ — ${bilan.length} magasin${bilan.length > 1 ? "s" : ""}${pourcent !== 100 ? ` · quantités à ${pourcent} %` : ""}`;
     const bilanZone = document.getElementById("dupli-bilan");
     if (bilanZone) bilanZone.innerHTML = bilan.map(b => {
       const m = MES_SOCIETES.find(x => x.id === b.societe_id) || {};
       return `<div>✓ <b>${echapperHTML(etiquetteMagasin(m))}</b> : nouveau panier « ${echapperHTML(b.panier || "")} », ${b.pieces} pièce${b.pieces > 1 ? "s" : ""} sur ${b.references} référence${b.references > 1 ? "s" : ""}${
         b.envoi ? `, <b>transmis</b> n° ${b.envoi.numero}` : `, à transmettre depuis ce magasin`}
-        ${!b.envoi ? `<button class="puce-claire" style="margin-left:8px" onclick="allerValiderPourMagasin('${b.societe_id}', '${b.panier_id}')">Aller valider →</button>` : ""}</div>`;
+        ${!b.envoi ? `<button class="puce-claire" style="margin-left:8px" title="Ouvre la grille de saisie de ce magasin pour retoucher les quantités à la main" onclick="allerPagePourMagasin('${b.societe_id}', '${b.panier_id}', 'panier')">Retoucher les quantités →</button>
+        <button class="puce-claire" onclick="allerPagePourMagasin('${b.societe_id}', '${b.panier_id}', 'validation')">Aller valider →</button>` : ""}</div>`;
     }).join("");
   } catch (e) {
     bouton.disabled = false;
@@ -5831,11 +5845,15 @@ async function changerMagasinValidation(societeId) {
 }
 
 // Bascule sur le magasin, puis ouvre sa page de validation de la même campagne.
-async function allerValiderPourMagasin(societeId, panierId) {
+async function allerValiderPourMagasin(societeId, panierId) { return allerPagePourMagasin(societeId, panierId, "validation"); }
+
+// Bascule sur un autre magasin du compte et ouvre son panier : la grille (pour retoucher
+// les quantités après une duplication) ou la validation.
+async function allerPagePourMagasin(societeId, panierId, page) {
   const campagne = PRECO_COURANTE;
   try { if (panierId) localStorage.setItem(clePanierActif(campagne, societeId), panierId); } catch (e) { /* sans mémoire locale */ }
   await changerSociete(societeId);
-  location.hash = `#/preco-validation/${encodeURIComponent(campagne)}`;
+  location.hash = `#/${page === "panier" ? "preco-panier" : "preco-validation"}/${encodeURIComponent(campagne)}`;
 }
 
 async function transmettrePreco() {
@@ -5965,6 +5983,29 @@ function repartirLignePanier(inp) {
   });
   majTotauxGrillePreco();
   planifierSauvegardeAuto();
+}
+
+/* Baisser (ou monter) tout un panier d'un même pourcentage : chaque case est multipliée
+   puis arrondie à l'unité ; le résultat s'enregistre comme une saisie normale. */
+function ajusterQuantitesPreco() {
+  const saisie = prompt("Multiplier toutes les quantités de ce panier par (en %) :\n80 = baisse de 20 %, 120 = hausse de 20 %", "80");
+  if (saisie === null) return;
+  const pourcent = parseFloat(String(saisie).replace(",", "."));
+  if (!Number.isFinite(pourcent) || pourcent <= 0 || pourcent > 500) { alert("Indiquez un pourcentage entre 1 et 500."); return; }
+  if (pourcent === 100) return;
+  let touchees = 0, avant = 0, apres = 0;
+  for (const inp of document.querySelectorAll(".table-panier input[data-l]")) {
+    const q = parseInt(inp.value, 10) || 0;
+    if (!q) continue;
+    const n = Math.round(q * pourcent / 100);
+    avant += q; apres += n; touchees++;
+    inp.value = n || "";
+    inp.classList.remove("rempli"); void inp.offsetWidth; if (n) inp.classList.add("rempli");
+  }
+  majTotauxGrillePreco();
+  planifierSauvegardeAuto();
+  const etat = document.getElementById("pp-etat");
+  if (etat) etat.textContent = `${touchees} case${touchees > 1 ? "s" : ""} ajustée${touchees > 1 ? "s" : ""} : ${avant} → ${apres} pièces (${pourcent} %) — enregistrement automatique…`;
 }
 
 function brancherGrillePanier() {
