@@ -1581,10 +1581,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789396531"></script>
-<script src="imports.js?v=1789396531"></script>
-<script src="merch-shopify.js?v=1789396531"></script>
-<script src="moteur-merch.js?v=1789396531"></script>
+<script src="config.js?v=1789463218"></script>
+<script src="imports.js?v=1789463218"></script>
+<script src="merch-shopify.js?v=1789463218"></script>
+<script src="moteur-merch.js?v=1789463218"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2063,7 +2063,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789396531";
+    v.src = "hero.mp4?v=1789463218";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4961,6 +4961,14 @@ function memoriserPanierPreco() {
 function basculerPanierPreco(reference, ev) {
   ev?.stopPropagation();
   const ajout = !PRECO_PANIER.has(reference);
+  if (!ajout) {
+    if (!confirmerRetraitPreco(reference)) return;
+    // la saisie enregistrée part avec la référence ; si la base refuse, on la remet
+    effacerSaisieReference(reference).then(() => rafraichirPaniersPreco().catch(() => {})).catch(e => {
+      alert("Impossible de retirer cette référence : " + (e.donnees?.message || e.message));
+      PRECO_PANIER.add(reference); memoriserPanierPreco(); rendreGrillePreco();
+    });
+  }
   // la carte est redessinée juste après : on relève la vignette maintenant
   const source = ajout ? sourceAnimation(ev?.currentTarget?.closest(".media")) : null;
   if (ajout) PRECO_PANIER.add(reference); else PRECO_PANIER.delete(reference);
@@ -5902,10 +5910,32 @@ function majBoutonsPresse() {
   }
 }
 
-function retirerDuPanierPreco(reference) {
+/* Retirer une référence du panier retire aussi ce qui a été enregistré pour elle dans ce
+   panier. Sinon la sélection se reconstruit depuis la base au chargement suivant et la
+   référence « revient » — constaté chez GO MOUV le 15/09 sur son panier KIDS. */
+const piecesSaisiesReference = reference => Object.entries(PRECO_SAISIE)
+  .filter(([c]) => c.startsWith(reference + "|")).reduce((s, [, q]) => s + (Number(q) || 0), 0);
+async function effacerSaisieReference(reference) {
+  const cles = Object.keys(PRECO_SAISIE).filter(c => c.startsWith(reference + "|"));
+  if (!cles.length) return;
+  await api("/rest/v1/rpc/enregistrer_precommande", { corps: {
+    p_campagne: PRECO_COURANTE, p_societe: clientActif?.id ?? null,
+    p_reference: reference, p_lignes: [], p_panier: PRECO_PANIER_ID } });
+  cles.forEach(c => delete PRECO_SAISIE[c]);
+}
+function confirmerRetraitPreco(reference) {
+  const pieces = piecesSaisiesReference(reference);
+  return !pieces || confirm(`Retirer ${reference} du panier « ${panierActif()?.nom || ""} » ?\n\n`
+    + `${pieces} pièce${pieces > 1 ? "s" : ""} saisie${pieces > 1 ? "s" : ""} sur cette référence seront effacées de ce panier.`);
+}
+async function retirerDuPanierPreco(reference) {
+  if (!confirmerRetraitPreco(reference)) return;
+  try { await effacerSaisieReference(reference); }
+  catch (e) { alert("Impossible de retirer cette référence : " + (e.donnees?.message || e.message)); return; }
   PRECO_PANIER.delete(reference);
   memoriserPanierPreco();
   rendrePanierPreco(PRECO_COURANTE);
+  rafraichirPaniersPreco().catch(() => {});
 }
 
 let PRECO_COURBE = {};   // référence → { taille: pièces vendues } (courbe du réseau)
