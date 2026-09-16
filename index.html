@@ -1598,10 +1598,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789566210"></script>
-<script src="imports.js?v=1789566210"></script>
-<script src="merch-shopify.js?v=1789566210"></script>
-<script src="moteur-merch.js?v=1789566210"></script>
+<script src="config.js?v=1789572358"></script>
+<script src="imports.js?v=1789572358"></script>
+<script src="merch-shopify.js?v=1789572358"></script>
+<script src="moteur-merch.js?v=1789572358"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2080,7 +2080,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789566210";
+    v.src = "hero.mp4?v=1789572358";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -5307,6 +5307,7 @@ async function rendrePrecommandesAdmin(campagne) {
           · ${info.references || 0} références</span>
         <button class="puce-claire" onclick="exporterPrecoAdmin()">Exporter le cumul (CSV)</button>
         <button class="puce-claire" onclick="excelPrecoReseau()" title="Toutes les transmissions de la campagne : cumul réseau, récap par magasin, et un bon de commande par magasin et panier">⬇ Excel réseau</button>
+        <button class="puce-claire" id="pa-zip-bdc" onclick="zipBdcValides()" title="Un fichier ZIP avec un bon de commande Excel par panier validé (validés + intégrés, ou seulement le statut filtré)">⬇ BDC validés (ZIP)</button>
         <button class="puce-claire" onclick="location.hash='#/merch-preco/'+encodeURIComponent(PRECO_ADMIN_CAMPAGNE)">Merch de la campagne →</button>
         <button class="puce-claire forte" onclick="location.hash='#/tableau-bord-preco/'+encodeURIComponent(PRECO_ADMIN_CAMPAGNE)">📊 Tableau de bord →</button>
       </div>
@@ -6589,6 +6590,50 @@ async function excelPrecoEnvoi(envoiId, campagne, options = {}) {
     feuillesBonDeCommande({ campagne, magasin, panier: options.panier, numero: options.numero, date: options.date,
                             statut: options.statut ? (LIBELLES_PRECO[options.statut] || [options.statut])[0] : "",
                             lignes, produits, remise: Number(options.remise) || 0, miniatures }));
+}
+
+// Back-office : tous les bons de commande validés d'un coup — un .xlsx par panier (le même
+// que le bouton « ⬇ Excel » de chaque panier), rangés dans un seul ZIP. Si la liste est filtrée
+// sur « Validées » ou « Intégrées », seul ce statut part ; sinon les deux.
+async function zipBdcValides() {
+  const statuts = ["validee", "integree"].includes(PRECO_ADMIN_FILTRE) ? [PRECO_ADMIN_FILTRE] : ["validee", "integree"];
+  const envois = PRECO_ADMIN_RANGS.flatMap(r => (r.paniers || []).filter(p => p.envoi && statuts.includes(p.envoi.statut))
+    .map(p => ({ magasin: r, panier: p, envoi: p.envoi })));
+  if (!envois.length) { alert("Aucun bon de commande validé sur cette campagne."); return; }
+  const bouton = document.getElementById("pa-zip-bdc"), libelle = bouton?.textContent;
+  const etat = t => { if (bouton) bouton.textContent = t; };
+  if (bouton) bouton.disabled = true;
+  try {
+    for (let i = 0; i < envois.length; i++) {
+      etat(`lignes ${i + 1}/${envois.length}…`);
+      envois[i].lignes = await api("/rest/v1/rpc/precommande_envoi_lignes", { corps: { p_id: envois[i].envoi.id } }) || [];
+    }
+    const refs = [...new Set(envois.flatMap(e => e.lignes.map(l => l.reference)))];
+    etat("photos…");
+    const produits = await infosProduitsPreco(PRECO_ADMIN_CAMPAGNE, refs);
+    const miniatures = await miniaturesPreco(produits, refs);
+    const noms = new Set(), fichiers = [];
+    for (const e of envois) {
+      if (!e.lignes.length) continue;
+      const base = nomFichierExcel(PRECO_ADMIN_CAMPAGNE, e.magasin.compte || e.magasin.nom, e.panier.nom, e.envoi.numero);
+      let nom = base;
+      for (let k = 2; noms.has(nom); k++) nom = base.replace(/\.xlsx$/, `_${k}.xlsx`);
+      noms.add(nom);
+      fichiers.push({ nom, octets: fabriquerXlsx(feuillesBonDeCommande({ campagne: PRECO_ADMIN_CAMPAGNE, magasin: libelleMagasinExcel(e.magasin),
+        panier: e.panier.nom, numero: e.envoi.numero, date: e.envoi.envoye_le, statut: (LIBELLES_PRECO[e.envoi.statut] || [e.envoi.statut])[0],
+        lignes: e.lignes, produits, remise: Number(e.envoi.remise_pct) || 0, miniatures })) });
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([zipperStore(fichiers)], { type: "application/zip" }));
+    a.download = `BDC_${String(PRECO_ADMIN_CAMPAGNE).replace(/[^\w-]+/g, "_")}_${statuts.join("-").toUpperCase()}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.zip`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    etat(`✓ ${fichiers.length} BDC`);
+    setTimeout(() => { etat(libelle); if (bouton) bouton.disabled = false; }, 4000);
+  } catch (e) {
+    alert("Export impossible : " + (e.donnees?.message || e.message));
+    etat(libelle); if (bouton) bouton.disabled = false;
+  }
 }
 
 // Back-office : toutes les transmissions de la campagne (hors refusées), une feuille
