@@ -450,6 +450,23 @@
   .pa-panier { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-top: 1px dashed var(--hairline); font-size: 13px; }
   .pa-panier .nom { font-weight: 600; }
   .pa-panier .meta { flex-basis: 100%; color: var(--encre2); font-size: 12px; }
+  .ajust-preco { margin-top: 12px; padding: 14px 16px; background: #fff; border: 1px solid #111; border-radius: 12px; }
+  .ajust-tete { display: flex; gap: 18px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+  .ajust-totaux { display: flex; gap: 22px; flex-wrap: wrap; }
+  .ajust-totaux div { display: flex; flex-direction: column; }
+  .ajust-totaux span { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--encre2); }
+  .ajust-totaux b { font-size: 16px; font-variant-numeric: tabular-nums; }
+  .ajust-totaux i { font-style: normal; font-size: 11px; color: var(--encre2); }
+  .ajust-table thead th { position: sticky; top: 0; z-index: 1; }
+  .ajust-table td.liv { white-space: nowrap; color: var(--encre2); }
+  .ajust-table td.tailles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ajust-table td.tailles label { display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 4px; align-items: center; padding: 3px 5px; border: 1px solid #eeeeeb; border-radius: 7px; }
+  .ajust-table td.tailles .t { font-size: 10.5px; color: var(--encre2); }
+  .ajust-table td.tailles .avant { font-size: 10.5px; color: #9a9a96; text-align: right; }
+  .ajust-table td.tailles input { grid-column: 1 / span 2; width: 52px; text-align: center; border: 1px solid #d8d8d5; border-radius: 6px; padding: 3px; font: inherit; font-size: 13px; }
+  .ajust-table td.tailles input.baisse { background: #fdf4e6; border-color: #d9a441; }
+  .ajust-table td.tailles input.hausse { background: #eef7f0; border-color: #6fbf87; }
+  .ajust-table .baisse { color: #8a6414; font-weight: 600; } .ajust-table .hausse { color: #1f7a3a; font-weight: 600; }
   .pa-panier .actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .pp-verrou { display: flex; gap: 14px; align-items: flex-start; margin: 0 22px 14px; padding: 14px 18px; background: #eef7f0;
     border: 1px solid #bfe3c7; border-radius: 12px; color: #1f5a2c; font-size: 13.5px; line-height: 1.5; }
@@ -1581,10 +1598,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789487075"></script>
-<script src="imports.js?v=1789487075"></script>
-<script src="merch-shopify.js?v=1789487075"></script>
-<script src="moteur-merch.js?v=1789487075"></script>
+<script src="config.js?v=1789556656"></script>
+<script src="imports.js?v=1789556656"></script>
+<script src="merch-shopify.js?v=1789556656"></script>
+<script src="moteur-merch.js?v=1789556656"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2063,7 +2080,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789487075";
+    v.src = "hero.mp4?v=1789556656";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -5173,7 +5190,8 @@ async function rendrePanierPreco(campagne) {
       <div><b>Panier « ${echapperHTML(pa?.nom || "")} » — précommande n° ${envoi.numero} ${envoi.statut === "integree" ? "intégrée en Fastmag" : "validée par Footkorner"}</b>
         le ${dateHeure(envoi.validee_le || envoi.integree_le || envoi.envoye_le)} — ${envoi.pieces} pièces, ${eur(Number(envoi.total_net))} HT${Number(envoi.remise_pct) > 0 ? " net" : ""}.
         Elle n'est plus modifiable : la grille ci-dessous est en lecture seule. Pour la retoucher, contactez votre commercial,
-        qui peut la remettre en attente.</div>
+        qui peut la remettre en attente.
+        ${envoi.ajustee ? `<br><b>Quantités ajustées par Footkorner à la validation</b> : ${envoi.pieces_origine} pièces transmises, ${envoi.pieces} retenues (${eur(Number(envoi.total_net_origine))} → ${eur(Number(envoi.total_net))} HT${Number(envoi.remise_pct) > 0 ? " net" : ""}).${envoi.commentaire ? ` <i>${echapperHTML(envoi.commentaire)}</i>` : ""}` : ""}</div>
     </div>` : `<div class="pp-aide">
       <span class="pp-aide-ico">⤳</span>
       <div><b>Répartition automatique.</b> Tapez un total dans la colonne bleue <b>TOTAL</b> d'une ligne :
@@ -5514,10 +5532,14 @@ function rendrePanierAdmin(p, r) {
                : `Panier vide`}
         ${e && b && Number(b.pieces) !== Number(e.pieces) && !p.verrouille ? `<br><span style="color:#8a6414">Saisie modifiée depuis la transmission (${b.pieces} pièces) — le magasin devra retransmettre.</span>` : ""}
         ${e && e.par_livraison?.length ? `<br>${e.par_livraison.map(x => `${jourCourt(x.livraison)} : <b>${x.pieces}</b> pièces, ${eur(Number(x.montant))}`).join(" · ")}` : ""}
+        ${e && e.ajustee ? `<br><span style="color:#8a6414">Validée avec quantités ajustées : ${e.pieces_origine} → <b>${e.pieces}</b> pièces, ${eur(Number(e.total_net_origine))} → <b>${eur(Number(e.total_net))}</b> HT net.</span>` : ""}
+        ${e && e.proposition && e.statut === "transmise" ? `<br><span style="color:#8a6414">Proposition enregistrée le ${dateHeure(e.proposition_le)} : ${e.pieces} → <b>${e.proposition_pieces}</b> pièces, pas encore validée.</span>` : ""}
         ${e && e.commentaire ? `<br><i>${echapperHTML(e.commentaire)}</i>` : ""}
       </span>
       ${e ? `<span class="actions">
-        ${e.statut === "transmise" && peutApprouver ? `<button class="puce-claire" onclick="statutPreco('${e.id}','validee')">✓ Valider</button>
+        ${e.statut === "transmise" && peutApprouver ? `<button class="puce-claire" style="border-color:#111; font-weight:600" title="Proposer des quantités revues (ancienne / nouvelle quantité), puis valider"
+            onclick="ouvrirAjustementPreco('${e.id}')">✎ Ajuster les quantités${e.proposition ? " (proposition en cours)" : ""}</button>
+          <button class="puce-claire" onclick="statutPreco('${e.id}','validee')">✓ Valider</button>
           <button class="puce-claire" onclick="statutPreco('${e.id}','refusee', true)">Refuser</button>` : ""}
         ${e.statut === "validee" && peutIntegrer ? `<button class="puce-claire" onclick="statutPreco('${e.id}','integree')">Marquer intégrée Fastmag</button>` : ""}
         ${(e.statut === "validee" || e.statut === "refusee") && peutApprouver ? `<button class="puce-claire" onclick="statutPreco('${e.id}','transmise')">Remettre à valider</button>` : ""}
@@ -5530,6 +5552,183 @@ function rendrePanierAdmin(p, r) {
       </span>
       <div id="pa-detail-${e.id}" style="flex-basis:100%"></div>` : ""}
     </div>`;
+}
+
+/* ---------------- ajustement des quantités avant validation (commercial) ----------------
+   Le magasin a transmis plus que ce qu'on peut accepter : le commercial propose de nouvelles
+   quantités, voit ancienne et nouvelle quantité côte à côte avec les totaux, peut enregistrer
+   la proposition (reprise plus tard, export Excel pour la montrer au magasin) puis valider.
+   À la validation, les quantités retenues remplacent la transmission et le panier du magasin ;
+   les quantités d'origine restent conservées (« Remettre à valider » y revient). */
+let AJUST_PRECO = null;
+
+async function ouvrirAjustementPreco(envoiId) {
+  const zone = document.getElementById(`pa-detail-${envoiId}`);
+  if (!zone) return;
+  if (zone.dataset.mode === "ajust" && zone.innerHTML) { zone.innerHTML = ""; zone.dataset.mode = ""; return; }
+  zone.dataset.mode = "ajust";
+  zone.innerHTML = `<div class="compte-produits">chargement de la précommande…</div>`;
+  let d;
+  try { d = await api("/rest/v1/rpc/precommande_envoi_ajustement", { corps: { p_id: envoiId } }); }
+  catch (e) { zone.innerHTML = `<div class="compte-produits">impossible : ${echapperHTML(String(e.donnees?.message || e.message))}</div>`; return; }
+  if (!d) { zone.innerHTML = `<div class="compte-produits">réservé au commercial</div>`; return; }
+  const origine = d.origine || [];
+  const refs = [...new Set(origine.map(l => l.reference))];
+  const produits = await infosProduitsPreco(PRECO_ADMIN_CAMPAGNE, refs);
+  const cle = l => `${l.reference}|${l.taille}|${l.livraison || ""}`;
+  const depart = {};
+  for (const l of (d.proposition || d.actuelles || origine)) depart[cle(l)] = Number(l.quantite) || 0;
+  AJUST_PRECO = { id: envoiId, remise: Number(d.remise_pct) || 0, origine, produits, cle };
+  // une ligne par référence et livraison, les tailles en cases
+  const groupes = {};
+  for (const l of origine) {
+    const k = `${l.reference}|${l.livraison || ""}`;
+    (groupes[k] ??= { reference: l.reference, livraison: l.livraison || "", prix: Number(l.prix) || 0, lignes: [] }).lignes.push(l);
+  }
+  const lignesHtml = Object.values(groupes)
+    .sort((a, b) => a.reference.localeCompare(b.reference) || a.livraison.localeCompare(b.livraison))
+    .map(g => {
+      const p = produits[g.reference] || {};
+      g.lignes.sort((a, b) => cleTaille(a.taille) - cleTaille(b.taille));
+      return `<tr data-ref="${echapperHTML(g.reference)}" data-cherche="${echapperHTML((g.reference + " " + (p.designation || "")).toLowerCase())}">
+        <td class="lib"><b>${echapperHTML(g.reference)}</b><br><span class="sous">${echapperHTML(p.designation || "")}</span></td>
+        <td class="liv">${echapperHTML(jourCourt(g.livraison || null))}</td>
+        <td class="num">${eur(g.prix)}</td>
+        <td class="tailles">${g.lignes.map(l => `<label title="transmis : ${l.quantite}">
+            <span class="t">${echapperHTML(l.taille)}</span>
+            <span class="avant">${l.quantite}</span>
+            <input type="number" min="0" inputmode="numeric" value="${depart[cle(l)] ?? l.quantite}"
+                   data-cle="${echapperHTML(cle(l))}" data-avant="${l.quantite}" data-prix="${Number(l.prix) || 0}"
+                   oninput="majAjustementPreco()">
+          </label>`).join("")}</td>
+        <td class="num ecart-ligne"></td>
+      </tr>`;
+    }).join("");
+  zone.innerHTML = `<div class="ajust-preco">
+    <div class="ajust-tete">
+      <div><b>Proposition de quantités — transmission n° ${d.numero}</b>
+        <div class="compte-produits" style="margin:2px 0 0">Petit chiffre gris = quantité transmise par le magasin ; la case = quantité retenue.${d.proposition ? ` Proposition reprise du ${dateHeure(d.proposition_le)}.` : ""}</div></div>
+      <div class="ajust-totaux" id="ajust-totaux"></div>
+    </div>
+    <div class="formu" style="margin:10px 0">
+      <label class="pa-budget">Toutes les quantités à <input class="qte-claire" id="ajust-pct" type="number" min="1" max="100" step="5" value="80" style="width:70px"> %</label>
+      <button class="puce-claire" onclick="appliquerPctAjustementPreco()">Appliquer</button>
+      <button class="puce-claire" onclick="retablirAjustementPreco()">Revenir aux quantités transmises</button>
+      <input class="qte-claire" style="width:220px; text-align:left" placeholder="filtrer une référence…" oninput="filtrerAjustementPreco(this.value)">
+    </div>
+    <div style="overflow-x:auto; max-height:520px; overflow-y:auto; border:1px solid var(--hairline); border-radius:10px">
+      <table class="table-detail-preco ajust-table" style="margin:0; border:0">
+        <thead><tr><th>Référence</th><th>Livraison</th><th class="num">Prix HT</th><th>Tailles : transmis → retenu</th><th class="num">Écart</th></tr></thead>
+        <tbody id="ajust-corps">${lignesHtml}</tbody>
+      </table>
+    </div>
+    <div class="formu" style="margin-top:12px">
+      <input class="qte-claire" id="ajust-mot" style="flex:1; min-width:240px; text-align:left" placeholder="mot pour le magasin (facultatif), ex. « quantités ramenées au budget »">
+      <button class="puce-claire" onclick="enregistrerAjustementPreco()">Enregistrer la proposition</button>
+      <button class="puce-claire" onclick="excelAjustementPreco()">⬇ Excel de la proposition</button>
+      <button class="btn-noir" onclick="validerAjustementPreco()">VALIDER AVEC CES QUANTITÉS</button>
+      <span class="compte-produits" id="ajust-etat" style="margin:0"></span>
+    </div>
+  </div>`;
+  majAjustementPreco();
+  zone.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+function lignesAjustementPreco() {
+  return [...document.querySelectorAll("#ajust-corps input[data-cle]")].map(i => {
+    const [reference, taille, livraison] = i.dataset.cle.split("|");
+    return { reference, taille, livraison: livraison || null, quantite: Math.max(parseInt(i.value, 10) || 0, 0),
+             avant: Number(i.dataset.avant) || 0, prix: Number(i.dataset.prix) || 0 };
+  });
+}
+
+function majAjustementPreco() {
+  const a = AJUST_PRECO; if (!a) return;
+  let pa = 0, pn = 0, ma = 0, mn = 0, lignesModif = 0;
+  for (const i of document.querySelectorAll("#ajust-corps input[data-cle]")) {
+    const avant = Number(i.dataset.avant) || 0, n = Math.max(parseInt(i.value, 10) || 0, 0), prix = Number(i.dataset.prix) || 0;
+    pa += avant; pn += n; ma += avant * prix; mn += n * prix;
+    const modif = n !== avant;
+    i.classList.toggle("modif", modif); i.classList.toggle("baisse", n < avant); i.classList.toggle("hausse", n > avant);
+    if (modif) lignesModif++;
+  }
+  for (const tr of document.querySelectorAll("#ajust-corps tr")) {
+    let e = 0;
+    tr.querySelectorAll("input[data-cle]").forEach(i => e += ((parseInt(i.value, 10) || 0) - Number(i.dataset.avant)));
+    tr.querySelector(".ecart-ligne").innerHTML = e ? `<span class="${e < 0 ? "baisse" : "hausse"}">${e > 0 ? "+" : ""}${e}</span>` : "—";
+  }
+  const net = x => x * (1 - a.remise / 100);
+  const pctP = pa ? Math.round((pn / pa) * 1000) / 10 : 0;
+  document.getElementById("ajust-totaux").innerHTML = `
+    <div><span>Pièces</span><b>${pa} → ${pn}</b><i>${pctP.toLocaleString("fr-FR")} %</i></div>
+    <div><span>Montant HT${a.remise ? " net" : ""}</span><b>${eur(net(ma))} → ${eur(net(mn))}</b><i>${mn - ma <= 0 ? "" : "+"}${eur(net(mn - ma))}</i></div>
+    <div><span>Cases modifiées</span><b>${lignesModif}</b></div>`;
+}
+
+function appliquerPctAjustementPreco() {
+  const pct = Math.min(100, Math.max(1, parseFloat(document.getElementById("ajust-pct").value) || 100));
+  document.querySelectorAll("#ajust-corps tr:not([hidden]) input[data-cle]").forEach(i => i.value = Math.round((Number(i.dataset.avant) || 0) * pct / 100));
+  majAjustementPreco();
+}
+function retablirAjustementPreco() {
+  document.querySelectorAll("#ajust-corps input[data-cle]").forEach(i => i.value = i.dataset.avant);
+  majAjustementPreco();
+}
+function filtrerAjustementPreco(v) {
+  const q = (v || "").trim().toLowerCase();
+  document.querySelectorAll("#ajust-corps tr").forEach(tr => tr.hidden = !!q && !tr.dataset.cherche.includes(q));
+}
+
+async function enregistrerAjustementPreco() {
+  const etat = document.getElementById("ajust-etat");
+  etat.textContent = "enregistrement…";
+  try {
+    const r = await api("/rest/v1/rpc/proposer_quantites_precommande", { corps: { p_id: AJUST_PRECO.id,
+      p_lignes: lignesAjustementPreco().map(({ reference, taille, livraison, quantite }) => ({ reference, taille, livraison, quantite })) } });
+    etat.textContent = `proposition enregistrée ✓ — ${r.pieces_origine} → ${r.pieces} pièces`;
+  } catch (e) { etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 160); }
+}
+
+async function validerAjustementPreco() {
+  const lignes = lignesAjustementPreco();
+  const pa = lignes.reduce((s, l) => s + l.avant, 0), pn = lignes.reduce((s, l) => s + l.quantite, 0);
+  const ma = lignes.reduce((s, l) => s + l.avant * l.prix, 0), mn = lignes.reduce((s, l) => s + l.quantite * l.prix, 0);
+  const net = x => eur(x * (1 - AJUST_PRECO.remise / 100));
+  if (!confirm(`Valider cette précommande avec les quantités retenues ?\n\n`
+    + `Pièces : ${pa} → ${pn}\nMontant HT${AJUST_PRECO.remise ? " net" : ""} : ${net(ma)} → ${net(mn)}\n\n`
+    + `Le panier du magasin prend ces quantités et n'est plus modifiable. Les quantités transmises restent conservées.`)) return;
+  const etat = document.getElementById("ajust-etat");
+  etat.textContent = "validation…";
+  try {
+    await api("/rest/v1/rpc/valider_precommande_ajustee", { corps: { p_id: AJUST_PRECO.id,
+      p_lignes: lignes.map(({ reference, taille, livraison, quantite }) => ({ reference, taille, livraison, quantite })),
+      p_commentaire: document.getElementById("ajust-mot").value || null } });
+    AJUST_PRECO = null;
+    await chargerListePrecoAdmin();
+  } catch (e) { etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 160); }
+}
+
+// La proposition en Excel, pour la montrer au magasin : ancienne et nouvelle quantité par taille.
+function excelAjustementPreco() {
+  const a = AJUST_PRECO; if (!a) return;
+  const lignes = lignesAjustementPreco();
+  const r = PRECO_ADMIN_RANGS.find(x => (x.paniers || []).some(p => p.envoi && p.envoi.id === a.id));
+  const p = r && r.paniers.find(x => x.envoi && x.envoi.id === a.id);
+  const dateFr = d => d ? new Date(d).toLocaleDateString("fr-FR") : "";
+  const r2 = n => Math.round(n * 100) / 100;
+  const tri = [...lignes].sort((x, y) => x.reference.localeCompare(y.reference) || String(x.livraison || "").localeCompare(String(y.livraison || "")) || cleTaille(x.taille) - cleTaille(y.taille));
+  const pa = lignes.reduce((s, l) => s + l.avant, 0), pn = lignes.reduce((s, l) => s + l.quantite, 0);
+  const ma = lignes.reduce((s, l) => s + l.avant * l.prix, 0), mn = lignes.reduce((s, l) => s + l.quantite * l.prix, 0);
+  const tete = [
+    ["FKB2B — Proposition de quantités"], ["Campagne", PRECO_ADMIN_CAMPAGNE], ["Magasin", r ? libelleMagasinExcel(r) : ""],
+    ["Panier", p ? p.nom : ""], ["Transmission", p ? `n° ${p.envoi.numero}` : ""], ["Date", new Date().toLocaleString("fr-FR")],
+    ["Pièces transmises", pa], ["Pièces retenues", pn], ["Montant HT transmis", r2(ma)], ["Montant HT retenu", r2(mn)], [],
+  ];
+  const entete = ["Article-Couleur", "Nom du produit", "Livraison", "Taille", "Prix HT", "Qté transmise", "Qté retenue", "Écart", "Montant retenu"];
+  const corps = tri.map(l => [l.reference, (a.produits[l.reference] || {}).designation || "", dateFr(l.livraison), l.taille, l.prix, l.avant, l.quantite, l.quantite - l.avant, r2(l.quantite * l.prix)]);
+  telechargerXlsx(`PROPOSITION_${String(PRECO_ADMIN_CAMPAGNE).replace(/[^\w-]+/g, "_")}_${String(r?.compte || "MAGASIN").replace(/[^\w-]+/g, "_")}_N${p ? p.envoi.numero : ""}.xlsx`,
+    [{ nom: "Proposition", lignes: [...tete, entete, ...corps, [], ["TOTAL", "", "", "", "", pa, pn, pn - pa, r2(mn)]],
+       gras: [1, tete.length + 1, tete.length + corps.length + 3], figer: tete.length + 1, largeurs: [14, 34, 12, 8, 10, 12, 12, 8, 14] }]);
 }
 
 async function statutPreco(id, statut, demanderMotif = false) {
@@ -5700,6 +5899,7 @@ async function rendreValidationPreco(campagne) {
       ${verrou ? `<div class="valid-info verrou"><b>Précommande n° ${envoi.numero} ${envoi.statut === "integree" ? "intégrée en Fastmag" : "validée par Footkorner"}</b>
           le ${dateHeure(envoi.validee_le || envoi.integree_le || envoi.envoye_le)} — ${envoi.pieces} pièces, ${eur(Number(envoi.total_net))} HT${Number(envoi.remise_pct) > 0 ? " net" : ""}.
           Elle n'est plus modifiable ni retransmissible. Pour la retoucher, contactez votre commercial, qui peut la remettre en attente.
+          ${envoi.ajustee ? `<br><b>Quantités ajustées par Footkorner à la validation</b> : ${envoi.pieces_origine} pièces transmises, ${envoi.pieces} retenues (${eur(Number(envoi.total_net_origine))} → ${eur(Number(envoi.total_net))} HT${Number(envoi.remise_pct) > 0 ? " net" : ""}).${envoi.commentaire ? ` <i>${echapperHTML(envoi.commentaire)}</i>` : ""}` : ""}
           <div style="margin-top:8px"><button class="puce-claire" onclick="excelPrecoEnvoi('${envoi.id}', PRECO_COURANTE, { panier: panierActif()?.nom, numero: ${Number(envoi.numero) || 0}, date: '${envoi.envoye_le || ""}', statut: '${envoi.statut}', remise: ${Number(envoi.remise_pct) || 0} })">⬇ Excel (bon de commande)</button></div></div>`
       : envoi ? `<div class="valid-info">Une précommande a déjà été transmise le
           <b>${new Date(envoi.envoye_le).toLocaleString("fr-FR", { day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}</b>
