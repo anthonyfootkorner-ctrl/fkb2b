@@ -1598,10 +1598,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789572719"></script>
-<script src="imports.js?v=1789572719"></script>
-<script src="merch-shopify.js?v=1789572719"></script>
-<script src="moteur-merch.js?v=1789572719"></script>
+<script src="config.js?v=1789572959"></script>
+<script src="imports.js?v=1789572959"></script>
+<script src="merch-shopify.js?v=1789572959"></script>
+<script src="moteur-merch.js?v=1789572959"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2080,7 +2080,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789572719";
+    v.src = "hero.mp4?v=1789572959";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -6682,7 +6682,9 @@ async function excelPrecoReseau() {
     const f = feuillesBonDeCommande({ campagne: PRECO_ADMIN_CAMPAGNE, magasin: libelleMagasinExcel(e.magasin), panier: e.panier.nom,
       numero: e.envoi.numero, date: e.envoi.envoye_le, statut: (LIBELLES_PRECO[e.envoi.statut] || [e.envoi.statut])[0],
       lignes: e.lignes, produits, remise: Number(e.envoi.remise_pct) || 0, miniatures })[0];
-    f.nom = `${e.magasin.id_fastmag ? e.magasin.id_fastmag + " " : ""}${e.magasin.nom || ""} ${e.panier.nom}`.slice(0, 31);
+    // le n° de transmission en fin de nom : lisible et unique même quand le nom du magasin est long
+    const suffixe = e.envoi.numero ? ` N${e.envoi.numero}` : "";
+    f.nom = `${e.magasin.id_fastmag ? e.magasin.id_fastmag + " " : ""}${e.magasin.nom || ""} ${e.panier.nom}`.slice(0, 31 - suffixe.length).trim() + suffixe;
     feuilles.push(f);
   }
   telechargerXlsx(`PRECO_${String(PRECO_ADMIN_CAMPAGNE).replace(/[^\w-]+/g, "_")}_RESEAU${f ? "_" + f.toUpperCase() : ""}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`, feuilles);
