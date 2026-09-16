@@ -1598,10 +1598,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789556656"></script>
-<script src="imports.js?v=1789556656"></script>
-<script src="merch-shopify.js?v=1789556656"></script>
-<script src="moteur-merch.js?v=1789556656"></script>
+<script src="config.js?v=1789566210"></script>
+<script src="imports.js?v=1789566210"></script>
+<script src="merch-shopify.js?v=1789566210"></script>
+<script src="moteur-merch.js?v=1789566210"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2080,7 +2080,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789556656";
+    v.src = "hero.mp4?v=1789566210";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -5244,7 +5244,8 @@ const dateHeure = iso => iso ? new Date(iso).toLocaleString("fr-FR", { day: "2-d
 function rendreMesPrecommandes(precos) {
   if (!precos.length) return `<div class="rang" style="color:var(--gris)">Aucune campagne de précommande ouverte à votre magasin</div>`;
   const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
-  return precos.map(p => {
+  MES_PRECOS_COMPTE = precos;
+  return precos.map((p, i) => {
     const e = p.envoi, b = p.brouillon;
     const [lib, cls] = e ? (LIBELLES_PRECO[e.statut] || [e.statut, ""]) : [p.panier ? "NON TRANSMIS" : "RIEN DE SAISI", "alerte"];
     const mag = MES_SOCIETES.find(x => x.id === p.societe_id);
@@ -5266,8 +5267,10 @@ function rendreMesPrecommandes(precos) {
         ${b && (!e || b.pieces !== e.pieces) ? `<button class="puce" onclick="ouvrirPanierPreco(${arg(p.campagne)}, ${arg(p.panier_id || "")}, 'validation')">Valider / transmettre</button>` : ""}` : ""}
       ${ouvrable && p.verrouille ? `<button class="puce" style="margin-left:12px" onclick="ouvrirPanierPreco(${arg(p.campagne)}, ${arg(p.panier_id || "")}, 'validation')">Voir</button>` : ""}
       ${e && e.id ? `<button class="puce" onclick="excelPrecoEnvoi('${e.id}', ${arg(p.campagne)}, { panier: ${arg(p.panier || "")}, numero: ${Number(e.numero) || 0}, date: '${e.envoye_le || ""}', statut: '${e.statut}', remise: ${Number(e.remise_pct) || 0}, magasin: ${arg(libelleMagasinExcel(mag))}, compte: ${arg(mag?.compte || "")} })" title="Copie Excel façon bon de commande Nike">⬇ Excel</button>` : ""}
+      ${ouvrable && p.panier_id && ((b && b.pieces > 0) || (e && e.pieces > 0)) ? `<button class="puce" onclick="ouvrirDupliCompte(${i})" title="Recopier ce panier, en entier ou réduit d'un pourcentage, dans un nouveau panier de ce magasin ou d'un autre">Dupliquer</button>` : ""}
       ${e && e.par_livraison?.length ? `<div class="fin" style="margin-top:6px">${e.par_livraison.map(x =>
           `${jourCourt(x.livraison)} : ${x.pieces} pièces, ${eur(Number(x.montant))}`).join(" · ")}</div>` : ""}
+      <div id="dupli-compte-${i}"></div>
     </div>`;
   }).join("");
 }
@@ -5992,6 +5995,90 @@ async function rendreDupliPreco(campagne, magasins) {
     </div>`;
 }
 
+/* ---- dupliquer depuis Mon compte → Mes précommandes ----
+   Même moteur que sur la page de validation (dupliquer_precommande) : nouveau panier du même nom
+   pour chaque magasin coché — le magasin d'origine compris —, quantités au pourcentage choisi,
+   puis la grille s'ouvre pour retoucher à la main. Rien n'est transmis d'ici. */
+let MES_PRECOS_COMPTE = [];
+async function ouvrirDupliCompte(i) {
+  const p = MES_PRECOS_COMPTE[i], zone = document.getElementById("dupli-compte-" + i);
+  if (!p || !zone) return;
+  if (zone.innerHTML) { zone.innerHTML = ""; return; }
+  zone.innerHTML = `<div class="compte-produits" style="margin-top:8px">chargement des magasins…</div>`;
+  let magasins = MES_SOCIETES.length > 1
+    ? await api("/rest/v1/rpc/mes_magasins_campagne", { corps: { p_campagne: p.campagne } }).catch(() => [])
+    : [];
+  if (!magasins.some(m => m.id === p.societe_id)) {
+    const s = MES_SOCIETES.find(x => x.id === p.societe_id) || {};
+    magasins = [{ id: p.societe_id, nom: s.nom, compte: s.compte, id_fastmag: s.id_fastmag, ville: s.ville }, ...magasins];
+  }
+  magasins.sort((a, b) => (b.id === p.societe_id) - (a.id === p.societe_id));
+  const seul = magasins.length === 1;
+  zone.innerHTML = `
+    <div class="preco-dupli" style="margin-top:12px">
+      <h3>Dupliquer le panier « ${echapperHTML(p.panier || "")} »</h3>
+      <div class="compte-produits">Chaque magasin coché reçoit un <b>nouveau panier</b> avec les mêmes références, tailles et dates,
+        aux prix de sa grille tarifaire, et les quantités au pourcentage choisi (une ligne qui tombe à 0 n'est pas recopiée).
+        Le panier d'origine ne bouge pas. Pour un seul magasin, sa grille s'ouvre aussitôt pour retoucher à la main.</div>
+      <div class="liste">${magasins.map(m => `<label class="mag">
+          <input type="checkbox" value="${m.id}" ${seul ? "checked" : ""} onchange="majBoutonDupliCompte(${i})">
+          <b>${echapperHTML(m.id_fastmag ? m.id_fastmag + ") " : "")}${echapperHTML(m.nom || m.compte || "")}</b>
+          <span style="color:var(--encre2)">${echapperHTML(m.ville || "")}</span>
+          <span class="etat">${m.id === p.societe_id ? "ce magasin — nouveau panier à côté de l'original"
+            : Number(m.paniers) > 0 ? `${m.paniers} panier${m.paniers > 1 ? "s" : ""} · ${m.pieces} pièces` : "rien de saisi"}</span>
+        </label>`).join("")}</div>
+      <div class="options">
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px">
+          Quantités à <input class="qte-claire" id="dupli-compte-coef-${i}" type="number" min="1" max="500" step="5" value="100" style="width:74px"> % de ce panier
+          <span class="compte-produits" style="margin:0">(80 % = commande réduite de 20 %)</span>
+        </label>
+      </div>
+      <div class="valid-actions" style="margin-top:12px">
+        <button class="btn-noir" id="dupli-compte-bouton-${i}" ${seul ? "" : "disabled"} onclick="dupliquerDepuisCompte(${i})">DUPLIQUER</button>
+        <span class="compte-produits" id="dupli-compte-etat-${i}" style="margin:0"></span>
+      </div>
+      <div class="bilan" id="dupli-compte-bilan-${i}"></div>
+    </div>`;
+  majBoutonDupliCompte(i);
+}
+
+function majBoutonDupliCompte(i) {
+  const n = document.querySelectorAll(`#dupli-compte-${i} .mag input:checked`).length;
+  const b = document.getElementById("dupli-compte-bouton-" + i);
+  if (!b) return;
+  b.disabled = !n;
+  b.textContent = n > 1 ? `DUPLIQUER SUR ${n} MAGASINS` : "DUPLIQUER";
+}
+
+async function dupliquerDepuisCompte(i) {
+  const p = MES_PRECOS_COMPTE[i];
+  const cibles = [...document.querySelectorAll(`#dupli-compte-${i} .mag input:checked`)].map(x => x.value);
+  if (!p || !cibles.length) return;
+  const pourcent = Math.min(500, Math.max(1, parseFloat(document.getElementById("dupli-compte-coef-" + i)?.value) || 100));
+  const bouton = document.getElementById("dupli-compte-bouton-" + i), etat = document.getElementById("dupli-compte-etat-" + i);
+  bouton.disabled = true; etat.textContent = "duplication…";
+  try {
+    const bilan = await api("/rest/v1/rpc/dupliquer_precommande", { corps: {
+      p_campagne: p.campagne, p_source: p.societe_id, p_cibles: cibles, p_transmettre: false, p_panier: p.panier_id,
+      p_coef: Math.round(pourcent * 100) / 10000 } });
+    if (bilan.length === 1) {
+      await allerPagePourMagasin(bilan[0].societe_id, bilan[0].panier_id, "panier", p.campagne);
+      return;
+    }
+    etat.textContent = `fait ✓ — ${bilan.length} magasins${pourcent !== 100 ? ` · quantités à ${pourcent} %` : ""}`;
+    const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
+    document.getElementById("dupli-compte-bilan-" + i).innerHTML = bilan.map(b => {
+      const m = MES_SOCIETES.find(x => x.id === b.societe_id) || {};
+      return `<div>✓ <b>${echapperHTML(etiquetteMagasin(m))}</b> : nouveau panier « ${echapperHTML(b.panier || "")} », ${b.pieces} pièce${b.pieces > 1 ? "s" : ""} sur ${b.references} référence${b.references > 1 ? "s" : ""}
+        <button class="puce-claire" style="margin-left:8px" onclick="allerPagePourMagasin('${b.societe_id}', '${b.panier_id}', 'panier', ${arg(p.campagne)})">Retoucher les quantités →</button>
+        <button class="puce-claire" onclick="allerPagePourMagasin('${b.societe_id}', '${b.panier_id}', 'validation', ${arg(p.campagne)})">Aller valider →</button></div>`;
+    }).join("");
+  } catch (e) {
+    bouton.disabled = false;
+    etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 160);
+  }
+}
+
 function majBoutonDupliPreco() {
   const n = document.querySelectorAll("#preco-dupli .mag input:checked").length;
   const b = document.getElementById("dupli-bouton");
@@ -6049,10 +6136,10 @@ async function allerValiderPourMagasin(societeId, panierId) { return allerPagePo
 
 // Bascule sur un autre magasin du compte et ouvre son panier : la grille (pour retoucher
 // les quantités après une duplication) ou la validation.
-async function allerPagePourMagasin(societeId, panierId, page) {
-  const campagne = PRECO_COURANTE;
+async function allerPagePourMagasin(societeId, panierId, page, campagne = PRECO_COURANTE) {
   try { if (panierId) localStorage.setItem(clePanierActif(campagne, societeId), panierId); } catch (e) { /* sans mémoire locale */ }
   await changerSociete(societeId);
+  PRECO_COURANTE = null;   // même magasin : force la relecture de ses paniers (le nouveau compris)
   location.hash = `#/${page === "panier" ? "preco-panier" : "preco-validation"}/${encodeURIComponent(campagne)}`;
 }
 
