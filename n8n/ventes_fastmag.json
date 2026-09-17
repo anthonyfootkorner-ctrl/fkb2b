@@ -1,0 +1,199 @@
+{
+  "name": "FKB2B — ventes Fastmag → portail (merch)",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyHour"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "sender": "planificateur@fastmag.fr",
+          "q": "subject:\"Ventes FKB2B\" has:attachment"
+        },
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "name": "Mail « Ventes FKB2B » de Fastmag",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "notes": "Boîte anthony.poignard@footkorner.com : identifiant Gmail (OAuth) à choisir dans le nœud. Ne prend que les mails du planificateur Fastmag avec pièce jointe.",
+      "id": "v-trig"
+    },
+    {
+      "parameters": {
+        "jsCode": "// La pièce jointe Fastmag (journal VENTE) part telle quelle : le portail détecte séparateur et encodage.\nconst sortie = [];\nconst items = $input.all();\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  const cles = Object.keys(item.binary || {});\n  const cle = cles.find(k => /\\.(csv|xls|txt|tsv)$/i.test(item.binary[k].fileName || '')) || cles[0];\n  if (!cle) continue;\n  const octets = await this.helpers.getBinaryDataBuffer(i, cle);\n  sortie.push({ json: {\n    action: 'ventes_fastmag',\n    fichier: `${item.json.subject || 'Ventes FKB2B'} — ${item.binary[cle].fileName || 'piece jointe'}`,\n    fichier_base64: octets.toString('base64'),\n    simuler: false\n  } });\n}\nif (!sortie.length) throw new Error('aucune pièce jointe dans ce mail');\nreturn sortie;"
+      },
+      "name": "Pièce jointe → base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "id": "v-code"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://jklubjblmqwlhiumnlet.supabase.co/functions/v1/import-donnees",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 180000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "Portail FKB2B — dépôt des ventes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        300
+      ],
+      "notes": "Identifiant « Header Auth » : Name = x-import-token, Value = la clé jeton_import (table config_privee du projet Supabase).",
+      "id": "v-http",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Dépôt en échec ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ],
+      "id": "v-if"
+    },
+    {
+      "parameters": {
+        "jsCode": "// On n'écrit que si ça coince : un dépôt réussi reste silencieux.\nconst r = $input.first().json;\nreturn [{ json: {\n  sujet: 'FKB2B ventes : le dépôt automatique a échoué',\n  texte: 'Le mail « Ventes FKB2B » de Fastmag est arrivé mais le portail n\\'a pas pu charger les ventes.\\n\\nRéponse du portail :\\n' + JSON.stringify(r, null, 2).slice(0, 3000)\n} }];"
+      },
+      "name": "Message d'alerte",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        200
+      ],
+      "id": "v-cr"
+    },
+    {
+      "parameters": {
+        "sendTo": "anthony.poignard@footkorner.com",
+        "subject": "={{ $json.sujet }}",
+        "emailType": "text",
+        "message": "={{ $json.texte }}",
+        "options": {}
+      },
+      "name": "Alerte par mail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1200,
+        200
+      ],
+      "notes": "Même identifiant Gmail que le déclencheur.",
+      "id": "v-mail"
+    }
+  ],
+  "connections": {
+    "Mail « Ventes FKB2B » de Fastmag": {
+      "main": [
+        [
+          {
+            "node": "Pièce jointe → base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pièce jointe → base64": {
+      "main": [
+        [
+          {
+            "node": "Portail FKB2B — dépôt des ventes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Portail FKB2B — dépôt des ventes": {
+      "main": [
+        [
+          {
+            "node": "Dépôt en échec ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dépôt en échec ?": {
+      "main": [
+        [
+          {
+            "node": "Message d'alerte",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Message d'alerte": {
+      "main": [
+        [
+          {
+            "node": "Alerte par mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
