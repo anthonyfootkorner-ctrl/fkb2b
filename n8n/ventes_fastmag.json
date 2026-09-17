@@ -1,5 +1,5 @@
 {
-  "name": "FKB2B — ventes Copilot (VENTESTOCKFLOW par mail) → portail",
+  "name": "FKB2B — ventes (mail Fastmag du lundi) → portail",
   "nodes": [
     {
       "parameters": {
@@ -12,34 +12,35 @@
         },
         "simple": false,
         "filters": {
-          "q": "has:attachment filename:VENTESTOCKFLOW"
+          "q": "has:attachment (from:planificateur@fastmag.fr OR filename:VENTESTOCKFLOW) -subject:\"Stock Theorique\""
         },
         "options": {
           "downloadAttachments": true
         }
       },
-      "name": "Mail avec VENTESTOCKFLOW en pièce jointe",
+      "name": "Mail des ventes (Fastmag ou Copilot)",
       "type": "n8n-nodes-base.gmailTrigger",
       "typeVersion": 1.2,
       "position": [
         0,
         300
       ],
-      "notes": "Le mail hebdomadaire (lundi) avec l'export Copilot VENTESTOCKFLOW.csv doit arriver sur anthony.poignard@footkorner.com (boîte de l'identifiant Gmail de n8n). Expéditeur libre : seule la pièce jointe compte ; le portail refuse de toute façon un fichier incomplet.",
+      "notes": "Mail hebdomadaire du planificateur Fastmag (export détaillé des ventes) ou export Copilot VENTESTOCKFLOW, reçu sur anthony.poignard@footkorner.com. Les états de stock sont exclus ; toute autre pièce jointe qui n'est pas un fichier de ventes est ignorée.",
       "id": "v-trig"
     },
     {
       "parameters": {
-        "jsCode": "// Export Copilot VENTESTOCKFLOW (~11 Mo, 35 jours) : trop gros pour un seul appel.\n// On le découpe en tranches de 7 jours ; chaque tranche remplace ses jours dans le portail.\nconst sortie = [];\nconst items = $input.all();\nconst champ = (ligne, index) => {           // n-ième cellule d'une ligne CSV (guillemets gérés)\n  let cour = '', entre = false, n = 0;\n  for (let i = 0; i < ligne.length; i++) {\n    const ch = ligne[i];\n    if (ch === '\"') { if (entre && ligne[i + 1] === '\"') { cour += '\"'; i++; } else entre = !entre; }\n    else if (ch === ',' && !entre) { if (n === index) return cour; n++; cour = ''; }\n    else cour += ch;\n  }\n  return n === index ? cour : '';\n};\nfor (let k = 0; k < items.length; k++) {\n  const item = items[k];\n  const cles = Object.keys(item.binary || {});\n  const cle = cles.find(c => /VENTESTOCKFLOW.*\\.csv$/i.test(item.binary[c].fileName || ''));\n  if (!cle) continue;\n  const texte = (await this.helpers.getBinaryDataBuffer(k, cle)).toString('utf8').replace(/^﻿/, '');\n  const lignes = texte.split(/\\r?\\n/);\n  // le portail attend MtVenteRetailTTC ; Copilot l'appelle « Total MtVenteRetailTTC »\n  const entete = lignes[0].replace('\"Total MtVenteRetailTTC\"', '\"MtVenteRetailTTC\"');\n  const noms = entete.split(',').map(x => x.replace(/\"/g, '').trim());\n  const iJour = noms.indexOf('Jours dans Date');\n  if (iJour < 0) throw new Error('colonne « Jours dans Date » absente : est-ce bien l\\'export VENTESTOCKFLOW ?');\n  const parJour = {};\n  for (let i = 1; i < lignes.length; i++) {\n    if (!lignes[i].trim()) continue;\n    const j = champ(lignes[i], iJour);\n    const cleJour = j.slice(6, 10) + '-' + j.slice(3, 5) + '-' + j.slice(0, 2);\n    (parJour[cleJour] = parJour[cleJour] || []).push(lignes[i]);\n  }\n  const jours = Object.keys(parJour).sort();\n  for (let i = 0; i < jours.length; i += 7) {\n    const tranche = jours.slice(i, i + 7);\n    let contenu = entete;\n    for (const j of tranche) contenu += '\\n' + parJour[j].join('\\n');\n    sortie.push({ json: {\n      action: 'ventes_fastmag',\n      fichier: (item.binary[cle].fileName || 'VENTESTOCKFLOW.csv') + ' (' + tranche[0] + ' → ' + tranche[tranche.length - 1] + ')',\n      fichier_base64: Buffer.from(contenu, 'utf8').toString('base64'),\n      encodage: 'utf-8'\n    } });\n  }\n}\nif (!sortie.length) throw new Error('aucune pièce jointe VENTESTOCKFLOW*.csv dans ce mail');\nreturn sortie;"
+        "jsCode": "// Ventes → portail FKB2B. Accepte deux fichiers :\n//  • l'export détaillé Fastmag (une ligne par article : LIGNE_BarCode, VENTE_nature…),\n//    envoyé par le planificateur ;\n//  • l'export Copilot VENTESTOCKFLOW (déjà agrégé).\n// L'export Fastmag contient des données clients (nom, adresse…) : elles ne sortent jamais d'ici,\n// seules référence / taille / magasin / jour / quantité / montant partent vers le portail.\n// Envoi par tranches de 7 jours (chaque tranche remplace ses jours dans le portail).\nconst decoder = (octets) => {\n  try { return new TextDecoder('utf-8', { fatal: true }).decode(octets); }\n  catch (e) {\n    try { return new TextDecoder('windows-1252').decode(octets); } catch (e2) { return octets.toString('latin1'); }\n  }\n};\nconst cellules = (ligne, sep) => {\n  const res = []; let cour = '', entre = false;\n  for (let i = 0; i < ligne.length; i++) {\n    const ch = ligne[i];\n    if (ch === '\"') { if (entre && ligne[i + 1] === '\"') { cour += '\"'; i++; } else entre = !entre; }\n    else if (ch === sep && !entre) { res.push(cour); cour = ''; }\n    else cour += ch;\n  }\n  res.push(cour);\n  return res;\n};\nconst csv = (v) => '\"' + String(v).replace(/\"/g, '\"\"') + '\"';\nconst nombre = (v) => parseFloat(String(v || '0').replace(/\\s/g, '').replace(',', '.')) || 0;\n\nconst sortie = [];\nconst items = $input.all();\nfor (let k = 0; k < items.length; k++) {\n  const item = items[k];\n  for (const cle of Object.keys(item.binary || {})) {\n    const nomFichier = item.binary[cle].fileName || 'ventes.csv';\n    if (!/\\.(csv|txt|tsv)$/i.test(nomFichier)) continue;\n    const texte = decoder(await this.helpers.getBinaryDataBuffer(k, cle)).replace(/^﻿/, '');\n    const lignes = texte.split(/\\r?\\n/);\n    const tete = lignes[0] || '';\n    const sep = tete.includes('\\t') ? '\\t' : (tete.split(';').length > tete.split(',').length ? ';' : ',');\n    const noms = cellules(tete, sep).map(x => x.trim());\n    const col = (n) => noms.indexOf(n);\n\n    // parJour[jour]['magasin|ref|taille'] = [quantité, montant]\n    const parJour = {};\n    const ajouter = (jourFr, magasin, ref, taille, q, mt) => {\n      const m = /^(\\d{2})\\/(\\d{2})\\/(\\d{4})/.exec(jourFr);\n      if (!m || !ref || !magasin || !q) return;\n      const jour = m[3] + '-' + m[2] + '-' + m[1];\n      const bloc = parJour[jour] = parJour[jour] || {};\n      const c = magasin + '|' + ref + '|' + taille;\n      const e = bloc[c] = bloc[c] || [0, 0];\n      e[0] += q; e[1] += mt;\n    };\n\n    if (col('LIGNE_BarCode') >= 0 && col('VENTE_nature') >= 0) {\n      // export détaillé Fastmag : ventes + avoirs (retours), hors frais de port et mouvements de stock\n      const iMag = col('LIGNE_CodeMag') >= 0 ? col('LIGNE_CodeMag') : col('VENTE_codemag');\n      const iRef = col('LIGNE_BarCode'), iTaille = col('LIGNE_Taille'), iQ = col('LIGNE_Quantite'),\n            iMt = col('LIGNE_Total'), iDate = col('VENTE_date'), iNat = col('VENTE_nature'), iFam = col('LIGNE_Famille');\n      for (let i = 1; i < lignes.length; i++) {\n        if (!lignes[i].trim()) continue;\n        const c = cellules(lignes[i], sep);\n        const nature = (c[iNat] || '').trim().toUpperCase();\n        if (nature !== 'VENTE' && nature !== 'AVOIR') continue;\n        const ref = (c[iRef] || '').trim();\n        if (ref === 'FP' || ref === 'SHIPPING' || (c[iFam] || '').trim().startsWith('~')) continue;\n        ajouter((c[iDate] || '').trim(), (c[iMag] || '').trim().toUpperCase(), ref,\n                (c[iTaille] || '').trim(), Math.trunc(nombre(c[iQ])), nombre(c[iMt]));\n      }\n    } else if (col('BarCode V2') >= 0 && col('Jours dans Date') >= 0) {\n      // export Copilot VENTESTOCKFLOW\n      const iMt = col('Total MtVenteRetailTTC') >= 0 ? col('Total MtVenteRetailTTC') : col('MtVenteRetailTTC');\n      const iQ = col('Total QteVenteRetail'), iTaille = col('Taille');\n      const iJ = col('Jours dans Date'), iMag = col('Code_Origine'), iRef = col('BarCode V2');\n      for (let i = 1; i < lignes.length; i++) {\n        if (!lignes[i].trim()) continue;\n        const c = cellules(lignes[i], sep);\n        ajouter((c[iJ] || '').trim(), (c[iMag] || '').trim(), (c[iRef] || '').trim(),\n                iTaille >= 0 ? (c[iTaille] || '').trim() : '', Math.trunc(nombre(c[iQ])), iMt >= 0 ? nombre(c[iMt]) : 0);\n      }\n    } else {\n      continue; // pièce jointe qui n'est pas un fichier de ventes (état de stock…) : ignorée\n    }\n\n    const jours = Object.keys(parJour).sort();\n    for (let i = 0; i < jours.length; i += 7) {\n      const tranche = jours.slice(i, i + 7);\n      let contenu = 'Code_Origine,BarCode V2,Taille,Jours dans Date,MtVenteRetailTTC,Total QteVenteRetail';\n      let nb = 0;\n      for (const jour of tranche) {\n        const jourFr = jour.slice(8, 10) + '/' + jour.slice(5, 7) + '/' + jour.slice(0, 4);\n        for (const [c, e] of Object.entries(parJour[jour])) {\n          if (!e[0]) continue;\n          const [magasin, ref, taille] = c.split('|');\n          contenu += '\\n' + [csv(magasin), csv(ref), csv(taille), csv(jourFr), e[1].toFixed(2), e[0]].join(',');\n          nb++;\n        }\n      }\n      if (!nb) continue;\n      sortie.push({ json: {\n        action: 'ventes_fastmag',\n        fichier: nomFichier + ' (' + tranche[0] + ' → ' + tranche[tranche.length - 1] + ')',\n        fichier_base64: Buffer.from(contenu, 'utf8').toString('base64'),\n        encodage: 'utf-8'\n      } });\n    }\n  }\n}\n// aucun fichier de ventes dans ce mail : on s'arrête sans erreur\nreturn sortie;\n"
       },
-      "name": "Découpage par semaine",
+      "name": "Tri, agrégation et découpage",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         240,
         300
       ],
-      "id": "v-code"
+      "id": "v-code",
+      "notes": "Garde : ventes + avoirs, hors frais de port (FP, SHIPPING, familles ~) et mouvements. Les données clients ne sont jamais transmises."
     },
     {
       "parameters": {
@@ -142,18 +143,18 @@
     }
   ],
   "connections": {
-    "Mail avec VENTESTOCKFLOW en pièce jointe": {
+    "Mail des ventes (Fastmag ou Copilot)": {
       "main": [
         [
           {
-            "node": "Découpage par semaine",
+            "node": "Tri, agrégation et découpage",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Découpage par semaine": {
+    "Tri, agrégation et découpage": {
       "main": [
         [
           {
