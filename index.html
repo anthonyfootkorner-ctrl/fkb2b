@@ -1150,13 +1150,13 @@
       </div>
     </div>
     <div class="menu-deroulant" id="lien-dashboard" style="display:none">
-      <a href="#/dashboard">DASHBOARD ▾</a>
+      <a href="#/dashboard" id="lien-dashboard-tete">DASHBOARD ▾</a>
       <div class="sous-menu">
-        <a href="#/dashboard">Magasins &amp; produits</a>
-        <a href="#/reporting">Reporting (CA, marge, saisons)</a>
+        <a href="#/dashboard" class="lien-dash-magasins" style="display:none">Magasins &amp; produits</a>
+        <a href="#/reporting" class="lien-dash-magasins" style="display:none">Analyse CA, marge &amp; saisons</a>
+        <a href="#/hebdo" id="lien-hebdo" style="display:none">Reporting hebdo (direction)</a>
       </div>
     </div>
-    <a href="#/hebdo" id="lien-hebdo" style="display:none">REPORTING</a>
     <a href="#/compte">MON COMPTE</a>
     <div class="menu-deroulant" id="lien-backoffice" style="display:none">
       <a style="color:#d9a441">BACK OFFICE ▾</a>
@@ -1169,6 +1169,7 @@
         <a href="#/merch-preco" id="bo-merch-preco">Merch Préco</a>
         <a href="#/merch-shopify" id="bo-merch-shopify">Merch Shopify</a>
         <a href="#/imports" id="bo-imports">Imports</a>
+        <a href="#/import-reporting" id="bo-import-reporting">Import reporting</a>
         <a href="#/utilisateurs" id="bo-utilisateurs">Utilisateurs</a>
       </div>
     </div>
@@ -1406,6 +1407,7 @@
   <section class="vue page-claire" id="vue-dashboard"></section>
   <section class="vue page-claire" id="vue-reporting"></section>
   <section class="vue page-claire" id="vue-hebdo"></section>
+  <section class="vue page-claire" id="vue-import-reporting"></section>
 
   <section class="vue page-claire" id="vue-calendrier">
     <div class="col-tete">
@@ -1657,8 +1659,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789915392"></script>
-<script src="imports.js?v=1789915392"></script>
+<script src="config.js?v=1789916035"></script>
+<script src="imports.js?v=1789916035"></script>
 <script src="merch-shopify.js?v=1789911674"></script>
 <script src="moteur-merch.js?v=1789911674"></script>
 <script>
@@ -1783,6 +1785,7 @@ async function init() {
     montrer("bo-merch-preco", estAdmin || estMerch);
     montrer("bo-merch-shopify", estAdmin || estMerch);
     montrer("bo-imports", estAdmin || MON_ROLE === "admin_commercial");
+    montrer("bo-import-reporting", estAdmin);
     montrer("bo-utilisateurs", estAdmin || MON_ROLE === "admin_commercial");
   }
   if (estMerch) {
@@ -2075,6 +2078,9 @@ function router() {
   } else if (route === "hebdo") {
     document.getElementById("vue-hebdo").classList.add("active");
     rendreHebdo();
+  } else if (route === "import-reporting") {
+    document.getElementById("vue-import-reporting").classList.add("active");
+    rendreImportReporting();
   } else if (route === "dashboard") {
     document.getElementById("vue-dashboard").classList.add("active");
     rendreDashboard();
@@ -8948,22 +8954,9 @@ async function rendreHebdo() {
       <div class="compte-produits">Le reporting du lundi : chiffre d'affaires, marge et fréquentation
         de la semaine écoulée, comparés aux mêmes dates l'an dernier. Semaine ISO, du lundi au dimanche.</div>
     </div>
-    ${admin ? `
-    <div class="dash-section">
-      <h3>Dépôt du lundi</h3>
-      <div class="compte-produits">Déposez les exports Fastmag de la semaine (VENTE, OBJECTIF, STOCK,
-        fréquentation, Productivité, VENDEUR, REF, HEBDO REF, FICHIER GLOBAL MAG) et, tant que le calcul
-        tourne encore sur votre Mac, les fichiers produits. Chaque fichier est rangé d'après son nom.</div>
-      <div class="dash-ligne" style="margin-top:10px">
-        <label class="compte-produits" style="margin:0">Semaine si le nom ne la dit pas :
-          <input type="number" id="hebdo-semaine" min="1" max="53" value="${p.semaine}" style="width:70px">
-          <input type="number" id="hebdo-annee" min="2024" max="2100" value="${p.annee}" style="width:90px">
-        </label>
-        <input type="file" id="hebdo-fichiers" multiple>
-        <button class="puce-claire" onclick="deposerHebdo()">Déposer</button>
-      </div>
-      <div id="hebdo-depot" class="compte-produits"></div>
-    </div>` : ""}
+    ${admin ? `<div class="dash-section"><div class="dash-ligne">
+      <span class="compte-produits" style="margin:0">Le dépôt des exports et le lancement du calcul se font dans le Back Office.</span>
+      <a class="puce-claire" href="#/import-reporting">Import reporting</a></div></div>` : ""}
     <div class="dash-section">
       <h3>Semaines archivées</h3>
       <div class="dash-ligne" id="hebdo-semaines"></div>
@@ -9011,7 +9004,9 @@ async function rendreSemaineCorpsHebdo() {
   const deLaPortee = HEBDO.fichiers.filter(f => f.categorie === "sortie" && f.portee === HEBDO.onglet);
   const mail = deLaPortee.find(f => f.genre === "mail" || /_mail\.html$|^reporting_succ_S\d+\.html$/i.test(f.nom)
                                     || (/\.html$/i.test(f.nom)));
-  const image = deLaPortee.find(f => /\.png$/i.test(f.nom));
+  // l'image mise en avant : le classement (enseigne) ou le tableau détaillé (succ), pas une page de flash
+  const image = deLaPortee.find(f => /_classement\.png$/i.test(f.nom) || /^reporting_succ_S\d+\.png$/i.test(f.nom))
+    || deLaPortee.find(f => /\.png$/i.test(f.nom) && !/^flash_/i.test(f.nom));
   const exports_ = HEBDO.fichiers.filter(f => f.categorie === "export");
   const analyses = HEBDO.fichiers.filter(f => f.categorie === "analyse");
   const ligne = f => `<tr>
@@ -9074,38 +9069,274 @@ async function telechargerHebdo(chemin) {
   } catch (e) { alert("Téléchargement impossible : " + (e.donnees?.message || e.message)); }
 }
 
-async function deposerHebdo() {
-  const champ = document.getElementById("hebdo-fichiers");
-  const zone = document.getElementById("hebdo-depot");
-  const fichiers = [...(champ?.files || [])];
-  if (!fichiers.length) { zone.textContent = "Choisissez d'abord des fichiers."; return; }
-  const semaine = Number(document.getElementById("hebdo-semaine").value) || hebdoSemainePrecedente().semaine;
-  const annee = Number(document.getElementById("hebdo-annee").value) || hebdoSemainePrecedente().annee;
-  const lignes = [];
-  let n = 0;
-  for (const f of fichiers) {
-    const c = hebdoClasser(f.name, semaine, annee);
-    const chemin = hebdoChemin({ ...c, nom: f.name });
-    zone.textContent = `Envoi ${++n}/${fichiers.length} — ${f.name}…`;
-    try { await hebdoEnvoyer(chemin, f); }
-    catch (e) { zone.textContent = `Échec sur ${f.name} : ${e.message}`; return; }
-    lignes.push({ annee: c.annee, semaine: c.semaine, categorie: c.categorie, portee: c.portee,
-                  genre: c.genre, nom: f.name, chemin, taille: f.size });
-  }
-  await api("/rest/v1/rpc/reporting_enregistrer", { corps: { p_fichiers: lignes } });
-  zone.innerHTML = `<b>${lignes.length} fichier${lignes.length > 1 ? "s" : ""} déposé${lignes.length > 1 ? "s" : ""}.</b>
-    ${lignes.map(l => `<div>${echapperHTML(l.nom)} → ${l.categorie} · ${l.portee}${l.genre ? " · " + echapperHTML(l.genre) : ""} · S${String(l.semaine).padStart(2, "0")} ${l.annee}</div>`).join("")}`;
-  champ.value = "";
-  HEBDO.semaines = await api("/rest/v1/rpc/reporting_semaines", { corps: { p_limite: 60 } }) || [];
-  rendreSemainesHebdo();
-  await ouvrirSemaineHebdo(lignes[0].annee, lignes[0].semaine);
-}
-
 async function activerLienHebdo() {
   try {
     const acces = await api("/rest/v1/rpc/reporting_mes_acces", { corps: {} });
-    if ((acces || []).length) document.getElementById("lien-hebdo").style.display = "";
+    if ((acces || []).length) {
+      document.getElementById("lien-dashboard").style.display = "";
+      document.getElementById("lien-hebdo").style.display = "";
+      // un compte sans magasin au dashboard arrive directement sur le reporting
+      if (!document.querySelector(".lien-dash-magasins:not([style*='none'])"))
+        document.getElementById("lien-dashboard-tete").href = "#/hebdo";
+    }
   } catch (e) { /* pas de reporting pour ce compte */ }
+}
+
+/* ================= Import reporting (Back Office) =================
+   La liste de contrôle du lundi : chaque export attendu est coché, signalé manquant,
+   ou repris du dernier dépôt quand il ne change pas chaque semaine. Le calcul ne se
+   lance que lorsque tout est là et que les contrôles de contenu sont passés. */
+const HEBDO_ATTENDUS = [
+  { genre: "ventes", libelle: "VENTE", detail: "jour × magasin × marque, avec les colonnes « Past Year »", motif: "VENTE….csv", type: "requis", controle: "ventes" },
+  { genre: "objectifs", libelle: "OBJECTIF", detail: "objectifs et tickets par jour", motif: "OBJECTIF….csv", type: "requis", controle: "dates" },
+  { genre: "stock", libelle: "STOCK", detail: "stock par magasin, référence et taille", motif: "STOCK….csv", type: "requis" },
+  { genre: "fréquentation", libelle: "Analyse fréquentation", detail: "passages et tickets par heure", motif: "Analyse…fréquentation….csv", type: "requis", controle: "frequentation" },
+  { genre: "heures travaillées", libelle: "Productivité", detail: "heures réelles, un onglet par magasin", motif: "Productivité….xlsx", type: "requis" },
+  { genre: "vendeurs", libelle: "VENDEUR", detail: "CA par vendeur (fiches magasins)", motif: "VENDEUR….csv", type: "requis" },
+  { genre: "ventes par référence", libelle: "REF", detail: "jour × magasin × référence (flash produits)", motif: "REF….csv", type: "requis", controle: "dates" },
+  { genre: "désignations (HEBDO REF)", libelle: "HEBDO REF", detail: "désignations, saisons et rayons", motif: "…HEBDO REF….xlsx", type: "durable" },
+  { genre: "référentiel réseau", libelle: "FICHIER GLOBAL MAG", detail: "référentiel de tous les magasins du réseau", motif: "FICHIER GLOBAL MAG….xlsx", type: "durable" },
+  { genre: "fréquentation N-1", libelle: "fastmag (fréquentation 2025)", detail: "passages de l'an dernier", motif: "fastmag….csv", type: "durable", controle: "frequentation_n1" },
+  { genre: "ventes N-1", libelle: "VENTE N-1", detail: "mois N-1 complet, une fois par mois, pour figer le taux de marge du mois N-1", motif: "VENTE N-1….csv", type: "optionnel" },
+];
+let IMPREP = { annee: null, semaine: null, etat: null, suivi: null };
+
+const imprepDate = d => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+const imprepLundi = (annee, semaine) => {            // lundi d'une semaine ISO
+  const j4 = new Date(annee, 0, 4);
+  const lundi1 = new Date(j4); lundi1.setDate(j4.getDate() - ((j4.getDay() + 6) % 7));
+  const d = new Date(lundi1); d.setDate(lundi1.getDate() + (semaine - 1) * 7); return d;
+};
+
+/* Contrôle de contenu d'un export CSV, fait dans le navigateur avant l'envoi.
+   Renvoie { refus } quand le fichier ne doit pas entrer, sinon { du, au, lignes, alertes }. */
+async function imprepControler(fichier, controle, lundi) {
+  if (!controle) return {};
+  const texte = (await fichier.text()).replace(/^﻿/, "");
+  const lignes = texte.split(/\r?\n/).filter(l => l.trim() !== "");
+  if (lignes.length < 2) return { refus: "fichier vide" };
+  const sep = controle.startsWith("frequentation") ? ";" : ",";
+  const entete = decouperLigne(lignes[0], sep).map(c => c.trim());
+  const col = nom => entete.findIndex(c => c.toLowerCase() === nom.toLowerCase());
+  const dimanche = new Date(lundi); dimanche.setDate(lundi.getDate() + 6);
+  const alertes = [];
+  let iDate, lireDate;
+  if (controle === "frequentation_n1") {
+    // d'autres exports Fastmag s'appellent aussi « fastmag (n).csv » : on vérifie que c'est bien la fréquentation
+    return col("DatePassage") >= 0 && col("codemag") >= 0 ? { lignes: lignes.length - 1 }
+      : { refus: "ce n'est pas l'export de fréquentation (colonnes codemag et DatePassage attendues)" };
+  }
+  if (controle === "frequentation") {
+    iDate = col("DatePassage");
+    lireDate = v => { const m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? new Date(+m[3], +m[1] - 1, +m[2]) : null; };
+  } else {
+    iDate = col("Jours dans Date");
+    lireDate = v => { const m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})/); return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null; };
+  }
+  if (iDate < 0) return { refus: `colonne de date introuvable (${controle === "frequentation" ? "DatePassage" : "Jours dans Date"}) — est-ce le bon export ?` };
+  let iCA = -1;
+  if (controle === "ventes") {
+    if (col("Marque Gp") < 0) return { refus: "pas de colonne « Marque Gp » : export raté, à refaire" };
+    if (!entete.some(c => /^past year/i.test(c)))
+      return { refus: "pas de colonnes « Past Year » : ce n'est pas l'export VENTE du reporting (VENTESTOCKFLOW va dans Back Office → Imports)" };
+    iCA = col("Total MtVenteRetailTTC");
+  }
+  let du = null, au = null, nDim = 0, nDimAvecCA = 0, nSemaine = 0;
+  for (let i = 1; i < lignes.length; i++) {
+    const c = decouperLigne(lignes[i], sep);
+    const d = lireDate((c[iDate] || "").trim());
+    if (!d) continue;
+    if (!du || d < du) du = d;
+    if (!au || d > au) au = d;
+    if (d >= lundi && d <= dimanche) nSemaine++;
+    if (controle === "ventes" && d.getTime() === dimanche.getTime()) {
+      nDim++;
+      if (iCA >= 0 && (c[iCA] || "").trim() !== "") nDimAvecCA++;
+    }
+  }
+  if (!du) return { refus: "aucune date lisible dans le fichier" };
+  let bloquant = false;
+  if (au < dimanche) { alertes.push(`s'arrête au ${imprepDate(au)} : il doit couvrir jusqu'au dimanche ${imprepDate(dimanche)}`); bloquant = true; }
+  if (du > lundi) { alertes.push(`commence le ${imprepDate(du)}, après le lundi ${imprepDate(lundi)}`); bloquant = true; }
+  if (controle === "ventes" && au >= dimanche) {
+    // leçon S36 : le dimanche arrive parfois sans son CA (retard Copilot) — comparer 6 jours à 7 fausse tout
+    if (!nDim || nDimAvecCA < Math.max(3, nDim * 0.3)) {
+      alertes.push(`dimanche ${imprepDate(dimanche)} incomplet (${nDimAvecCA} ligne(s) avec un CA sur ${nDim}) : attendre la mise à jour Copilot et réexporter`);
+      bloquant = true;
+    }
+  }
+  return { du: imprepDate(du), au: imprepDate(au), lignes: lignes.length - 1, lignes_semaine: nSemaine, alertes, bloquant };
+}
+
+async function rendreImportReporting() {
+  const vue = document.getElementById("vue-import-reporting");
+  if (!estAdmin) { vue.innerHTML = `<div class="col-tete"><h1>IMPORT REPORTING</h1><div class="compte-produits">Réservé à un administrateur.</div></div>`; return; }
+  if (!IMPREP.semaine) Object.assign(IMPREP, hebdoSemainePrecedente());
+  const lundi = imprepLundi(IMPREP.annee, IMPREP.semaine);
+  const dimanche = new Date(lundi); dimanche.setDate(lundi.getDate() + 6);
+  vue.innerHTML = `
+    <div class="col-tete">
+      <h1>IMPORT REPORTING</h1>
+      <div class="compte-produits">Le dépôt du lundi : les exports Fastmag de la semaine écoulée. Le site vérifie
+        chaque fichier, vous dit ce qui manque, puis lance le calcul des reportings ENSEIGNE et SUCC.</div>
+      <div class="dash-filtres"><div class="dash-ligne">
+        <span class="compte-produits" style="margin:0">Semaine :</span>
+        <input type="number" id="imprep-semaine" min="1" max="53" value="${IMPREP.semaine}" style="width:70px" onchange="changerSemaineImportReporting()">
+        <input type="number" id="imprep-annee" min="2024" max="2100" value="${IMPREP.annee}" style="width:90px" onchange="changerSemaineImportReporting()">
+        <span class="compte-produits" style="margin:0">du lundi <b>${imprepDate(lundi)}</b> au dimanche <b>${imprepDate(dimanche)}</b></span>
+      </div></div>
+    </div>
+    <div class="dash-section">
+      <h3>Déposer les fichiers</h3>
+      <div class="compte-produits">Sélectionnez tous les exports d'un coup : chacun est reconnu à son nom et rangé à sa place.
+        Un fichier redéposé remplace le précédent.</div>
+      <div class="dash-ligne" style="margin-top:10px">
+        <input type="file" id="imprep-fichiers" multiple>
+        <button class="puce-claire" onclick="deposerImportReporting()">Déposer et contrôler</button>
+      </div>
+      <div id="imprep-depot" class="compte-produits"></div>
+    </div>
+    <div class="dash-section">
+      <h3>Liste de contrôle</h3>
+      <div id="imprep-liste"><div class="compte-produits">Chargement…</div></div>
+    </div>
+    <div class="dash-section">
+      <h3>Calcul</h3>
+      <div id="imprep-calcul"></div>
+    </div>`;
+  await chargerImportReporting();
+}
+
+function changerSemaineImportReporting() {
+  IMPREP.semaine = Math.min(53, Math.max(1, Number(document.getElementById("imprep-semaine").value) || IMPREP.semaine));
+  IMPREP.annee = Number(document.getElementById("imprep-annee").value) || IMPREP.annee;
+  rendreImportReporting();
+}
+
+async function chargerImportReporting() {
+  try {
+    IMPREP.etat = await api("/rest/v1/rpc/reporting_exports_semaine", { corps: { p_annee: IMPREP.annee, p_semaine: IMPREP.semaine } });
+  } catch (e) {
+    document.getElementById("imprep-liste").innerHTML = `<div class="compte-produits">Lecture impossible : ${echapperHTML(e.donnees?.message || e.message)}</div>`;
+    return;
+  }
+  rendreListeImportReporting();
+}
+
+// L'état de chaque fichier attendu : present | repris | manquant, avec ses alertes.
+function imprepBilan() {
+  const e = IMPREP.etat || { semaine: [], derniers: [] };
+  return HEBDO_ATTENDUS.map(a => {
+    const f = (e.semaine || []).find(x => x.genre === a.genre);
+    const dernier = (e.derniers || []).find(x => x.genre === a.genre);
+    const alertes = f?.meta?.alertes || [];
+    const etat = f ? (f.meta?.bloquant ? "alerte" : "present")
+      : a.type === "durable" && dernier ? "repris"
+      : a.type === "optionnel" ? "facultatif" : "manquant";
+    return { ...a, fichier: f, dernier, alertes, etat };
+  });
+}
+
+function rendreListeImportReporting() {
+  const bilan = imprepBilan();
+  const pastille = b => ({
+    present: `<span class="dash-badge ok">✓ déposé</span>`,
+    alerte: `<span class="dash-badge rouge">✕ à refaire</span>`,
+    repris: `<span class="dash-badge ok" title="ce fichier ne change pas chaque semaine">↺ repris de S${String(b.dernier.semaine).padStart(2, "0")} ${b.dernier.annee}</span>`,
+    facultatif: `<span class="dash-badge">facultatif</span>`,
+    manquant: `<span class="dash-badge rouge">✕ manquant</span>`,
+  })[b.etat];
+  document.getElementById("imprep-liste").innerHTML = `
+    <div class="rep-table"><table><thead><tr><th>Fichier attendu</th><th>État</th><th>Contrôle</th><th></th></tr></thead><tbody>
+    ${bilan.map((b, i) => `<tr>
+      <td style="white-space:normal"><b>${echapperHTML(b.libelle)}</b> <span class="compte-produits" style="margin:0">— ${echapperHTML(b.detail)}</span>
+        <div class="compte-produits" style="margin:2px 0 0">${echapperHTML(b.motif)}${b.type === "durable" ? " · à redéposer seulement quand il change" : ""}</div></td>
+      <td>${pastille(b)}</td>
+      <td style="white-space:normal">${b.fichier ? `${echapperHTML(b.fichier.nom)} · ${hebdoTaille(b.fichier.taille)} · ${dateHeure(b.fichier.depose_le)}
+          ${b.fichier.meta?.du ? `<div class="compte-produits" style="margin:2px 0 0">couvre du ${b.fichier.meta.du} au ${b.fichier.meta.au} · ${Number(b.fichier.meta.lignes || 0).toLocaleString("fr-FR")} lignes</div>` : ""}`
+          : b.etat === "repris" ? `${echapperHTML(b.dernier.nom)} · déposé ${dateHeure(b.dernier.depose_le)}` : ""}
+        ${b.alertes.map(a => `<div style="color:#b3261e;margin-top:2px">⚠ ${echapperHTML(a)}</div>`).join("")}</td>
+      <td><label class="puce-claire" style="cursor:pointer">${b.fichier || b.etat === "repris" ? "Remplacer" : "Charger"}
+        <input type="file" style="display:none" onchange="deposerImportReporting(this.files, ${i})"></label></td>
+    </tr>`).join("")}
+    </tbody></table></div>`;
+  rendreCalculImportReporting(bilan);
+}
+
+function rendreCalculImportReporting(bilan) {
+  const zone = document.getElementById("imprep-calcul"); if (!zone) return;
+  const manquants = bilan.filter(b => b.etat === "manquant");
+  const aRefaire = bilan.filter(b => b.etat === "alerte");
+  const run = IMPREP.etat?.run;
+  const pret = !manquants.length && !aRefaire.length;
+  const libelleStatut = { depot: "en attente de calcul", demande: "calcul demandé, le job démarre…", en_cours: "calcul en cours…",
+                          termine: "calcul terminé", erreur: "le calcul a échoué" };
+  zone.innerHTML = `
+    ${manquants.length ? `<div style="color:#b3261e;margin-bottom:8px"><b>Il manque ${manquants.length} fichier${manquants.length > 1 ? "s" : ""} :</b>
+      ${manquants.map(b => echapperHTML(b.libelle)).join(", ")}. Chargez-${manquants.length > 1 ? "les" : "le"} avec le bouton « Charger » de la ligne concernée.</div>` : ""}
+    ${aRefaire.length ? `<div style="color:#b3261e;margin-bottom:8px"><b>À refaire :</b> ${aRefaire.map(b => echapperHTML(b.libelle)).join(", ")} — voir l'alerte sur la ligne.</div>` : ""}
+    ${pret ? `<div class="compte-produits" style="margin-bottom:8px">Tout est là et les contrôles sont passés.</div>` : ""}
+    <div class="dash-ligne">
+      <button class="puce-claire" ${pret && !["demande", "en_cours"].includes(run?.statut) ? "" : "disabled"} onclick="lancerCalculReporting()">Lancer le calcul de S${String(IMPREP.semaine).padStart(2, "0")}</button>
+      <span class="compte-produits" style="margin:0" id="imprep-statut">${run ? `${libelleStatut[run.statut] || run.statut}${run.fini_le ? " · " + dateHeure(run.fini_le) : ""}` : ""}</span>
+      ${run?.statut === "termine" ? `<a class="puce-claire" href="#/hebdo">Voir le reporting</a>` : ""}
+      ${run?.lien_execution ? `<a class="puce-claire" href="${echapperHTML(run.lien_execution)}" target="_blank" rel="noopener">Journal GitHub</a>` : ""}
+    </div>
+    ${run?.journal ? `<details style="margin-top:10px"${run.statut === "erreur" ? " open" : ""}><summary class="compte-produits" style="cursor:pointer">Compte rendu du calcul</summary>
+      <pre style="white-space:pre-wrap;font-size:11.5px;background:#fff;border:1px solid var(--hairline);border-radius:10px;padding:10px;max-height:340px;overflow:auto">${echapperHTML(run.journal)}</pre></details>` : ""}`;
+  // tant que le job tourne, on regarde où il en est toutes les 15 s
+  clearTimeout(IMPREP.suivi);
+  if (["demande", "en_cours"].includes(run?.statut) && location.hash.startsWith("#/import-reporting"))
+    IMPREP.suivi = setTimeout(chargerImportReporting, 15000);
+}
+
+async function deposerImportReporting(liste, indexAttendu) {
+  const zone = document.getElementById("imprep-depot");
+  const champ = document.getElementById("imprep-fichiers");
+  const fichiers = [...(liste || champ?.files || [])];
+  if (!fichiers.length) { zone.textContent = "Choisissez d'abord des fichiers."; return; }
+  const lundi = imprepLundi(IMPREP.annee, IMPREP.semaine);
+  const lignes = [], comptes = [];
+  let n = 0;
+  for (const f of fichiers) {
+    // dépôt depuis une ligne de la liste : le type est imposé, quel que soit le nom du fichier
+    const attendu = indexAttendu != null ? HEBDO_ATTENDUS[indexAttendu] : null;
+    const c = attendu ? { categorie: "export", portee: "admin", genre: attendu.genre, semaine: IMPREP.semaine, annee: IMPREP.annee }
+                      : hebdoClasser(f.name, IMPREP.semaine, IMPREP.annee);
+    if (c.categorie === "export") { c.semaine = IMPREP.semaine; c.annee = IMPREP.annee; }
+    const regle = HEBDO_ATTENDUS.find(a => a.genre === c.genre);
+    zone.textContent = `Contrôle ${++n}/${fichiers.length} — ${f.name}…`;
+    let meta = {};
+    if (c.categorie === "export" && regle?.controle && /\.csv$/i.test(f.name)) {
+      try { meta = await imprepControler(f, regle.controle, lundi); }
+      catch (e) { meta = { alertes: ["contrôle impossible : " + e.message] }; }
+      if (meta.refus) { comptes.push(`<div style="color:#b3261e">✕ ${echapperHTML(f.name)} refusé — ${echapperHTML(meta.refus)}</div>`); continue; }
+    }
+    const chemin = hebdoChemin({ ...c, nom: f.name });
+    zone.textContent = `Envoi ${n}/${fichiers.length} — ${f.name}…`;
+    try { await hebdoEnvoyer(chemin, f); }
+    catch (e) { comptes.push(`<div style="color:#b3261e">✕ ${echapperHTML(f.name)} — envoi impossible : ${echapperHTML(e.message)}</div>`); continue; }
+    lignes.push({ annee: c.annee, semaine: c.semaine, categorie: c.categorie, portee: c.portee,
+                  genre: c.genre, nom: f.name, chemin, taille: f.size, meta });
+    comptes.push(`<div>${meta.bloquant ? "⚠" : "✓"} ${echapperHTML(f.name)} → ${c.categorie === "export" ? echapperHTML(regle?.libelle || c.genre) : c.categorie + " · " + c.portee}
+      ${c.categorie === "analyse" ? " <i>(nom non reconnu : rangé dans les analyses)</i>" : ""}</div>`);
+  }
+  if (lignes.length) await api("/rest/v1/rpc/reporting_enregistrer", { corps: { p_fichiers: lignes } });
+  zone.innerHTML = comptes.join("");
+  if (champ) champ.value = "";
+  await chargerImportReporting();
+}
+
+async function lancerCalculReporting() {
+  const statut = document.getElementById("imprep-statut");
+  statut.textContent = "demande envoyée…";
+  try {
+    await api("/functions/v1/reporting", { corps: { action: "lancer", annee: IMPREP.annee, semaine: IMPREP.semaine } });
+  } catch (e) {
+    statut.textContent = "lancement impossible : " + String(e.donnees?.erreur || e.message).slice(0, 200);
+    return;
+  }
+  await chargerImportReporting();
 }
 
 /* ================= Reporting (maquette « lecture rapide ») =================
@@ -9278,7 +9509,11 @@ function dashDates(periode) {
 async function activerLienDashboard() {
   try {
     const codes = await api("/rest/v1/rpc/dash_mes_magasins", { corps: {} });
-    if ((codes || []).length) document.getElementById("lien-dashboard").style.display = "";
+    if ((codes || []).length) {
+      document.getElementById("lien-dashboard").style.display = "";
+      document.querySelectorAll(".lien-dash-magasins").forEach(a => a.style.display = "");
+      document.getElementById("lien-dashboard-tete").href = "#/dashboard";
+    }
   } catch (e) { /* pas de dashboard pour ce compte */ }
 }
 
