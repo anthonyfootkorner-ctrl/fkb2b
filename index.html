@@ -1659,8 +1659,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789928722"></script>
-<script src="imports.js?v=1789928722"></script>
+<script src="config.js?v=1789929430"></script>
+<script src="imports.js?v=1789929430"></script>
 <script src="merch-shopify.js?v=1789911674"></script>
 <script src="moteur-merch.js?v=1789911674"></script>
 <script>
@@ -9141,7 +9141,12 @@ async function imprepControler(fichier, controle, lundi) {
       return { refus: "pas de colonnes « Past Year » : ce n'est pas l'export VENTE du reporting (VENTESTOCKFLOW va dans Back Office → Imports)" };
     iCA = col("Total MtVenteRetailTTC");
   }
-  let du = null, au = null, nDim = 0, nDimAvecCA = 0, nSemaine = 0;
+  let du = null, au = null, nSemaine = 0;
+  // même garde-fou que le pipeline : le dimanche est comparé au dimanche d'avant
+  // (CA et nombre de magasins ayant vendu), pas à un seuil absolu
+  const iMag = col("Code_Origine"), nombre = v => parseFloat(String(v || "").replace(/\s/g, "").replace(",", ".")) || 0;
+  const veille7 = new Date(dimanche); veille7.setDate(dimanche.getDate() - 7);
+  const jour = { dim: { ca: 0, mags: new Set() }, ref: { ca: 0, mags: new Set() } };
   for (let i = 1; i < lignes.length; i++) {
     const c = decouperLigne(lignes[i], sep);
     const d = lireDate((c[iDate] || "").trim());
@@ -9149,9 +9154,10 @@ async function imprepControler(fichier, controle, lundi) {
     if (!du || d < du) du = d;
     if (!au || d > au) au = d;
     if (d >= lundi && d <= dimanche) nSemaine++;
-    if (controle === "ventes" && d.getTime() === dimanche.getTime()) {
-      nDim++;
-      if (iCA >= 0 && (c[iCA] || "").trim() !== "") nDimAvecCA++;
+    if (controle === "ventes" && iCA >= 0) {
+      const cible = d.getTime() === dimanche.getTime() ? jour.dim : d.getTime() === veille7.getTime() ? jour.ref : null;
+      const ca = cible ? nombre(c[iCA]) : 0;
+      if (cible && ca > 0) { cible.ca += ca; cible.mags.add((c[iMag] || "").trim()); }
     }
   }
   if (!du) return { refus: "aucune date lisible dans le fichier" };
@@ -9160,12 +9166,15 @@ async function imprepControler(fichier, controle, lundi) {
   if (du > lundi) { alertes.push(`commence le ${imprepDate(du)}, après le lundi ${imprepDate(lundi)}`); bloquant = true; }
   if (controle === "ventes" && au >= dimanche) {
     // leçon S36 : le dimanche arrive parfois sans son CA (retard Copilot) — comparer 6 jours à 7 fausse tout
-    if (!nDim || nDimAvecCA < Math.max(3, nDim * 0.3)) {
-      alertes.push(`dimanche ${imprepDate(dimanche)} incomplet (${nDimAvecCA} ligne(s) avec un CA sur ${nDim}) : attendre la mise à jour Copilot et réexporter`);
+    const nDim = jour.dim.mags.size, nRef = jour.ref.mags.size;
+    if (nRef > 0 && (nDim < Math.max(3, nRef * 0.3) || jour.dim.ca < jour.ref.ca * 0.2)) {
+      alertes.push(`dimanche ${imprepDate(dimanche)} quasi vide (${Math.round(jour.dim.ca).toLocaleString("fr-FR")} € sur ${nDim} magasins, contre ${Math.round(jour.ref.ca).toLocaleString("fr-FR")} € sur ${nRef} le dimanche précédent) : attendre la mise à jour Copilot et réexporter`);
       bloquant = true;
     }
   }
-  return { du: imprepDate(du), au: imprepDate(au), lignes: lignes.length - 1, lignes_semaine: nSemaine, alertes, bloquant };
+  return { du: imprepDate(du), au: imprepDate(au), lignes: lignes.length - 1, lignes_semaine: nSemaine, alertes, bloquant,
+           ...(controle === "ventes" ? { dimanche: { ca: Math.round(jour.dim.ca), magasins: jour.dim.mags.size,
+                                                     ca_ref: Math.round(jour.ref.ca), magasins_ref: jour.ref.mags.size } } : {}) };
 }
 
 async function rendreImportReporting() {
