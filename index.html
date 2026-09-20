@@ -1634,10 +1634,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789910423"></script>
-<script src="imports.js?v=1789910423"></script>
-<script src="merch-shopify.js?v=1789910423"></script>
-<script src="moteur-merch.js?v=1789910423"></script>
+<script src="config.js?v=1789910855"></script>
+<script src="imports.js?v=1789910855"></script>
+<script src="merch-shopify.js?v=1789910855"></script>
+<script src="moteur-merch.js?v=1789910855"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2120,7 +2120,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789910423";
+    v.src = "hero.mp4?v=1789910855";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -8878,7 +8878,7 @@ async function chargerDashboard() {
   const [kpis, objectifs, tops, retard, central] = await Promise.all([
     appel("dash_kpis"),
     appel("dash_objectifs"),
-    appel("dash_top_produits", { p_categorie: null, p_n: 10 }),
+    appel("dash_top_produits", { p_categorie: null, p_n: 18 }),
     appel("dash_retard_reseau", { p_n: 20 }),
     appel("dash_central_non_implante", { p_n: 30, p_stock_central_min: 20 }),
   ]);
@@ -8894,6 +8894,19 @@ async function chargerDashboard() {
 }
 
 const dashNb = n => Math.round(Number(n) || 0).toLocaleString("fr-FR");
+// Couverture : combien de semaines le stock du magasin tient au rythme de vente de la
+// période. C'est là qu'on voit la rupture arriver (rouge sous 2 semaines).
+function dashCouverture(stock, ventes) {
+  const { du, au } = dashDates(DASH.periode);
+  const semaines = Math.max(1, (new Date(au) - new Date(du)) / 604800000 + 1 / 7);
+  const parSemaine = Number(ventes || 0) / semaines;
+  if (!Number(stock) && !parSemaine) return null;
+  if (!parSemaine) return { texte: "—", classe: "", titre: "aucune vente sur la période" };
+  const sem = Number(stock || 0) / parSemaine;
+  return { sem, texte: sem < 10 ? dashRos(sem) + " sem" : Math.round(sem) + " sem",
+           classe: sem < 2 ? "rouge" : sem < 4 ? "alerte" : "ok",
+           titre: `stock ${dashNb(stock)} ÷ ${dashRos(parSemaine)} pièces vendues par semaine` };
+}
 const dashRos = n => (Math.round(Number(n || 0) * 10) / 10).toString().replace(".", ",");
 
 function rendreKpisDash() {
@@ -8924,6 +8937,7 @@ function rendreKpisDash() {
 // Une carte produit : photo, identité, et les chiffres qui font décider.
 function carteDash(p, options = {}) {
   const vert = Number(p.ros_mag) >= Number(p.ros_reseau);
+  const couverture = p.stock_mag != null ? dashCouverture(p.stock_mag, p.ventes ?? p.ventes_mag) : null;
   const stockGlobal = p.stock_global ?? ((Number(p.stock_mag) || 0) + (Number(p.stock_central) || 0));
   return `<div class="dash-carte">
     ${options.rang ? `<span class="dash-rang">${options.rang}</span>` : ""}
@@ -8939,6 +8953,7 @@ function carteDash(p, options = {}) {
         ${options.global ? `<span><i>Stock global</i><br>${dashNb(stockGlobal)}</span>`
           : `<span><i>Stock central</i><br>${dashNb(p.stock_central)}</span>`}
         ${p.ventes != null ? `<span><i>Ventes</i><br>${dashNb(p.ventes)}</span>` : ""}
+        ${couverture ? `<span title="${echapperHTML(couverture.titre)}"><i>Couverture</i><br><span class="dash-badge ${couverture.classe}">${couverture.texte}</span></span>` : ""}
         ${p.indice != null ? `<span><i>Indice</i><br><span class="dash-badge rouge">${dashRos(p.indice)}</span></span>` : ""}
         ${p.nb_mag_vendeurs != null ? `<span><i>Magasins vendeurs</i><br>${dashNb(p.nb_mag_vendeurs)}</span>` : ""}
         ${p.tendance != null ? `<span><i>Tendance</i><br>${Number(p.tendance) >= 0 ? "↑ +" : "↓ "}${dashNb(p.tendance)} %</span>` : ""}
@@ -8959,7 +8974,7 @@ function rendreTopsDash() {
   DASH.categorie = active;
   const liste = tops.filter(p => p.categorie === active);
   zone.innerHTML = `<h3>Top produits</h3>
-    <div class="compte-produits">Les meilleures ventes du périmètre, catégorie par catégorie. Le ROS est en pièces par magasin et par semaine : vert si vous faites au moins aussi bien que le réseau.</div>
+    <div class="compte-produits">Les 18 meilleures ventes du périmètre, catégorie par catégorie. Le ROS est en pièces par magasin et par semaine (vert si vous faites au moins aussi bien que le réseau) ; la couverture dit combien de semaines le stock tient au rythme actuel — <b>rouge sous 2 semaines</b>, orange sous 4.</div>
     <div class="dash-ligne" style="margin-top:10px">
       ${presentes.map(([c, lib]) => `<button class="puce-claire dash-chip${c === active ? " on" : ""}" onclick="choisirCategorieDash('${c}')">${lib} · ${tops.filter(p => p.categorie === c).length}</button>`).join("")}
     </div>
