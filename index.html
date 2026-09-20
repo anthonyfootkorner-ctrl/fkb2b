@@ -1114,6 +1114,20 @@
     .dash-kpis, .dash-section { margin-left: 14px; margin-right: 14px; }
     .dash-grille { grid-template-columns: repeat(auto-fill, minmax(144px, 1fr)); gap: 8px; }
   }
+
+  /* ---- Reporting ---- */
+  .rep-ecarts { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; font-size: 11px; color: var(--encre2); }
+  .rep-ecarts .rep-absent { color: var(--gris); font-style: italic; }
+  .rep-table { overflow-x: auto; margin-top: 10px; background: #fff; border: 1px solid var(--hairline); border-radius: 14px; }
+  .rep-table table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .rep-table th { text-align: left; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--encre2);
+                  padding: 10px 12px; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+  .rep-table td { padding: 8px 12px; border-bottom: 1px solid #f0f0ee; white-space: nowrap; }
+  .rep-table tr:last-child td { border-bottom: 0; }
+  .rep-produit { display: flex; align-items: center; gap: 10px; min-width: 230px; white-space: normal; }
+  .rep-produit img, .rep-produit .vide { width: 38px; height: 38px; object-fit: contain; background: #f4f4f2; border-radius: 8px; flex: none; }
+  .rep-produit b { display: block; font-size: 12.5px; line-height: 1.2; }
+  .rep-produit span { font-size: 11px; color: var(--encre2); }
   </style>
 </head>
 <body>
@@ -1135,7 +1149,13 @@
         <a href="#/calendrier">Calendrier &amp; budgets</a>
       </div>
     </div>
-    <a href="#/dashboard" id="lien-dashboard" style="display:none">DASHBOARD</a>
+    <div class="menu-deroulant" id="lien-dashboard" style="display:none">
+      <a href="#/dashboard">DASHBOARD ▾</a>
+      <div class="sous-menu">
+        <a href="#/dashboard">Magasins &amp; produits</a>
+        <a href="#/reporting">Reporting (CA, marge, saisons)</a>
+      </div>
+    </div>
     <a href="#/compte">MON COMPTE</a>
     <div class="menu-deroulant" id="lien-backoffice" style="display:none">
       <a style="color:#d9a441">BACK OFFICE ▾</a>
@@ -1383,6 +1403,7 @@
   <section class="vue page-claire" id="vue-precommandes-admin"></section>
   <section class="vue page-claire" id="vue-tableau-bord-preco"></section>
   <section class="vue page-claire" id="vue-dashboard"></section>
+  <section class="vue page-claire" id="vue-reporting"></section>
 
   <section class="vue page-claire" id="vue-calendrier">
     <div class="col-tete">
@@ -1634,8 +1655,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789911674"></script>
-<script src="imports.js?v=1789911674"></script>
+<script src="config.js?v=1789912811"></script>
+<script src="imports.js?v=1789912811"></script>
 <script src="merch-shopify.js?v=1789911674"></script>
 <script src="moteur-merch.js?v=1789911674"></script>
 <script>
@@ -2045,6 +2066,9 @@ function router() {
   } else if (route === "precommandes-admin") {
     document.getElementById("vue-precommandes-admin").classList.add("active");
     rendrePrecommandesAdmin(decodeURIComponent(args.join("/")));
+  } else if (route === "reporting") {
+    document.getElementById("vue-reporting").classList.add("active");
+    rendreReporting();
   } else if (route === "dashboard") {
     document.getElementById("vue-dashboard").classList.add("active");
     rendreDashboard();
@@ -8772,6 +8796,145 @@ async function enregistrerAccesDash(userId) {
   }
 }
 
+/* ================= Reporting (maquette « lecture rapide ») =================
+   Quatre lectures : top line, saison produit, marque et catégorie, top et flop
+   produits. Tout vient d'une seule RPC (dash_reporting) : elle calcule le CA HT avec
+   la TVA du pays du magasin, la marge avec le coût d'achat du journal des ventes, et
+   compare à la période précédente et à l'an dernier. */
+async function rendreReporting() {
+  const vue = document.getElementById("vue-reporting");
+  if (!DASH.magasins.length) {
+    vue.innerHTML = `<div class="col-tete"><h1>REPORTING</h1><div class="compte-produits">Chargement…</div></div>`;
+    const souci = await chargerMagasinsDash();
+    if (souci) { vue.innerHTML = `<div class="col-tete"><h1>REPORTING</h1><div class="compte-produits">${souci}</div></div>`; return; }
+  }
+  const { du, au } = dashDates(DASH.periode);
+  vue.innerHTML = `
+    <div class="col-tete">
+      <h1>REPORTING</h1>
+      <div class="compte-produits">Lecture rapide : chiffre d'affaires, marge, stock et écoulement,
+        par saison, par marque et par catégorie. Du ${new Date(du).toLocaleDateString("fr-FR")}
+        au ${new Date(au).toLocaleDateString("fr-FR")}, comparé à la période précédente et à l'an dernier.</div>
+      <div class="dash-filtres" id="rep-filtres"></div>
+    </div>
+    <div id="rep-corps"><div class="dash-section"><div class="compte-produits">Chargement…</div></div></div>`;
+  rendreFiltresDash("rep-filtres");
+  await chargerReporting();
+}
+
+async function chargerReporting() {
+  const corps = document.getElementById("rep-corps");
+  if (!corps) return;
+  const { du, au } = dashDates(DASH.periode);
+  const jeton = ++DASH.chargement;
+  corps.innerHTML = `<div class="dash-section"><div class="compte-produits">Calcul en cours…</div></div>`;
+  let r = null;
+  try {
+    r = await api("/rest/v1/rpc/dash_reporting", { corps: {
+      p_magasins: DASH.choisis.length ? DASH.choisis : null, p_du: du, p_au: au, p_n: 30 } });
+  } catch (e) {
+    corps.innerHTML = `<div class="dash-section"><div class="compte-produits">Calcul impossible : ${
+      echapperHTML(String(e.donnees?.message || e.message).slice(0, 200))}</div></div>`;
+    return;
+  }
+  if (jeton !== DASH.chargement) return;
+  DASH.reporting = r;
+  rendreReportingCorps();
+}
+
+const repNb = n => n == null ? "—" : Math.round(Number(n)).toLocaleString("fr-FR");
+const repEur = n => n == null ? "—" : Math.round(Number(n)).toLocaleString("fr-FR") + " €";
+const repPct = n => n == null ? "—" : dashRos(n) + " %";
+// Une variation se lit tout de suite : vert au-dessus, rouge en dessous.
+function repEcart(valeur, reference) {
+  if (valeur == null || reference == null || Number(reference) === 0) return "";
+  const pct = 100 * (Number(valeur) - Number(reference)) / Math.abs(Number(reference));
+  return `<span class="dash-badge ${pct >= 0 ? "ok" : "rouge"}">${pct >= 0 ? "+" : ""}${dashRos(pct)} %</span>`;
+}
+
+function rendreReportingCorps() {
+  const corps = document.getElementById("rep-corps");
+  const r = DASH.reporting;
+  if (!corps || !r) return;
+  const p = r.topline?.p || {}, prec = r.topline?.prec || {}, n1 = r.topline?.n1 || {};
+  const stock = r.stock || {};
+  const tuile = (libelle, valeur, avant, titre) => `<div class="dash-kpi" title="${echapperHTML(titre || "")}">
+    <b>${valeur}</b><span>${libelle}</span>${avant || ""}</div>`;
+  const ligneEcarts = (v, cle, format) => `<div class="rep-ecarts">
+    ${prec[cle] != null ? `<span>vs période précédente ${repEcart(v, prec[cle])}</span>` : ""}
+    ${n1[cle] != null ? `<span>vs N-1 ${repEcart(v, n1[cle])}</span>`
+      : `<span class="rep-absent">N-1 non chargé</span>`}</div>`;
+  const blocs = r.saisons_blocs || {};
+  const libBloc = { actuelle: "Saison actuelle", semestre_avant: "Semestre d'avant", ancienne: "Ancien stock" };
+  const tableau = (titre, colonnes, lignes, sous) => `
+    <div class="dash-section">
+      <h3>${titre}</h3>
+      ${sous ? `<div class="compte-produits">${sous}</div>` : ""}
+      <div class="rep-table"><table><thead><tr>${colonnes.map(c => `<th>${c}</th>`).join("")}</tr></thead>
+        <tbody>${lignes.length ? lignes.map(l => `<tr>${l.map(c => `<td>${c}</td>`).join("")}</tr>`).join("")
+          : `<tr><td colspan="${colonnes.length}" class="dash-vide">Rien à afficher sur cette période.</td></tr>`}</tbody></table></div>
+    </div>`;
+  const vignette = x => `<div class="rep-produit">${x.photo_url
+      ? `<img loading="lazy" src="${echapperHTML(x.photo_url)}" alt="">` : `<span class="vide"></span>`}
+      <div><b>${echapperHTML(x.designation || x.reference)}</b>
+      <span>${echapperHTML(x.reference)}${x.marque ? " · " + echapperHTML(x.marque) : ""}</span></div></div>`;
+  const couv = x => x.couverture_sem == null ? "—"
+    : `<span class="dash-badge ${x.couverture_sem < 2 ? "rouge" : x.couverture_sem < 4 ? "alerte" : "ok"}">${dashRos(x.couverture_sem)} sem</span>`;
+
+  corps.innerHTML = `
+    <div class="dash-kpis">
+      ${tuile("CA HT", repEur(p.ca_ht), ligneEcarts(p.ca_ht, "ca_ht"), "ventes hors taxes : TTC ramené au taux de TVA du pays du magasin")}
+      ${tuile("CA TTC", repEur(p.ca_ttc), ligneEcarts(p.ca_ttc, "ca_ttc"))}
+      ${tuile("Pièces vendues", repNb(p.units), ligneEcarts(p.units, "units"))}
+      ${tuile("Marge €", repEur(p.marge_eur),
+        p.marge_eur == null
+          ? `<div class="rep-ecarts"><span class="rep-absent">coût d'achat absent de l'import des ventes</span></div>`
+          : ligneEcarts(p.marge_eur, "marge_eur")
+            + (p.cout_connu_pct != null && p.cout_connu_pct < 95
+               ? `<div class="rep-ecarts"><span class="rep-absent">coût connu sur ${p.cout_connu_pct} % des lignes</span></div>` : ""),
+        "CA HT moins le coût d'achat des pièces vendues")}
+      ${tuile("Marge %", repPct(p.marge_pct), n1.marge_pct != null ? `<div class="rep-ecarts"><span>N-1 ${repPct(n1.marge_pct)}</span></div>` : "")}
+      ${tuile("Stock magasins", repNb(stock.succ), "", "dernière photo de stock des magasins retenus")}
+      ${tuile("Stock central", repNb(stock.central), "", "entrepôt central, tous magasins confondus")}
+      ${tuile("Écoulement", repPct(stock.ecoulement), "", "pièces vendues ÷ (pièces vendues + stock) sur le périmètre")}
+    </div>
+
+    <div class="dash-section">
+      <h3>Par saison produit</h3>
+      <div class="compte-produits">La saison vient de la fiche Fastmag (année + trimestre). « Ancien stock » regroupe les saisons hors format et les fiches sans saison.</div>
+      <div class="dash-kpis" style="margin-left:0; margin-right:0">
+        ${["actuelle", "semestre_avant", "ancienne"].map(cle => {
+          const b = blocs[cle];
+          return `<div class="dash-kpi"><b>${b ? repEur(b.ca_ht) : "—"}</b><span>${libBloc[cle]}</span>
+            <div class="rep-ecarts"><span>${b ? repNb(b.units) : "—"} pièces</span>
+            <span>stock ${b ? repNb(b.stock) : "—"}</span>
+            <span>sortie ${b ? repPct(b.tx_sortie) : "—"}</span>
+            ${b && b.marge_pct != null ? `<span>marge ${repPct(b.marge_pct)}</span>` : ""}</div></div>`;
+        }).join("")}
+      </div>
+      <div class="rep-table"><table><thead><tr><th>Saison</th><th>Pièces vendues</th><th>CA HT</th><th>Stock</th><th>Taux de sortie</th><th>Marge %</th></tr></thead>
+        <tbody>${(r.saisons || []).length ? (r.saisons || []).map(x => `<tr>
+          <td>${echapperHTML(x.libelle || "Ancien")}</td><td>${repNb(x.units)}</td><td>${repEur(x.ca_ht)}</td>
+          <td>${repNb(x.stock)}</td><td>${repPct(x.tx_sortie)}</td><td>${repPct(x.marge_pct)}</td></tr>`).join("")
+          : `<tr><td colspan="6" class="dash-vide">Rien à afficher sur cette période.</td></tr>`}</tbody></table></div>
+    </div>
+
+    ${tableau("Par marque", ["Marque", "Pièces", "CA HT", "Marge €", "Marge %"],
+      (r.marques || []).map(m => [echapperHTML(m.marque), repNb(m.units), repEur(m.ca_ht), repEur(m.marge_eur), repPct(m.marge_pct)]))}
+
+    ${tableau("Par catégorie", ["Catégorie", "Pièces", "CA HT", "Marge €", "Marge %"],
+      (r.categories || []).map(c => [echapperHTML(c.categorie), repNb(c.units), repEur(c.ca_ht), repEur(c.marge_eur), repPct(c.marge_pct)]))}
+
+    ${tableau("Top 30 produits", ["Produit", "Pièces", "CA HT", "Marge %", "Stock", "Tx sortie", "Couverture", "vs N-1"],
+      (r.top || []).map(x => [vignette(x), repNb(x.units), repEur(x.ca_ht), repPct(x.marge_pct), repNb(x.stock),
+        repPct(x.tx_sortie), couv(x), x.evolution_n1 == null ? "—" : repEcart(100 + Number(x.evolution_n1), 100)]),
+      "Classés par chiffre d'affaires hors taxes sur la période.")}
+
+    ${tableau("Flop 30 — stock qui ne part pas", ["Produit", "Pièces", "CA HT", "Stock", "Tx sortie", "Couverture"],
+      (r.flop || []).map(x => [vignette(x), repNb(x.units), repEur(x.ca_ht), repNb(x.stock), repPct(x.tx_sortie), couv(x)]),
+      "Références en stock dont le taux de sortie est le plus faible : à animer, à transférer ou à solder.")}`;
+}
+
 /* ================= Dashboard magasins =================
    Ce que vendent et ce que détiennent les boutiques, en face du réseau. Tout le calcul
    est fait par les fonctions SQL dash_* (elles appliquent aussi les droits : un magasin
@@ -8807,21 +8970,30 @@ async function activerLienDashboard() {
   } catch (e) { /* pas de dashboard pour ce compte */ }
 }
 
+// Les magasins autorisés sont les mêmes pour le dashboard et le reporting : on ne les charge qu'une fois.
+// Renvoie null si tout va bien, sinon le message à afficher à la place de la page.
+async function chargerMagasinsDash() {
+  if (DASH.magasins.length) return null;
+  let codes = [];
+  try { codes = await api("/rest/v1/rpc/dash_mes_magasins", { corps: {} }) || []; }
+  catch (e) { return `Accès impossible : ${echapperHTML((e.donnees?.message || e.message || "").slice(0, 160))}`; }
+  if (!codes.length) return "Aucun magasin ne vous est ouvert sur ce dashboard. L'accès se donne magasin par magasin : demandez-le à un administrateur (écran Utilisateurs).";
+  const liste = await api("/rest/v1/magasins?select=code,nom,groupe,ordre&actif=eq.true&order=ordre,nom").catch(() => []);
+  const connus = new Map((liste || []).map(m => [m.code, m]));
+  DASH.magasins = codes.map(c => connus.get(c) || { code: c, nom: c, groupe: "", ordre: 999 })
+    .sort((a, b) => (a.ordre ?? 999) - (b.ordre ?? 999) || a.nom.localeCompare(b.nom, "fr"));
+  // un seul magasin : il est d'office le périmètre, on ne demande rien
+  if (DASH.magasins.length === 1) DASH.choisis = [DASH.magasins[0].code];
+  else { try { DASH.choisis = JSON.parse(localStorage.getItem("fkb2b-dash-magasins") || "[]").filter(c => connus.has(c) || codes.includes(c)); } catch (e) { DASH.choisis = []; } }
+  return null;
+}
+
 async function rendreDashboard() {
   const vue = document.getElementById("vue-dashboard");
   if (!DASH.magasins.length) {
     vue.innerHTML = `<div class="col-tete"><h1>DASHBOARD MAGASINS</h1><div class="compte-produits">Chargement…</div></div>`;
-    let codes = [];
-    try { codes = await api("/rest/v1/rpc/dash_mes_magasins", { corps: {} }) || []; }
-    catch (e) { vue.innerHTML = `<div class="col-tete"><h1>DASHBOARD MAGASINS</h1><div class="compte-produits">Accès impossible : ${echapperHTML((e.donnees?.message || e.message || "").slice(0, 160))}</div></div>`; return; }
-    if (!codes.length) { vue.innerHTML = `<div class="col-tete"><h1>DASHBOARD MAGASINS</h1><div class="compte-produits">Aucun magasin ne vous est ouvert sur ce dashboard. L'accès se donne magasin par magasin : demandez-le à un administrateur (écran Utilisateurs).</div></div>`; return; }
-    const liste = await api("/rest/v1/magasins?select=code,nom,groupe,ordre&actif=eq.true&order=ordre,nom").catch(() => []);
-    const connus = new Map((liste || []).map(m => [m.code, m]));
-    DASH.magasins = codes.map(c => connus.get(c) || { code: c, nom: c, groupe: "", ordre: 999 })
-      .sort((a, b) => (a.ordre ?? 999) - (b.ordre ?? 999) || a.nom.localeCompare(b.nom, "fr"));
-    // un seul magasin : il est d'office le périmètre, on ne demande rien
-    if (DASH.magasins.length === 1) DASH.choisis = [DASH.magasins[0].code];
-    else { try { DASH.choisis = JSON.parse(localStorage.getItem("fkb2b-dash-magasins") || "[]").filter(c => connus.has(c) || codes.includes(c)); } catch (e) { DASH.choisis = []; } }
+    const souci = await chargerMagasinsDash();
+    if (souci) { vue.innerHTML = `<div class="col-tete"><h1>DASHBOARD MAGASINS</h1><div class="compte-produits">${souci}</div></div>`; return; }
   }
   const { du, au } = dashDates(DASH.periode);
   vue.innerHTML = `
@@ -8838,8 +9010,9 @@ async function rendreDashboard() {
   await chargerDashboard();
 }
 
-function rendreFiltresDash() {
-  const zone = document.getElementById("dash-filtres");
+function rendreFiltresDash(idZone) {
+  if (idZone) DASH.zoneFiltres = idZone;
+  const zone = document.getElementById(DASH.zoneFiltres || "dash-filtres");
   if (!zone) return;
   const groupes = [...new Set(DASH.magasins.map(m => m.groupe).filter(Boolean))];
   const multi = DASH.magasins.length > 1;
@@ -8856,19 +9029,22 @@ function rendreFiltresDash() {
       <span class="compte-produits" style="margin:0">Période :</span>
       ${DASH_PERIODES.map(([cle, lib]) => `<button class="puce-claire dash-chip${DASH.periode === cle ? " on" : ""}"
           onclick="choisirPeriodeDash('${cle}')">${lib}</button>`).join("")}
-      <button class="puce-claire" onclick="rendreDashboard()">↻ Actualiser</button>
+      <button class="puce-claire" onclick="rafraichirDash()">↻ Actualiser</button>
     </div>`;
 }
 
 function memoriserMagasinsDash() {
   try { localStorage.setItem("fkb2b-dash-magasins", JSON.stringify(DASH.choisis)); } catch (e) { /* sans mémoire locale */ }
 }
-function choisirMagasinsDash(liste) { DASH.choisis = liste.slice(); memoriserMagasinsDash(); rendreFiltresDash(); chargerDashboard(); }
+const surReporting = () => location.hash.startsWith("#/reporting");
+const rafraichirDash = () => surReporting() ? rendreReporting() : rendreDashboard();
+const rechargerDash = () => surReporting() ? chargerReporting() : chargerDashboard();
+function choisirMagasinsDash(liste) { DASH.choisis = liste.slice(); memoriserMagasinsDash(); rendreFiltresDash(); rechargerDash(); }
 function choisirGroupeDash(groupe) { choisirMagasinsDash(DASH.magasins.filter(m => m.groupe === groupe).map(m => m.code)); }
 function basculerMagasinDash(code) {
   choisirMagasinsDash(DASH.choisis.includes(code) ? DASH.choisis.filter(c => c !== code) : DASH.choisis.concat(code));
 }
-function choisirPeriodeDash(p) { DASH.periode = p; rendreDashboard(); }
+function choisirPeriodeDash(p) { DASH.periode = p; rafraichirDash(); }
 function choisirCategorieDash(c) { DASH.categorie = c; rendreTopsDash(); }
 
 async function chargerDashboard() {

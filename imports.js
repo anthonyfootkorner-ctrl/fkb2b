@@ -556,11 +556,15 @@ function mapperVersTables(analyse) {
         const jour = `${j.slice(6, 10)}-${j.slice(3, 5)}-${j.slice(0, 2)}`;
         const cle = `${l.Code_Origine}|${ref}|${l.Taille}|${jour}`;
         const e = parCle.get(cle) || { magasin: l.Code_Origine, reference: ref,
-          taille: l.Taille || "", jour, quantite: 0, montant_ttc: 0 };
+          taille: l.Taille || "", jour, quantite: 0, montant_ttc: 0, cout_achat: null };
         e.quantite += parseInt(parseFloat(l["Total QteVenteRetail"] || 0), 10) || 0;
         // l'export s'appelle tantôt MtVenteRetailTTC, tantôt Total MtVenteRetailTTC :
         // ne lire que le premier nom a effacé le CA des imports d'août et septembre
         e.montant_ttc += parseFloat(l["Total MtVenteRetailTTC"] ?? l.MtVenteRetailTTC ?? 0) || 0;
+        // coût d'achat de ce qui est sorti : c'est ce qui permet la marge du reporting.
+        // Absent du fichier, il reste à null : une marge de 100 % vaut moins qu'une marge non calculée.
+        const cout = parseFloat(String(l["valeur prix d'achat"] ?? l["Valeur prix d'achat"] ?? "").replace(",", "."));
+        if (Number.isFinite(cout)) e.cout_achat = (e.cout_achat || 0) + cout;
         parCle.set(cle, e);
       }
       return [{ table: "ventes", rows: [...parCle.values()].filter(r => r.quantite !== 0) }];
