@@ -547,7 +547,9 @@ function mapperVersTables(analyse) {
         const e = parCle.get(cle) || { magasin: l.Code_Origine, reference: ref,
           taille: l.Taille || "", jour, quantite: 0, montant_ttc: 0 };
         e.quantite += parseInt(parseFloat(l["Total QteVenteRetail"] || 0), 10) || 0;
-        e.montant_ttc += parseFloat(l.MtVenteRetailTTC || 0) || 0;
+        // l'export s'appelle tantôt MtVenteRetailTTC, tantôt Total MtVenteRetailTTC :
+        // ne lire que le premier nom a effacé le CA des imports d'août et septembre
+        e.montant_ttc += parseFloat(l["Total MtVenteRetailTTC"] ?? l.MtVenteRetailTTC ?? 0) || 0;
         parCle.set(cle, e);
       }
       return [{ table: "ventes", rows: [...parCle.values()].filter(r => r.quantite !== 0) }];
@@ -750,14 +752,17 @@ async function executerStockMagasins(analyse, surProgres) {
     if (!magasin || !reference) continue;
     if (magasin === "CENTRAL" || magasin === "WEB") { ignorees++; continue; }
     const taille = (l.Taille || "").trim();
+    const pa = parseFloat(String(l.PrixAchat ?? "").replace(/\s/g, "").replace(",", ".")) || 0;
     const cle = `${magasin}|${reference}|${taille}`;
-    const e = parCle.get(cle) || { magasin, reference, taille, quantite: 0 };
+    const e = parCle.get(cle) || { magasin, reference, taille, quantite: 0, valeur: 0 };
     e.quantite += quantite;
+    e.valeur += quantite * pa;      // le même article peut arriver à deux prix d'achat
     parCle.set(cle, e);
   }
   // le fichier porte plusieurs lignes par taille (prix d'achat différents) et des
   // quantités négatives : on somme d'abord, on ne garde que ce qui reste en rayon
-  const rows = [...parCle.values()].filter(r => r.quantite > 0);
+  const rows = [...parCle.values()].filter(r => r.quantite > 0).map(({ valeur, ...r }) => ({
+    ...r, prix_achat: valeur > 0 ? Math.round(100 * valeur / r.quantite) / 100 : null }));
   if (!rows.length) throw new Error("aucune ligne de stock boutique exploitable (CENTRAL et WEB sont ignorés)");
   surProgres(`remplacement de la photo précédente… (${ignorees} ligne${ignorees > 1 ? "s" : ""} CENTRAL/WEB ignorée${ignorees > 1 ? "s" : ""})`);
   // écriture directe : la table n'est ouverte en écriture qu'aux comptes qui importent (peut_importer)

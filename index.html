@@ -1634,10 +1634,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789911307"></script>
-<script src="imports.js?v=1789911307"></script>
-<script src="merch-shopify.js?v=1789911307"></script>
-<script src="moteur-merch.js?v=1789911307"></script>
+<script src="config.js?v=1789911478"></script>
+<script src="imports.js?v=1789911478"></script>
+<script src="merch-shopify.js?v=1789911478"></script>
+<script src="moteur-merch.js?v=1789911478"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2120,7 +2120,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789911307";
+    v.src = "hero.mp4?v=1789911478";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -3599,6 +3599,11 @@ function telechargerPrixZero() {
   URL.revokeObjectURL(lien.href);
 }
 
+/* Ces modèles remplacent ce qu'ils touchent (le jour pour les ventes, le magasin pour
+   un stock) : les redéposer ne double rien et permet de corriger un import raté. Les
+   autres restent bloqués par l'anti-rejeu. */
+const MODELES_REJOUABLES = ["stock_b2b", "ventes", "objectifs", "stock_magasins", "stock_web_egonet", "stock_fastmag"];
+
 async function traiterFichier(fichier) {
   const zone = document.getElementById("rapport-import");
   zone.innerHTML = `<div class="compte-produits">Analyse de ${fichier.name}…</div>`;
@@ -3674,7 +3679,7 @@ async function traiterFichier(fichier) {
             chaque ligne (référence + taille) est corrigée si elle existe déjà dans cette campagne.</div>
         </div>
       </div>` : ""}
-    ${deja.length && a.modele !== "stock_b2b" ? `<div class="compte-produits" style="color:#a33; margin-top:12px">
+    ${deja.length && !MODELES_REJOUABLES.includes(a.modele) ? `<div class="compte-produits" style="color:#a33; margin-top:12px">
         <b>Fichier déjà importé le ${new Date(deja[0].horodatage).toLocaleString("fr-FR")}</b> — réimport bloqué (anti-rejeu).</div>`
       : `${deja.length ? `<div class="compte-produits" style="color:#a33; margin-top:12px">
           <b>Ce fichier a déjà été déposé le ${new Date(deja[0].horodatage).toLocaleString("fr-FR")}.</b>
@@ -8930,6 +8935,8 @@ function rendreKpisDash() {
     + kpi(eur(Number(k.ca || 0)), "CA TTC", "chiffre d'affaires TTC des magasins retenus")
     + suivi + frequentation
     + kpi(dashNb(k.stock_pieces), "pièces en stock", "stock des magasins retenus, dernière photo connue")
+    + (Number(k.valeur_stock) > 0 ? kpi(eur(Number(k.valeur_stock)), "valeur du stock", "au prix d'achat : celui du fichier de stock pour les boutiques, le tarif d'achat pour le web") : "")
+
     + kpi(k.couverture_jours == null ? "—" : dashNb(k.couverture_jours) + " j", "couverture", "stock ÷ ventes moyennes par jour")
     + kpi(dashNb(k.nb_magasins), "magasins", "magasins compris dans le périmètre");
 }
