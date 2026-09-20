@@ -62,6 +62,13 @@ const MODELES_IMPORT = {
     remplacement_complet: true,
     remplacement_libelle: "remplace l'état de stock Fastmag connu — le stock B2B vendable n'est pas touché",
   },
+  objectifs: {
+    /* Export OBJECTIF de Fastmag : objectif de CA du jour, pièces et tickets par magasin.
+       Sert au Dashboard magasins (réalisé / objectif, fréquentation, panier moyen). */
+    libelle: "Objectifs journaliers par magasin",
+    sep: ",", encodage: "utf-8",
+    signature: ["Jours dans Date", "Code_Origine", "Total ObjectifJ"],
+  },
   ventes: {
     libelle: "Ventes quotidiennes (journal VENTE)",
     sep: ",", encodage: "utf-8",
@@ -359,6 +366,18 @@ function mapperVersTables(analyse) {
         prix_vente: parseFloat(String(l.Prix_vente || "").replace(",", ".")) > 0
           ? parseFloat(String(l.Prix_vente || "").replace(",", ".")) : null })) }];
     }
+    case "objectifs": {
+      const parCle = new Map();
+      for (const l of L) {
+        const magasin = (l.Code_Origine || "").trim().toUpperCase();
+        const jour = dateISO(l["Jours dans Date"]);
+        if (!magasin || !jour) continue;
+        if (!String(l["Total ObjectifJ"] ?? "").trim() && !String(l["Nombre de ticket"] ?? "").trim()
+            && !String(l["Total QteVenteRetail"] ?? "").trim()) continue;
+        parCle.set(`${magasin}|${jour}`, { magasin, jour });
+      }
+      return [{ table: "objectifs_magasins", rows: [...parCle.values()] }];
+    }
     case "stock_magasins": {
       // simulation : ce qui sera réellement écrit (hors CENTRAL/WEB, hors stock nul)
       const parCle = new Map();
@@ -366,13 +385,13 @@ function mapperVersTables(analyse) {
         const magasin = (l.Code_Origine || "").trim().toUpperCase();
         const reference = (l["BarCode V2"] || "").trim();
         const q = parseInt(parseFloat(String(l["Total Stock"] ?? "0").replace(",", ".")), 10) || 0;
-        if (!magasin || !reference || magasin === "CENTRAL" || magasin === "WEB" || q <= 0) continue;
+        if (!magasin || !reference || magasin === "CENTRAL" || magasin === "WEB") continue;
         const cle = `${magasin}|${reference}|${(l.Taille || "").trim()}`;
         const e = parCle.get(cle) || { magasin, reference, taille: (l.Taille || "").trim(), quantite: 0 };
         e.quantite += q;
         parCle.set(cle, e);
       }
-      return [{ table: "stock_magasins", rows: [...parCle.values()] }];
+      return [{ table: "stock_magasins", rows: [...parCle.values()].filter(r => r.quantite > 0) }];
     }
     case "stock":
       return [{ table: "stocks", vider: true, activer: true,
@@ -591,6 +610,7 @@ async function executerImport(analyse, surProgres) {
   if (analyse.modele === "stock_b2b") return executerStockB2B(analyse, surProgres);
   if (analyse.modele === "stock_fastmag") return executerStockFastmag(analyse, surProgres);
   if (analyse.modele === "stock_magasins") return executerStockMagasins(analyse, surProgres);
+  if (analyse.modele === "objectifs") return executerObjectifs(analyse, surProgres);
   if (analyse.modele === "comptes") return executerComptes(analyse, surProgres);
 
   const plans = mapperVersTables(analyse);
@@ -627,6 +647,47 @@ async function executerImport(analyse, surProgres) {
 
 // État de stock Fastmag : on garde toutes les lignes (un 0 est une information), le
 // premier lot remplace l'état précédent. Les tailles arrivent avec des espaces devant.
+/* Objectifs journaliers : chaque jour présent dans le fichier est remplacé pour les
+   magasins du fichier. Redéposer une période qui chevauche la précédente ne double donc
+   rien et corrige les objectifs revus après coup. */
+async function executerObjectifs(analyse, surProgres) {
+  const nombre = v => { const n = parseFloat(String(v ?? "").replace(/\s/g, "").replace(",", ".")); return Number.isFinite(n) ? n : null; };
+  const entier = v => { const n = nombre(v); return n === null ? null : Math.round(n); };
+  const parCle = new Map();
+  for (const l of analyse.lignes) {
+    const magasin = (l.Code_Origine || "").trim().toUpperCase();
+    const jour = dateISO(l["Jours dans Date"]);
+    if (!magasin || !jour) continue;
+    const e = { magasin, jour, objectif: nombre(l["Total ObjectifJ"]), pieces: entier(l["Total QteVenteRetail"]),
+                tickets: entier(l["Nombre de ticket"]), tickets_n1: entier(l["Nombre de ticket n-1"]) };
+    // une ligne entièrement vide (magasin fermé ce jour-là) n'apporte rien
+    if (e.objectif === null && e.pieces === null && e.tickets === null && e.tickets_n1 === null) continue;
+    parCle.set(`${magasin}|${jour}`, e);
+  }
+  const rows = [...parCle.values()];
+  if (!rows.length) throw new Error("aucun objectif exploitable dans ce fichier");
+  const jours = [...new Set(rows.map(r => r.jour))].sort();
+  const magasins = [...new Set(rows.map(r => r.magasin))];
+  surProgres(`remplacement du ${jours[0]} au ${jours[jours.length - 1]} pour ${magasins.length} magasins…`);
+  const liste = t => "(" + t.map(x => `"${x}"`).join(",") + ")";
+  for (let i = 0; i < jours.length; i += 40) {
+    await api(`/rest/v1/objectifs_magasins?jour=in.${liste(jours.slice(i, i + 40))}&magasin=in.${encodeURIComponent(liste(magasins))}`,
+              { methode: "DELETE" });
+  }
+  let total = 0;
+  for (let i = 0; i < rows.length; i += 2000) {
+    const lot = rows.slice(i, i + 2000);
+    await api("/rest/v1/objectifs_magasins", { corps: lot });
+    total += lot.length;
+    surProgres(`objectifs : ${total}/${rows.length} lignes…`);
+  }
+  await apiFonction("journal", { entree: {
+    fichier: `${analyse.fichier} (${jours[0]} → ${jours[jours.length - 1]})`, modele: "objectifs", empreinte: analyse.empreinte,
+    lignes_lues: analyse.lues, crees: total, maj: 0, inchanges: 0,
+    quarantaine: analyse.quarantaine.length, statut: "OK" } });
+  return total;
+}
+
 /* Stock des boutiques : une photo complète, donc on vide puis on réécrit. CENTRAL et
    WEB sont ignorés (ils viennent de l'état de stock Fastmag) et un stock nul ou négatif
    n'a rien à faire dans une photo de stock. */
@@ -639,14 +700,15 @@ async function executerStockMagasins(analyse, surProgres) {
     const quantite = parseInt(parseFloat(String(l["Total Stock"] ?? "0").replace(",", ".")), 10) || 0;
     if (!magasin || !reference) continue;
     if (magasin === "CENTRAL" || magasin === "WEB") { ignorees++; continue; }
-    if (quantite <= 0) continue;
     const taille = (l.Taille || "").trim();
     const cle = `${magasin}|${reference}|${taille}`;
     const e = parCle.get(cle) || { magasin, reference, taille, quantite: 0 };
     e.quantite += quantite;
     parCle.set(cle, e);
   }
-  const rows = [...parCle.values()];
+  // le fichier porte plusieurs lignes par taille (prix d'achat différents) et des
+  // quantités négatives : on somme d'abord, on ne garde que ce qui reste en rayon
+  const rows = [...parCle.values()].filter(r => r.quantite > 0);
   if (!rows.length) throw new Error("aucune ligne de stock boutique exploitable (CENTRAL et WEB sont ignorés)");
   surProgres(`remplacement de la photo précédente… (${ignorees} ligne${ignorees > 1 ? "s" : ""} CENTRAL/WEB ignorée${ignorees > 1 ? "s" : ""})`);
   // écriture directe : la table n'est ouverte en écriture qu'aux comptes qui importent (peut_importer)

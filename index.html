@@ -1299,7 +1299,7 @@
       <label id="zone-depot" style="display:block; border:2px dashed #ccc; border-radius:12px; padding:38px;
              text-align:center; cursor:pointer; color:var(--encre2); font-size:13.5px; transition:border-color 150ms ease">
         Glissez un fichier ici ou cliquez pour choisir<br>
-        <span style="font-size:11px">fiches produits · stock B2B · état de stock Fastmag · stock boutiques (dashboard) · ventes · tarifs · clients — .csv, .xls, .xlsx, .txt ou .zip</span>
+        <span style="font-size:11px">fiches produits · stock B2B · état de stock Fastmag · stock boutiques · ventes · objectifs · tarifs · clients — .csv, .xls, .xlsx, .txt ou .zip</span>
         <input id="fichier-import" type="file" style="display:none">
       </label>
       <div id="rapport-import" style="margin-top:18px"></div>
@@ -1634,10 +1634,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789909570"></script>
-<script src="imports.js?v=1789909570"></script>
-<script src="merch-shopify.js?v=1789909570"></script>
-<script src="moteur-merch.js?v=1789909570"></script>
+<script src="config.js?v=1789910423"></script>
+<script src="imports.js?v=1789910423"></script>
+<script src="merch-shopify.js?v=1789910423"></script>
+<script src="moteur-merch.js?v=1789910423"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2120,7 +2120,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789909570";
+    v.src = "hero.mp4?v=1789910423";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -8875,14 +8875,16 @@ async function chargerDashboard() {
   corps.innerHTML = `<div class="dash-section"><div class="compte-produits">Chargement…</div></div>`;
   const appel = (nom, extra = {}) => api("/rest/v1/rpc/" + nom, { corps: { p_magasins, p_du: du, p_au: au, ...extra } })
     .catch(e => { console.warn(nom, e); return null; });
-  const [kpis, tops, retard, central] = await Promise.all([
+  const [kpis, objectifs, tops, retard, central] = await Promise.all([
     appel("dash_kpis"),
+    appel("dash_objectifs"),
     appel("dash_top_produits", { p_categorie: null, p_n: 10 }),
     appel("dash_retard_reseau", { p_n: 20 }),
     appel("dash_central_non_implante", { p_n: 30, p_stock_central_min: 20 }),
   ]);
   if (jeton !== DASH.chargement) return;
-  DASH.donnees = { kpis: (kpis || [])[0] || null, tops: tops || [], retard: retard || [], central: central || [] };
+  DASH.donnees = { kpis: (kpis || [])[0] || null, objectifs: (objectifs || [])[0] || null,
+                   tops: tops || [], retard: retard || [], central: central || [] };
   rendreKpisDash();
   corps.innerHTML = `
     <div class="dash-section" id="dash-tops"></div>
@@ -8899,8 +8901,21 @@ function rendreKpisDash() {
   const k = DASH.donnees?.kpis;
   if (!k) { zone.innerHTML = ""; return; }
   const kpi = (valeur, libelle, titre) => `<div class="dash-kpi" title="${echapperHTML(titre)}"><b>${valeur}</b><span>${libelle}</span></div>`;
+  const o = DASH.donnees?.objectifs;
+  // L'objectif ne s'affiche que si le fichier OBJECTIF couvre la période demandée.
+  const suivi = o && Number(o.objectif) > 0
+    ? kpi(eur(Number(o.objectif)), "objectif CA", `objectif Fastmag cumulé sur ${o.jours} jour(s) et le périmètre choisi`)
+      + kpi(o.taux == null ? "—" : dashRos(o.taux) + " %", "réalisation", "CA TTC réalisé ÷ objectif")
+    : "";
+  const frequentation = o && Number(o.tickets) > 0
+    ? kpi(dashNb(o.tickets) + (Number(o.tickets_n1) > 0 ? ` <span class="dash-badge ${o.tickets >= o.tickets_n1 ? "ok" : "alerte"}">${
+        o.tickets >= o.tickets_n1 ? "+" : ""}${dashRos(100 * (o.tickets - o.tickets_n1) / o.tickets_n1)} %</span>` : ""),
+        "tickets", "nombre de tickets sur la période, comparé à l'an dernier")
+      + kpi(o.panier_moyen == null ? "—" : eur(Number(o.panier_moyen)), "panier moyen", "CA TTC ÷ tickets")
+    : "";
   zone.innerHTML = kpi(dashNb(k.pieces), "pièces vendues", "sur la période et le périmètre choisis")
     + kpi(eur(Number(k.ca || 0)), "CA TTC", "chiffre d'affaires TTC des magasins retenus")
+    + suivi + frequentation
     + kpi(dashNb(k.stock_pieces), "pièces en stock", "stock des magasins retenus, dernière photo connue")
     + kpi(k.couverture_jours == null ? "—" : dashNb(k.couverture_jours) + " j", "couverture", "stock ÷ ventes moyennes par jour")
     + kpi(dashNb(k.nb_magasins), "magasins", "magasins compris dans le périmètre");
