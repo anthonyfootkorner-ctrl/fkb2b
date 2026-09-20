@@ -1156,6 +1156,7 @@
         <a href="#/reporting">Reporting (CA, marge, saisons)</a>
       </div>
     </div>
+    <a href="#/hebdo" id="lien-hebdo" style="display:none">REPORTING</a>
     <a href="#/compte">MON COMPTE</a>
     <div class="menu-deroulant" id="lien-backoffice" style="display:none">
       <a style="color:#d9a441">BACK OFFICE ▾</a>
@@ -1404,6 +1405,7 @@
   <section class="vue page-claire" id="vue-tableau-bord-preco"></section>
   <section class="vue page-claire" id="vue-dashboard"></section>
   <section class="vue page-claire" id="vue-reporting"></section>
+  <section class="vue page-claire" id="vue-hebdo"></section>
 
   <section class="vue page-claire" id="vue-calendrier">
     <div class="col-tete">
@@ -1655,8 +1657,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789912811"></script>
-<script src="imports.js?v=1789912811"></script>
+<script src="config.js?v=1789915392"></script>
+<script src="imports.js?v=1789915392"></script>
 <script src="merch-shopify.js?v=1789911674"></script>
 <script src="moteur-merch.js?v=1789911674"></script>
 <script>
@@ -1813,6 +1815,7 @@ async function init() {
   // le menu Précommandes n'apparaît que si une campagne est ouverte à ce magasin
   chargerMesCampagnes();
   activerLienDashboard();
+  activerLienHebdo();
 
   document.getElementById("recherche").oninput = e => { texteRecherche = e.target.value.trim().toLowerCase(); rendreCollection(); };
   document.getElementById("btn-panier").onclick = () => basculer("panier", true);
@@ -2069,6 +2072,9 @@ function router() {
   } else if (route === "reporting") {
     document.getElementById("vue-reporting").classList.add("active");
     rendreReporting();
+  } else if (route === "hebdo") {
+    document.getElementById("vue-hebdo").classList.add("active");
+    rendreHebdo();
   } else if (route === "dashboard") {
     document.getElementById("vue-dashboard").classList.add("active");
     rendreDashboard();
@@ -4411,13 +4417,15 @@ async function rendreUtilisateurs() {
   // référentiel sociétés pour la saisie (l'admin les voit toutes)
   initialiserExclusions();
 
-  const [liste, magasinsDash, accesDash] = await Promise.all([
+  const [liste, magasinsDash, accesDash, accesRep] = await Promise.all([
     api("/rest/v1/rpc/admin_utilisateurs", { corps: {} }),
     api("/rest/v1/magasins?select=code,nom,groupe,ordre&actif=eq.true&order=ordre,nom").catch(() => []),
     api("/rest/v1/rpc/dash_acces_liste", { corps: {} }).catch(() => []),
+    api("/rest/v1/rpc/reporting_acces_liste", { corps: {} }).catch(() => ({})),
   ]);
   DASH_MAGASINS_REF = magasinsDash || [];
   DASH_ACCES = Object.fromEntries((accesDash || []).map(a => [a.user_id, a.magasins || []]));
+  REPORTING_ACCES = accesRep || {};
   document.getElementById("liste-utilisateurs").innerHTML = (liste || []).map(u => `
     <div class="rang-util" data-user="${u.user_id}">
       <div class="qui"><b>${u.email}</b><span>${u.nom || "—"} · ${u.role}</span></div>
@@ -4445,6 +4453,7 @@ async function rendreUtilisateurs() {
         </div>
         <div class="chips" id="edit-${u.user_id}">${chipsHTML(u.societes.map(s => s.compte), true, `retirerAcces_${u.user_id.replaceAll("-", "_")}`)}</div>` : ""}
         ${u.role !== "admin" ? blocAccesDashboard(u) : `<div class="compte-produits" style="margin-top:8px">Dashboard magasins : tous les magasins (administrateur).</div>`}
+        ${u.role !== "admin" ? blocAccesReporting(u) : `<div class="compte-produits">Reporting hebdomadaire : enseigne et succursales (administrateur).</div>`}
       </div>
     </div>`).join("");
 
@@ -8736,6 +8745,42 @@ init();
    un compte magasin garde d'office le sien, sans rien accorder. */
 let DASH_MAGASINS_REF = [], DASH_ACCES = {};
 
+/* Reporting hebdomadaire : deux cases, données compte par compte. « Succursales »
+   ouvre les marges, la productivité et les équipes — jamais par défaut. */
+let REPORTING_ACCES = {};
+function blocAccesReporting(u) {
+  const a = REPORTING_ACCES[u.user_id] || [];
+  const case_ = (portee, libelle, aide) => `<label class="compte-produits" style="margin:0 14px 0 0" title="${echapperHTML(aide)}">
+    <input type="checkbox" ${a.includes(portee) ? "checked" : ""}
+           onchange="basculerAccesReporting('${u.user_id}', '${portee}', this.checked)"> ${libelle}</label>`;
+  return `<div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--hairline)">
+    <div class="compte-produits" style="margin:0 0 6px">Reporting hebdomadaire</div>
+    <div class="formu">
+      ${case_("enseigne", "Enseigne", "reporting réseau complet, classement et flashs")}
+      ${case_("succ", "Succursales (marges, productivité, équipes)", "sensible : marges, €/h, équipes de vente")}
+      <button class="puce-claire" onclick="enregistrerAccesReporting('${u.user_id}')">Enregistrer l'accès reporting</button>
+      <span class="compte-produits" id="rep-etat-${u.user_id}"></span>
+    </div>
+  </div>`;
+}
+function basculerAccesReporting(userId, portee, actif) {
+  const a = new Set(REPORTING_ACCES[userId] || []);
+  actif ? a.add(portee) : a.delete(portee);
+  REPORTING_ACCES[userId] = [...a];
+}
+async function enregistrerAccesReporting(userId) {
+  const etat = document.getElementById(`rep-etat-${userId}`);
+  etat.textContent = "enregistrement…";
+  try {
+    await api("/rest/v1/rpc/reporting_acces_definir",
+              { corps: { p_user_id: userId, p_portees: REPORTING_ACCES[userId] || [] } });
+    const n = (REPORTING_ACCES[userId] || []);
+    etat.textContent = n.length ? "accès enregistré ✓ — " + n.join(" + ") : "accès retiré ✓";
+  } catch (e) {
+    etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 120);
+  }
+}
+
 function blocAccesDashboard(u) {
   const codes = DASH_ACCES[u.user_id] || [];
   const id = u.user_id.replaceAll("-", "_");
@@ -8794,6 +8839,273 @@ async function enregistrerAccesDash(userId) {
   } catch (e) {
     etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 120);
   }
+}
+
+/* ================= Reporting hebdomadaire (direction) =================
+   Le pipeline du lundi produit deux reportings (ENSEIGNE, SUCC), trois flashs et les
+   fiches magasins. Cette page les archive semaine par semaine et les montre à ceux qui
+   y ont droit : « enseigne » et « succ » sont deux accès distincts, donnés compte par
+   compte, parce que le SUCC contient les marges, la productivité et les équipes. */
+let HEBDO = { acces: [], semaines: [], courante: null, fichiers: [], onglet: null, chargement: 0 };
+
+// Reconnaissance des fichiers par leur nom : c'est la convention du pipeline.
+// [motif, categorie, portee, genre]
+const HEBDO_MOTIFS = [
+  [/^reporting_succ_S\d{2}\d{4}(_sheet)?\.(json|html|png|pdf|xlsx|csv)$/i, "sortie", "succ", null],
+  [/^fiches_magasins_S\d{2}/i, "sortie", "succ", "fiches"],
+  [/^reporting_enseigne_/i, "sortie", "enseigne", null],
+  [/^flash_reseaux/i, "sortie", "enseigne", "flash réseaux"],
+  [/^flash_produits/i, "sortie", "enseigne", "flash produits"],
+  [/^vente\s*n-?1/i, "export", "admin", "ventes N-1"],
+  [/^vente/i, "export", "admin", "ventes"],
+  [/^objectif/i, "export", "admin", "objectifs"],
+  [/^stock/i, "export", "admin", "stock"],
+  [/^analyse.*fr[ée]quentation/i, "export", "admin", "fréquentation"],
+  [/^fastmag/i, "export", "admin", "fréquentation N-1"],
+  [/^productivit/i, "export", "admin", "heures travaillées"],
+  [/^vendeur/i, "export", "admin", "vendeurs"],
+  [/hebdo\s*ref/i, "export", "admin", "désignations (HEBDO REF)"],
+  [/^fichier\s*global\s*mag/i, "export", "admin", "référentiel réseau"],
+  [/^ref/i, "export", "admin", "ventes par référence"],
+];
+
+function hebdoClasser(nom, semaineDefaut, anneeDefaut) {
+  const sem = nom.match(/_S(\d{2})(\d{4})/i);
+  let categorie = "analyse", portee = "succ", genre = null;
+  for (const [motif, cat, por, gen] of HEBDO_MOTIFS) {
+    if (motif.test(nom)) { categorie = cat; portee = por; genre = gen; break; }
+  }
+  if (!genre) {
+    const ext = (nom.split(".").pop() || "").toLowerCase();
+    genre = /_mail\.html$|^reporting_succ_S\d+\d+\.html$/i.test(nom) ? "mail"
+      : /classement/i.test(nom) ? "classement"
+      : ext === "png" || ext === "pdf" ? (categorie === "sortie" && portee === "succ" ? "tableau" : ext)
+      : ext;
+  }
+  return { categorie, portee, genre,
+           semaine: sem ? Number(sem[1]) : semaineDefaut,
+           annee: sem ? Number(sem[2]) : anneeDefaut };
+}
+
+const hebdoSlug = n => String(n).normalize("NFD").replace(/[̀-ͯ]/g, "")
+  .replace(/[^A-Za-z0-9._-]+/g, "-").replace(/-+/g, "-");
+
+function hebdoChemin(c) {
+  const s = "S" + String(c.semaine).padStart(2, "0");
+  if (c.categorie === "export") return `exports/${c.annee}/${s}/${hebdoSlug(c.nom)}`;
+  if (c.categorie === "sortie") return `sorties/${c.portee}/${c.annee}/${s}/${hebdoSlug(c.nom)}`;
+  return `analyses/${c.portee}/${c.annee}/${hebdoSlug(c.nom)}`;
+}
+
+// Le bucket « reporting » est privé : dépôt et lecture passent par le jeton de session.
+async function hebdoEnvoyer(chemin, fichier) {
+  const session = await sessionValide();
+  const url = `${FKB2B.url}/storage/v1/object/reporting/${chemin.split("/").map(encodeURIComponent).join("/")}`;
+  const rep = await fetch(url, { method: "POST", body: fichier,
+    headers: { "apikey": FKB2B.cle, "Authorization": `Bearer ${session.access_token}`,
+               "Content-Type": fichier.type || "application/octet-stream", "x-upsert": "true" } });
+  if (!rep.ok) throw new Error((await rep.text()).slice(0, 200) || `dépôt refusé (${rep.status})`);
+}
+
+async function hebdoLien(chemin, secondes = 3600) {
+  const r = await api(`/storage/v1/object/sign/reporting/${chemin.split("/").map(encodeURIComponent).join("/")}`,
+                      { corps: { expiresIn: secondes } });
+  return FKB2B.url + "/storage/v1" + r.signedURL;
+}
+
+const hebdoTaille = o => o == null ? "" : o > 1048576 ? (o / 1048576).toFixed(1).replace(".", ",") + " Mo"
+  : o > 1024 ? Math.round(o / 1024) + " ko" : o + " o";
+const hebdoJour = d => new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+// semaine ISO précédente, celle que le pipeline traite le lundi
+function hebdoSemainePrecedente() {
+  const d = new Date(); d.setDate(d.getDate() - 7);
+  const j = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  j.setUTCDate(j.getUTCDate() + 4 - (j.getUTCDay() || 7));
+  const debut = new Date(Date.UTC(j.getUTCFullYear(), 0, 1));
+  return { semaine: Math.ceil(((j - debut) / 86400000 + 1) / 7), annee: j.getUTCFullYear() };
+}
+
+async function rendreHebdo() {
+  const vue = document.getElementById("vue-hebdo");
+  vue.innerHTML = `<div class="col-tete"><h1>REPORTING HEBDOMADAIRE</h1>
+    <div class="compte-produits">Chargement…</div></div>`;
+  try {
+    HEBDO.acces = await api("/rest/v1/rpc/reporting_mes_acces", { corps: {} }) || [];
+  } catch (e) { HEBDO.acces = []; }
+  if (!HEBDO.acces.length) {
+    vue.innerHTML = `<div class="col-tete"><h1>REPORTING HEBDOMADAIRE</h1>
+      <div class="compte-produits">Ce reporting ne vous est pas ouvert. Les accès « enseigne » et
+      « succursales » se donnent compte par compte : demandez-le à un administrateur.</div></div>`;
+    return;
+  }
+  HEBDO.semaines = await api("/rest/v1/rpc/reporting_semaines", { corps: { p_limite: 60 } }) || [];
+  if (!HEBDO.onglet) HEBDO.onglet = HEBDO.acces.includes("enseigne") ? "enseigne" : "succ";
+  const admin = HEBDO.acces.includes("admin");
+  const p = hebdoSemainePrecedente();
+  vue.innerHTML = `
+    <div class="col-tete">
+      <h1>REPORTING HEBDOMADAIRE</h1>
+      <div class="compte-produits">Le reporting du lundi : chiffre d'affaires, marge et fréquentation
+        de la semaine écoulée, comparés aux mêmes dates l'an dernier. Semaine ISO, du lundi au dimanche.</div>
+    </div>
+    ${admin ? `
+    <div class="dash-section">
+      <h3>Dépôt du lundi</h3>
+      <div class="compte-produits">Déposez les exports Fastmag de la semaine (VENTE, OBJECTIF, STOCK,
+        fréquentation, Productivité, VENDEUR, REF, HEBDO REF, FICHIER GLOBAL MAG) et, tant que le calcul
+        tourne encore sur votre Mac, les fichiers produits. Chaque fichier est rangé d'après son nom.</div>
+      <div class="dash-ligne" style="margin-top:10px">
+        <label class="compte-produits" style="margin:0">Semaine si le nom ne la dit pas :
+          <input type="number" id="hebdo-semaine" min="1" max="53" value="${p.semaine}" style="width:70px">
+          <input type="number" id="hebdo-annee" min="2024" max="2100" value="${p.annee}" style="width:90px">
+        </label>
+        <input type="file" id="hebdo-fichiers" multiple>
+        <button class="puce-claire" onclick="deposerHebdo()">Déposer</button>
+      </div>
+      <div id="hebdo-depot" class="compte-produits"></div>
+    </div>` : ""}
+    <div class="dash-section">
+      <h3>Semaines archivées</h3>
+      <div class="dash-ligne" id="hebdo-semaines"></div>
+    </div>
+    <div id="hebdo-corps"></div>`;
+  rendreSemainesHebdo();
+  const derniere = HEBDO.courante || HEBDO.semaines[0];
+  if (derniere) await ouvrirSemaineHebdo(derniere.annee, derniere.semaine);
+  else document.getElementById("hebdo-corps").innerHTML =
+    `<div class="dash-section"><div class="dash-vide">Aucune semaine archivée pour l'instant.</div></div>`;
+}
+
+function rendreSemainesHebdo() {
+  const zone = document.getElementById("hebdo-semaines"); if (!zone) return;
+  zone.innerHTML = HEBDO.semaines.length ? HEBDO.semaines.map(s => {
+    const actif = HEBDO.courante && HEBDO.courante.annee === s.annee && HEBDO.courante.semaine === s.semaine;
+    return `<button class="puce-claire dash-chip${actif ? " on" : ""}"
+      onclick="ouvrirSemaineHebdo(${s.annee}, ${s.semaine})"
+      title="du ${hebdoJour(s.du)} au ${hebdoJour(s.au)}${s.intermediaire ? " · version intermédiaire" : ""}">
+      S${String(s.semaine).padStart(2, "0")} ${s.annee}${s.intermediaire ? " ∗" : ""}</button>`;
+  }).join("") : `<span class="compte-produits">Rien d'archivé pour l'instant.</span>`;
+}
+
+async function ouvrirSemaineHebdo(annee, semaine) {
+  const corps = document.getElementById("hebdo-corps"); if (!corps) return;
+  HEBDO.courante = HEBDO.semaines.find(s => s.annee === annee && s.semaine === semaine) || { annee, semaine };
+  rendreSemainesHebdo();
+  const jeton = ++HEBDO.chargement;
+  corps.innerHTML = `<div class="dash-section"><div class="compte-produits">Chargement…</div></div>`;
+  const fichiers = await api("/rest/v1/rpc/reporting_fichiers_semaine",
+                             { corps: { p_annee: annee, p_semaine: semaine } }).catch(() => []);
+  if (jeton !== HEBDO.chargement) return;
+  HEBDO.fichiers = fichiers || [];
+  await rendreSemaineCorpsHebdo();
+}
+
+async function rendreSemaineCorpsHebdo() {
+  const corps = document.getElementById("hebdo-corps"); if (!corps) return;
+  const s = HEBDO.courante;
+  const du = s.du ? new Date(s.du) : null, au = s.au ? new Date(s.au) : null;
+  // N-1 = mêmes jours de semaine, soit 364 jours en arrière (règle du pipeline)
+  const n1 = d => d ? new Date(d.getTime() - 364 * 86400000) : null;
+  const portees = ["enseigne", "succ"].filter(p => HEBDO.acces.includes(p));
+  if (!portees.includes(HEBDO.onglet)) HEBDO.onglet = portees[0];
+  const deLaPortee = HEBDO.fichiers.filter(f => f.categorie === "sortie" && f.portee === HEBDO.onglet);
+  const mail = deLaPortee.find(f => f.genre === "mail" || /_mail\.html$|^reporting_succ_S\d+\.html$/i.test(f.nom)
+                                    || (/\.html$/i.test(f.nom)));
+  const image = deLaPortee.find(f => /\.png$/i.test(f.nom));
+  const exports_ = HEBDO.fichiers.filter(f => f.categorie === "export");
+  const analyses = HEBDO.fichiers.filter(f => f.categorie === "analyse");
+  const ligne = f => `<tr>
+      <td>${echapperHTML(f.nom)}</td><td>${echapperHTML(f.genre || "")}</td>
+      <td>${hebdoTaille(f.taille)}</td><td>${dateHeure(f.depose_le)}</td>
+      <td><button class="puce-claire" onclick="telechargerHebdo('${echapperHTML(f.chemin)}')">Télécharger</button></td>
+    </tr>`;
+  const tableau = (titre, liste) => !liste.length ? "" : `
+    <div class="dash-section"><h3>${titre}</h3>
+      <div class="rep-table"><table><thead><tr><th>Fichier</th><th>Type</th><th>Taille</th><th>Déposé</th><th></th></tr></thead>
+      <tbody>${liste.map(ligne).join("")}</tbody></table></div></div>`;
+
+  corps.innerHTML = `
+    <div class="dash-section">
+      <h3>S${String(s.semaine).padStart(2, "0")} ${s.annee}${s.intermediaire ? " — version intermédiaire (lundi-samedi)" : ""}</h3>
+      <div class="compte-produits">${du && au ? `Semaine du ${du.toLocaleDateString("fr-FR")} au ${au.toLocaleDateString("fr-FR")}
+        · comparée aux mêmes jours de semaine l'an dernier, du ${n1(du).toLocaleDateString("fr-FR")}
+        au ${n1(au).toLocaleDateString("fr-FR")}` : ""}</div>
+      ${portees.length > 1 ? `<div class="dash-ligne" style="margin-top:10px">
+        ${portees.map(p => `<button class="puce-claire dash-chip${HEBDO.onglet === p ? " on" : ""}"
+          onclick="ongletHebdo('${p}')">${p === "enseigne" ? "Enseigne (tout le réseau)" : "Succursales"}</button>`).join("")}
+      </div>` : ""}
+      ${deLaPortee.length ? "" : `<div class="dash-vide" style="margin-top:10px">Rien de publié pour cette portée sur cette semaine.</div>`}
+    </div>
+    ${mail ? `<div class="dash-section"><h3>Le mail de la semaine</h3>
+      <iframe id="hebdo-mail" sandbox="" style="width:100%;border:1px solid var(--hairline);border-radius:14px;background:#fff;min-height:420px"></iframe></div>` : ""}
+    ${image ? `<div class="dash-section"><h3>${HEBDO.onglet === "succ" ? "Tableau détaillé" : "Classement"}</h3>
+      <img id="hebdo-image" alt="" style="max-width:100%;border:1px solid var(--hairline);border-radius:14px;background:#fff"></div>` : ""}
+    ${tableau("Fichiers de la semaine", deLaPortee)}
+    ${tableau("Analyses", analyses)}
+    ${tableau("Exports déposés (administrateur)", exports_)}`;
+
+  if (mail) {
+    try {
+      const rep = await fetch(await hebdoLien(mail.chemin));
+      const html = await rep.text();
+      const cadre = document.getElementById("hebdo-mail");
+      if (cadre) {
+        // srcdoc + sandbox vide : le HTML du pipeline s'affiche, sans script ni accès à la page
+        cadre.srcdoc = html;
+        cadre.onload = () => { try {
+          cadre.style.height = (cadre.contentDocument.body.scrollHeight + 40) + "px";
+        } catch (e) { /* hauteur par défaut */ } };
+      }
+    } catch (e) { /* le mail reste téléchargeable */ }
+  }
+  if (image) {
+    try { document.getElementById("hebdo-image").src = await hebdoLien(image.chemin); } catch (e) { /* idem */ }
+  }
+}
+
+function ongletHebdo(p) { HEBDO.onglet = p; rendreSemaineCorpsHebdo(); }
+
+async function telechargerHebdo(chemin) {
+  try {
+    const url = await hebdoLien(chemin, 120);
+    const a = document.createElement("a");
+    a.href = url; a.download = chemin.split("/").pop(); a.target = "_blank";
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch (e) { alert("Téléchargement impossible : " + (e.donnees?.message || e.message)); }
+}
+
+async function deposerHebdo() {
+  const champ = document.getElementById("hebdo-fichiers");
+  const zone = document.getElementById("hebdo-depot");
+  const fichiers = [...(champ?.files || [])];
+  if (!fichiers.length) { zone.textContent = "Choisissez d'abord des fichiers."; return; }
+  const semaine = Number(document.getElementById("hebdo-semaine").value) || hebdoSemainePrecedente().semaine;
+  const annee = Number(document.getElementById("hebdo-annee").value) || hebdoSemainePrecedente().annee;
+  const lignes = [];
+  let n = 0;
+  for (const f of fichiers) {
+    const c = hebdoClasser(f.name, semaine, annee);
+    const chemin = hebdoChemin({ ...c, nom: f.name });
+    zone.textContent = `Envoi ${++n}/${fichiers.length} — ${f.name}…`;
+    try { await hebdoEnvoyer(chemin, f); }
+    catch (e) { zone.textContent = `Échec sur ${f.name} : ${e.message}`; return; }
+    lignes.push({ annee: c.annee, semaine: c.semaine, categorie: c.categorie, portee: c.portee,
+                  genre: c.genre, nom: f.name, chemin, taille: f.size });
+  }
+  await api("/rest/v1/rpc/reporting_enregistrer", { corps: { p_fichiers: lignes } });
+  zone.innerHTML = `<b>${lignes.length} fichier${lignes.length > 1 ? "s" : ""} déposé${lignes.length > 1 ? "s" : ""}.</b>
+    ${lignes.map(l => `<div>${echapperHTML(l.nom)} → ${l.categorie} · ${l.portee}${l.genre ? " · " + echapperHTML(l.genre) : ""} · S${String(l.semaine).padStart(2, "0")} ${l.annee}</div>`).join("")}`;
+  champ.value = "";
+  HEBDO.semaines = await api("/rest/v1/rpc/reporting_semaines", { corps: { p_limite: 60 } }) || [];
+  rendreSemainesHebdo();
+  await ouvrirSemaineHebdo(lignes[0].annee, lignes[0].semaine);
+}
+
+async function activerLienHebdo() {
+  try {
+    const acces = await api("/rest/v1/rpc/reporting_mes_acces", { corps: {} });
+    if ((acces || []).length) document.getElementById("lien-hebdo").style.display = "";
+  } catch (e) { /* pas de reporting pour ce compte */ }
 }
 
 /* ================= Reporting (maquette « lecture rapide ») =================
