@@ -1659,8 +1659,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789930050"></script>
-<script src="imports.js?v=1789930050"></script>
+<script src="config.js?v=1789930118"></script>
+<script src="imports.js?v=1789930118"></script>
 <script src="merch-shopify.js?v=1789911674"></script>
 <script src="moteur-merch.js?v=1789911674"></script>
 <script>
@@ -9002,8 +9002,9 @@ async function rendreSemaineCorpsHebdo() {
   const portees = ["enseigne", "succ"].filter(p => HEBDO.acces.includes(p));
   if (!portees.includes(HEBDO.onglet)) HEBDO.onglet = portees[0];
   const deLaPortee = HEBDO.fichiers.filter(f => f.categorie === "sortie" && f.portee === HEBDO.onglet);
-  const mail = deLaPortee.find(f => f.genre === "mail" || /_mail\.html$|^reporting_succ_S\d+\.html$/i.test(f.nom)
-                                    || (/\.html$/i.test(f.nom)));
+  // le mail mis en forme d'abord ; le HTML brut du moteur enseigne seulement à défaut
+  const mail = deLaPortee.find(f => f.genre === "mail" || /_mail\.html$|^reporting_succ_S\d+\.html$/i.test(f.nom))
+    || deLaPortee.find(f => /\.html$/i.test(f.nom));
   // l'image mise en avant : le classement (enseigne) ou le tableau détaillé (succ), pas une page de flash
   const image = deLaPortee.find(f => /_classement\.png$/i.test(f.nom) || /^reporting_succ_S\d+\.png$/i.test(f.nom))
     || deLaPortee.find(f => /\.png$/i.test(f.nom) && !/^flash_/i.test(f.nom));
