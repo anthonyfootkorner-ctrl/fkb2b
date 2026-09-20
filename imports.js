@@ -57,7 +57,7 @@ const MODELES_IMPORT = {
     // Repère pour le back-office (ajout rapide, consultation) — ce n'est PAS le stock
     // B2B vendable, qui reste alimenté par le fichier stock B2B.
     libelle: "État de stock Fastmag (stock physique par magasin)",
-    sep: "\t", encodage: "windows-1252",
+    sep: ["\t", ";"], encodage: ["windows-1252", "utf-8"],
     signature: ["Référence", "Taille", "Magasin", "Stock", "Valeur_Stock"],
     remplacement_complet: true,
     remplacement_libelle: "remplace l'état de stock Fastmag connu — le stock B2B vendable n'est pas touché",
@@ -213,11 +213,22 @@ function decouperTexte(texte, sep) {
 
 function detecterModeleImport(tampon) {
   for (const [nom, s] of Object.entries(MODELES_IMPORT)) {
-    const essai = new TextDecoder(s.encodage).decode(tampon);
-    const premiere = essai.slice(0, 8000).split(/\r?\n/)[0].replace(/^\uFEFF/, "");
-    const colonnes = decouperLigne(premiere, s.sep).map(col => col.trim());
-    if (s.signature.every(sig => colonnes.includes(sig))) {
-      return { modele: nom, spec: s, texte: essai, entete: colonnes };
+    // le même export sort tantôt en tabulations windows-1252, tantôt en CSV UTF-8 :
+    // un modèle peut donc lister plusieurs encodages et séparateurs
+    for (const encodage of [].concat(s.encodage)) {
+      let essai;
+      try { essai = new TextDecoder(encodage).decode(tampon); } catch (e) { continue; }
+      const premiere = essai.slice(0, 8000).split(/\r?\n/)[0].replace(/^\uFEFF/, "");
+      for (const sep of [].concat(s.sep)) {
+        const colonnes = decouperLigne(premiere, sep).map(col => col.trim());
+        if (colonnes.length < 2) continue;
+        // comparaison sans accent ni casse : un export qui écrit « Reference » ou
+        // « Quantité Disponible » reste reconnu (les intitulés Fastmag bougent)
+        const normalisees = colonnes.map(sansAccent);
+        if (s.signature.every(sig => colonnes.includes(sig) || normalisees.includes(sansAccent(sig)))) {
+          return { modele: nom, spec: { ...s, sep, encodage }, texte: essai, entete: colonnes };
+        }
+      }
     }
   }
   return null;
