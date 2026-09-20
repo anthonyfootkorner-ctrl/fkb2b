@@ -1659,8 +1659,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789930118"></script>
-<script src="imports.js?v=1789930118"></script>
+<script src="config.js?v=1789930439"></script>
+<script src="imports.js?v=1789930439"></script>
 <script src="merch-shopify.js?v=1789911674"></script>
 <script src="moteur-merch.js?v=1789911674"></script>
 <script>
@@ -9095,7 +9095,7 @@ const HEBDO_ATTENDUS = [
   { genre: "heures travaillées", libelle: "Productivité", detail: "heures réelles, un onglet par magasin", motif: "Productivité….xlsx", type: "requis" },
   { genre: "vendeurs", libelle: "VENDEUR", detail: "CA par vendeur (fiches magasins)", motif: "VENDEUR….csv", type: "requis" },
   { genre: "ventes par référence", libelle: "REF", detail: "jour × magasin × référence (flash produits)", motif: "REF….csv", type: "requis", controle: "dates" },
-  { genre: "désignations (HEBDO REF)", libelle: "HEBDO REF", detail: "désignations, saisons et rayons", motif: "…HEBDO REF….xlsx", type: "durable" },
+  { genre: "désignations (HEBDO REF)", libelle: "Désignations et saisons", detail: "lues dans la base produits du portail ; un classeur HEBDO REF déposé pour la semaine prime sur la base", motif: "rien à déposer", type: "auto" },
   { genre: "référentiel réseau", libelle: "FICHIER GLOBAL MAG", detail: "référentiel de tous les magasins du réseau", motif: "FICHIER GLOBAL MAG….xlsx", type: "durable" },
   { genre: "fréquentation N-1", libelle: "fastmag (fréquentation 2025)", detail: "passages de l'an dernier — un fichier par mois de 2025, ils se cumulent", motif: "fastmag….csv", type: "cumul", controle: "frequentation_n1" },
   { genre: "ventes N-1", libelle: "VENTE N-1", detail: "mois N-1 complet, une fois par mois, pour figer le taux de marge du mois N-1", motif: "VENTE N-1….csv", type: "optionnel" },
@@ -9238,6 +9238,8 @@ function changerSemaineImportReporting() {
 async function chargerImportReporting() {
   try {
     IMPREP.etat = await api("/rest/v1/rpc/reporting_exports_semaine", { corps: { p_annee: IMPREP.annee, p_semaine: IMPREP.semaine } });
+    if (IMPREP.nbDesignations == null)
+      IMPREP.nbDesignations = await api("/rest/v1/rpc/reporting_designations_nb", { corps: {} }).catch(() => 0);
   } catch (e) {
     document.getElementById("imprep-liste").innerHTML = `<div class="compte-produits">Lecture impossible : ${echapperHTML(e.donnees?.message || e.message)}</div>`;
     return;
@@ -9267,6 +9269,7 @@ function imprepBilan() {
     const dernier = (e.derniers || []).find(x => x.genre === a.genre);
     const alertes = f?.meta?.alertes || [];
     const etat = f ? (f.meta?.bloquant ? "alerte" : "present")
+      : a.type === "auto" ? "auto"
       : a.type === "durable" && dernier ? "repris"
       : a.type === "optionnel" ? "facultatif" : "manquant";
     return { ...a, fichier: f, dernier, alertes, etat };
@@ -9282,6 +9285,7 @@ function rendreListeImportReporting() {
     repris: () => `<span class="dash-badge ok" title="ce fichier ne change pas chaque semaine">↺ repris de S${String(b.dernier.semaine).padStart(2, "0")} ${b.dernier.annee}</span>`,
     facultatif: () => `<span class="dash-badge">facultatif</span>`,
     cumul: () => `<span class="dash-badge ok">✓ ${b.fichiers.length} fichier${b.fichiers.length > 1 ? "s" : ""}</span>`,
+    auto: () => `<span class="dash-badge ok">✓ automatique</span>`,
     manquant: () => `<span class="dash-badge rouge">✕ manquant</span>`,
   })[b.etat]();
   document.getElementById("imprep-liste").innerHTML = `
@@ -9293,6 +9297,7 @@ function rendreListeImportReporting() {
       <td style="white-space:normal">${b.fichier ? `${echapperHTML(b.fichier.nom)} · ${hebdoTaille(b.fichier.taille)} · ${dateHeure(b.fichier.depose_le)}
           ${b.fichier.meta?.du ? `<div class="compte-produits" style="margin:2px 0 0">couvre du ${b.fichier.meta.du} au ${b.fichier.meta.au} · ${Number(b.fichier.meta.lignes || 0).toLocaleString("fr-FR")} lignes</div>` : ""}`
           : b.etat === "repris" ? `${echapperHTML(b.dernier.nom)} · déposé ${dateHeure(b.dernier.depose_le)}`
+          : b.etat === "auto" ? `base produits du portail${IMPREP.nbDesignations ? ` · ${Number(IMPREP.nbDesignations).toLocaleString("fr-FR")} références avec désignation` : ""}`
           : b.fichiers ? b.fichiers.map(x => `<div>${echapperHTML(x.nom)}${x.meta?.du ? ` <span class="compte-produits" style="margin:0">· du ${x.meta.du} au ${x.meta.au}</span>` : ""}</div>`).join("") : ""}
         ${b.alertes.map(a => `<div style="color:#b3261e;margin-top:2px">⚠ ${echapperHTML(a)}</div>`).join("")}</td>
       <td><label class="puce-claire" style="cursor:pointer">${b.fichiers ? "Ajouter" : b.fichier || b.etat === "repris" ? "Remplacer" : "Charger"}
