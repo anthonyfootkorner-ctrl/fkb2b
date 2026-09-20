@@ -1299,7 +1299,7 @@
       <label id="zone-depot" style="display:block; border:2px dashed #ccc; border-radius:12px; padding:38px;
              text-align:center; cursor:pointer; color:var(--encre2); font-size:13.5px; transition:border-color 150ms ease">
         Glissez un fichier ici ou cliquez pour choisir<br>
-        <span style="font-size:11px">fiches produits · stock B2B · état de stock Fastmag · stock boutiques · ventes · objectifs · tarifs · clients — .csv, .xls, .xlsx, .txt ou .zip</span>
+        <span style="font-size:11px">fiches produits · stock B2B · état de stock Fastmag · stock boutiques · stock web (WMS) · ventes · objectifs · tarifs · clients — .csv, .xls, .xlsx, .txt ou .zip</span>
         <input id="fichier-import" type="file" style="display:none">
       </label>
       <div id="rapport-import" style="margin-top:18px"></div>
@@ -1634,10 +1634,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789910855"></script>
-<script src="imports.js?v=1789910855"></script>
-<script src="merch-shopify.js?v=1789910855"></script>
-<script src="moteur-merch.js?v=1789910855"></script>
+<script src="config.js?v=1789911307"></script>
+<script src="imports.js?v=1789911307"></script>
+<script src="merch-shopify.js?v=1789911307"></script>
+<script src="moteur-merch.js?v=1789911307"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2120,7 +2120,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789910855";
+    v.src = "hero.mp4?v=1789911307";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -8864,7 +8864,7 @@ function basculerMagasinDash(code) {
   choisirMagasinsDash(DASH.choisis.includes(code) ? DASH.choisis.filter(c => c !== code) : DASH.choisis.concat(code));
 }
 function choisirPeriodeDash(p) { DASH.periode = p; rendreDashboard(); }
-function choisirCategorieDash(c) { DASH.categorie = c === DASH.categorie ? null : c; rendreTopsDash(); }
+function choisirCategorieDash(c) { DASH.categorie = c; rendreTopsDash(); }
 
 async function chargerDashboard() {
   const corps = document.getElementById("dash-corps");
@@ -8952,6 +8952,7 @@ function carteDash(p, options = {}) {
         ${p.stock_mag != null ? `<span><i>Stock mag</i><br>${dashNb(p.stock_mag)}</span>` : ""}
         ${options.global ? `<span><i>Stock global</i><br>${dashNb(stockGlobal)}</span>`
           : `<span><i>Stock central</i><br>${dashNb(p.stock_central)}</span>`}
+        ${options.categorie && p.categorie ? `<span><i>Catégorie</i><br>${echapperHTML((DASH_CATS.find(([c]) => c === p.categorie) || [, p.categorie])[1])}</span>` : ""}
         ${p.ventes != null ? `<span><i>Ventes</i><br>${dashNb(p.ventes)}</span>` : ""}
         ${couverture ? `<span title="${echapperHTML(couverture.titre)}"><i>Couverture</i><br><span class="dash-badge ${couverture.classe}">${couverture.texte}</span></span>` : ""}
         ${p.indice != null ? `<span><i>Indice</i><br><span class="dash-badge rouge">${dashRos(p.indice)}</span></span>` : ""}
@@ -8970,15 +8971,21 @@ function rendreTopsDash() {
   const zone = document.getElementById("dash-tops"); if (!zone) return;
   const tops = DASH.donnees?.tops || [];
   const presentes = DASH_CATS.filter(([c]) => tops.some(p => p.categorie === c));
-  const active = DASH.categorie && presentes.some(([c]) => c === DASH.categorie) ? DASH.categorie : (presentes[0]?.[0] || null);
+  // « Tous » : les meilleures ventes toutes catégories confondues (le classement par
+  // catégorie ne dit pas qui pèse le plus dans le magasin).
+  const active = DASH.categorie === "TOUS" || (DASH.categorie && presentes.some(([c]) => c === DASH.categorie))
+    ? DASH.categorie : "TOUS";
   DASH.categorie = active;
-  const liste = tops.filter(p => p.categorie === active);
+  const liste = active === "TOUS"
+    ? [...tops].sort((a, b) => Number(b.ventes) - Number(a.ventes) || Number(b.ca) - Number(a.ca)).slice(0, 18)
+    : tops.filter(p => p.categorie === active);
   zone.innerHTML = `<h3>Top produits</h3>
-    <div class="compte-produits">Les 18 meilleures ventes du périmètre, catégorie par catégorie. Le ROS est en pièces par magasin et par semaine (vert si vous faites au moins aussi bien que le réseau) ; la couverture dit combien de semaines le stock tient au rythme actuel — <b>rouge sous 2 semaines</b>, orange sous 4.</div>
+    <div class="compte-produits">Les 18 meilleures ventes du périmètre, toutes catégories confondues ou catégorie par catégorie. Le ROS est en pièces par magasin et par semaine (vert si vous faites au moins aussi bien que le réseau) ; la couverture dit combien de semaines le stock tient au rythme actuel — <b>rouge sous 2 semaines</b>, orange sous 4.</div>
     <div class="dash-ligne" style="margin-top:10px">
+      <button class="puce-claire dash-chip${active === "TOUS" ? " on" : ""}" onclick="choisirCategorieDash('TOUS')">Tous · ${Math.min(tops.length, 18)}</button>
       ${presentes.map(([c, lib]) => `<button class="puce-claire dash-chip${c === active ? " on" : ""}" onclick="choisirCategorieDash('${c}')">${lib} · ${tops.filter(p => p.categorie === c).length}</button>`).join("")}
     </div>
-    ${liste.length ? `<div class="dash-grille">${liste.map(p => carteDash(p, { rang: p.rang, global: true })).join("")}</div>`
+    ${liste.length ? `<div class="dash-grille">${liste.map((p, i) => carteDash(p, { rang: active === "TOUS" ? i + 1 : p.rang, global: true, categorie: active === "TOUS" })).join("")}</div>`
       : `<div class="dash-vide">Aucune vente sur la période pour ce périmètre.</div>`}`;
 }
 

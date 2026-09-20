@@ -62,6 +62,16 @@ const MODELES_IMPORT = {
     remplacement_complet: true,
     remplacement_libelle: "remplace l'état de stock Fastmag connu — le stock B2B vendable n'est pas touché",
   },
+  stock_web_egonet: {
+    /* Export du WMS (EGONet) : le stock réel de l'entrepôt web, une ligne par
+       code-barres et par emplacement. Alimente le stock WEB (le central continue de
+       venir de l'état de stock Fastmag). */
+    libelle: "Stock web — export WMS EGONet",
+    sep: ";", encodage: "utf-8",
+    signature: ["Stock à date", "Référence", "Quantité disponible", "Quantité totale", "Adresse de stockage"],
+    remplacement_complet: true,
+    remplacement_libelle: "remplace le stock WEB connu — le stock central et le stock B2B ne sont pas touchés",
+  },
   objectifs: {
     /* Export OBJECTIF de Fastmag : objectif de CA du jour, pièces et tickets par magasin.
        Sert au Dashboard magasins (réalisé / objectif, fréquentation, panier moyen). */
@@ -366,6 +376,16 @@ function mapperVersTables(analyse) {
         prix_vente: parseFloat(String(l.Prix_vente || "").replace(",", ".")) > 0
           ? parseFloat(String(l.Prix_vente || "").replace(",", ".")) : null })) }];
     }
+    case "stock_web_egonet": {
+      const parEan = new Map();
+      for (const l of L) {
+        const ean = (l["Référence"] || "").trim();
+        if (!ean) continue;
+        const q = parseFloat(String(l["Quantité disponible"] ?? "0").replace(/\s/g, "").replace(",", ".")) || 0;
+        parEan.set(ean, (parEan.get(ean) || 0) + q);
+      }
+      return [{ table: "stock_fastmag (WEB)", rows: [...parEan.entries()].filter(([, q]) => q > 0).map(([ean, q]) => ({ ean, quantite: Math.round(q) })) }];
+    }
     case "objectifs": {
       const parCle = new Map();
       for (const l of L) {
@@ -611,6 +631,7 @@ async function executerImport(analyse, surProgres) {
   if (analyse.modele === "stock_fastmag") return executerStockFastmag(analyse, surProgres);
   if (analyse.modele === "stock_magasins") return executerStockMagasins(analyse, surProgres);
   if (analyse.modele === "objectifs") return executerObjectifs(analyse, surProgres);
+  if (analyse.modele === "stock_web_egonet") return executerStockWebEgonet(analyse, surProgres);
   if (analyse.modele === "comptes") return executerComptes(analyse, surProgres);
 
   const plans = mapperVersTables(analyse);
@@ -647,6 +668,34 @@ async function executerImport(analyse, surProgres) {
 
 // État de stock Fastmag : on garde toutes les lignes (un 0 est une information), le
 // premier lot remplace l'état précédent. Les tailles arrivent avec des espaces devant.
+/* Stock web (EGONet) : les lignes sont des codes-barres × emplacements, on additionne
+   la quantité disponible par code-barres. La RPC retrouve la référence et la taille par
+   le gencod de la fiche Fastmag et remplace le stock WEB. */
+async function executerStockWebEgonet(analyse, surProgres) {
+  const nombre = v => parseFloat(String(v ?? "0").replace(/\s/g, "").replace(",", ".")) || 0;
+  const parEan = new Map();
+  for (const l of analyse.lignes) {
+    const ean = (l["Référence"] || "").trim();
+    if (!ean) continue;
+    parEan.set(ean, (parEan.get(ean) || 0) + nombre(l["Quantité disponible"]));
+  }
+  const rows = [...parEan.entries()].filter(([, q]) => q > 0).map(([ean, quantite]) => ({ ean, quantite: Math.round(quantite) }));
+  if (!rows.length) throw new Error("aucune quantité disponible dans ce fichier");
+  let total = 0, inconnus = 0, piecesInconnues = 0, bilan = null;
+  for (let i = 0; i < rows.length; i += 2000) {
+    const lot = rows.slice(i, i + 2000);
+    bilan = await api("/rest/v1/rpc/stock_web_egonet_lot", { corps: { p_rows: lot, p_premier: i === 0 } });
+    total += lot.length; inconnus += Number(bilan?.inconnus) || 0; piecesInconnues += Number(bilan?.pieces_inconnues) || 0;
+    surProgres(`stock web : ${total}/${rows.length} codes-barres…`);
+  }
+  if (inconnus) surProgres(`${inconnus} codes-barres sans fiche Fastmag (${piecesInconnues} pièces) ignorés`);
+  await apiFonction("journal", { entree: {
+    fichier: `${analyse.fichier} (stock web)`, modele: "stock_web_egonet", empreinte: analyse.empreinte,
+    lignes_lues: analyse.lues, crees: Number(bilan?.total_web) || total, maj: 0, inchanges: 0,
+    quarantaine: inconnus, statut: "OK" } });
+  return Number(bilan?.pieces_web) || total;
+}
+
 /* Objectifs journaliers : chaque jour présent dans le fichier est remplacé pour les
    magasins du fichier. Redéposer une période qui chevauche la précédente ne double donc
    rien et corrige les objectifs revus après coup. */
