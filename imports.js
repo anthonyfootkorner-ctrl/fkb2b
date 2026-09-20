@@ -7,6 +7,17 @@ const MODELES_IMPORT = {
     sep: ";", encodage: "windows-1252",
     signature: ["Magasin", "Fournisseur", "Reference_Article", "Gencod", "Produit"],
   },
+  stock_magasins: {
+    /* Photo hebdomadaire du stock des boutiques (export STOCKPOURSTOCKFLOW) : elle
+       alimente le Dashboard magasins. Le stock CENTRAL et WEB, lui, continue d'arriver
+       par l'état de stock Fastmag ; ce modèle se place avant « stock » car le fichier
+       porte les mêmes colonnes, avec en plus la marque, la désignation et le prix d'achat. */
+    libelle: "Stock des boutiques (dashboard magasins)",
+    sep: ",", encodage: "utf-8",
+    signature: ["Code_Origine", "Marque Gp", "BarCode V2", "Designation", "Taille", "Total Stock"],
+    remplacement_complet: true,
+    remplacement_libelle: "remplace la photo du stock boutiques — le stock B2B et l'état Fastmag ne sont pas touchés",
+  },
   stock: {
     libelle: "Stock consolidé par magasin",
     sep: ",", encodage: "utf-8",
@@ -348,6 +359,21 @@ function mapperVersTables(analyse) {
         prix_vente: parseFloat(String(l.Prix_vente || "").replace(",", ".")) > 0
           ? parseFloat(String(l.Prix_vente || "").replace(",", ".")) : null })) }];
     }
+    case "stock_magasins": {
+      // simulation : ce qui sera réellement écrit (hors CENTRAL/WEB, hors stock nul)
+      const parCle = new Map();
+      for (const l of L) {
+        const magasin = (l.Code_Origine || "").trim().toUpperCase();
+        const reference = (l["BarCode V2"] || "").trim();
+        const q = parseInt(parseFloat(String(l["Total Stock"] ?? "0").replace(",", ".")), 10) || 0;
+        if (!magasin || !reference || magasin === "CENTRAL" || magasin === "WEB" || q <= 0) continue;
+        const cle = `${magasin}|${reference}|${(l.Taille || "").trim()}`;
+        const e = parCle.get(cle) || { magasin, reference, taille: (l.Taille || "").trim(), quantite: 0 };
+        e.quantite += q;
+        parCle.set(cle, e);
+      }
+      return [{ table: "stock_magasins", rows: [...parCle.values()] }];
+    }
     case "stock":
       return [{ table: "stocks", vider: true, activer: true,
         rows: L.filter(l => parseInt(l["Total Stock"], 10) > 0).map(l => ({
@@ -564,6 +590,7 @@ async function executerImport(analyse, surProgres) {
   // (le stock Duhamel reste en base pour le merch) et il solde les commandes en attente.
   if (analyse.modele === "stock_b2b") return executerStockB2B(analyse, surProgres);
   if (analyse.modele === "stock_fastmag") return executerStockFastmag(analyse, surProgres);
+  if (analyse.modele === "stock_magasins") return executerStockMagasins(analyse, surProgres);
   if (analyse.modele === "comptes") return executerComptes(analyse, surProgres);
 
   const plans = mapperVersTables(analyse);
@@ -600,6 +627,44 @@ async function executerImport(analyse, surProgres) {
 
 // État de stock Fastmag : on garde toutes les lignes (un 0 est une information), le
 // premier lot remplace l'état précédent. Les tailles arrivent avec des espaces devant.
+/* Stock des boutiques : une photo complète, donc on vide puis on réécrit. CENTRAL et
+   WEB sont ignorés (ils viennent de l'état de stock Fastmag) et un stock nul ou négatif
+   n'a rien à faire dans une photo de stock. */
+async function executerStockMagasins(analyse, surProgres) {
+  const parCle = new Map();
+  let ignorees = 0;
+  for (const l of analyse.lignes) {
+    const magasin = (l.Code_Origine || "").trim().toUpperCase();
+    const reference = (l["BarCode V2"] || "").trim();
+    const quantite = parseInt(parseFloat(String(l["Total Stock"] ?? "0").replace(",", ".")), 10) || 0;
+    if (!magasin || !reference) continue;
+    if (magasin === "CENTRAL" || magasin === "WEB") { ignorees++; continue; }
+    if (quantite <= 0) continue;
+    const taille = (l.Taille || "").trim();
+    const cle = `${magasin}|${reference}|${taille}`;
+    const e = parCle.get(cle) || { magasin, reference, taille, quantite: 0 };
+    e.quantite += quantite;
+    parCle.set(cle, e);
+  }
+  const rows = [...parCle.values()];
+  if (!rows.length) throw new Error("aucune ligne de stock boutique exploitable (CENTRAL et WEB sont ignorés)");
+  surProgres(`remplacement de la photo précédente… (${ignorees} ligne${ignorees > 1 ? "s" : ""} CENTRAL/WEB ignorée${ignorees > 1 ? "s" : ""})`);
+  // écriture directe : la table n'est ouverte en écriture qu'aux comptes qui importent (peut_importer)
+  await api("/rest/v1/stock_magasins?quantite=gte.-2147483647", { methode: "DELETE" });
+  let total = 0;
+  for (let i = 0; i < rows.length; i += 2000) {
+    const lot = rows.slice(i, i + 2000);
+    await api("/rest/v1/stock_magasins", { corps: lot });
+    total += lot.length;
+    surProgres(`stock boutiques : ${total}/${rows.length} lignes…`);
+  }
+  await apiFonction("journal", { entree: {
+    fichier: analyse.fichier, modele: "stock_magasins", empreinte: analyse.empreinte,
+    lignes_lues: analyse.lues, crees: total, maj: 0, inchanges: 0,
+    quarantaine: analyse.quarantaine.length, statut: "OK" } });
+  return total;
+}
+
 async function executerStockFastmag(analyse, surProgres) {
   const nombre = v => parseFloat(String(v || "0").replace(/\s/g, "").replace(",", ".")) || 0;
   const rows = analyse.lignes

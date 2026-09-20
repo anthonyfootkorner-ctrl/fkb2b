@@ -1080,6 +1080,40 @@
     .panneau-jauges .pied label { display: flex; align-items: center; gap: 6px;
       cursor: pointer; color: var(--encre); }
     .panneau-jauges .pied input[type=checkbox] { accent-color: #111; }
+
+  /* ---- Dashboard magasins (ventes / stock par boutique) ---- */
+  .dash-filtres { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  .dash-ligne { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .dash-chip { cursor: pointer; }
+  .dash-chip.on { background: #111; color: #fff; border-color: #111; }
+  .dash-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 16px 22px 0; }
+  .dash-kpi { background: #fff; border: 1px solid var(--hairline); border-radius: 14px; padding: 14px 16px; }
+  .dash-kpi b { display: block; font-size: 24px; letter-spacing: -.01em; }
+  .dash-kpi span { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--encre2); }
+  .dash-section { margin: 26px 22px 0; }
+  .dash-section > h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
+  .dash-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 12px; margin-top: 12px; }
+  .dash-carte { position: relative; background: #fff; border: 1px solid var(--hairline); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .dash-carte .photo { aspect-ratio: 1 / 1; background: #f4f4f2; display: block; width: 100%; object-fit: contain; }
+  .dash-carte .corps { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .dash-carte .marque { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--encre2); }
+  .dash-carte .nom { font-size: 13px; line-height: 1.25; font-weight: 600; }
+  .dash-carte .ref { font-size: 11px; color: var(--encre2); }
+  .dash-carte .chiffres { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; font-size: 11.5px; margin-top: auto; }
+  .dash-carte .chiffres i { font-style: normal; color: var(--encre2); }
+  .dash-badge { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .dash-badge.ok { background: #e8f5ec; color: #1f7a3d; }
+  .dash-badge.alerte { background: #fdeee2; color: #b4531a; }
+  .dash-badge.rouge { background: #fdeaea; color: #a32626; }
+  .dash-carte .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .dash-carte .actions .puce-claire { flex: 1 1 auto; padding: 6px 10px; font-size: 11.5px; }
+  .dash-rang { position: absolute; top: 0; left: 0; }
+  .dash-rang { position: absolute; margin: 8px; background: #111; color: #fff; border-radius: 999px; font-size: 11px; padding: 2px 8px; }
+  .dash-vide { color: var(--gris); font-size: 13px; padding: 10px 0; }
+  @media (max-width: 640px) {
+    .dash-kpis, .dash-section { margin-left: 14px; margin-right: 14px; }
+    .dash-grille { grid-template-columns: repeat(auto-fill, minmax(144px, 1fr)); gap: 8px; }
+  }
   </style>
 </head>
 <body>
@@ -1101,6 +1135,7 @@
         <a href="#/calendrier">Calendrier &amp; budgets</a>
       </div>
     </div>
+    <a href="#/dashboard" id="lien-dashboard" style="display:none">DASHBOARD</a>
     <a href="#/compte">MON COMPTE</a>
     <div class="menu-deroulant" id="lien-backoffice" style="display:none">
       <a style="color:#d9a441">BACK OFFICE ▾</a>
@@ -1264,7 +1299,7 @@
       <label id="zone-depot" style="display:block; border:2px dashed #ccc; border-radius:12px; padding:38px;
              text-align:center; cursor:pointer; color:var(--encre2); font-size:13.5px; transition:border-color 150ms ease">
         Glissez un fichier ici ou cliquez pour choisir<br>
-        <span style="font-size:11px">fiches produits · stock B2B · état de stock Fastmag · tarifs · clients — .csv, .xls, .xlsx, .txt ou .zip</span>
+        <span style="font-size:11px">fiches produits · stock B2B · état de stock Fastmag · stock boutiques (dashboard) · ventes · tarifs · clients — .csv, .xls, .xlsx, .txt ou .zip</span>
         <input id="fichier-import" type="file" style="display:none">
       </label>
       <div id="rapport-import" style="margin-top:18px"></div>
@@ -1347,6 +1382,7 @@
   <section class="vue page-claire" id="vue-preco-validation"></section>
   <section class="vue page-claire" id="vue-precommandes-admin"></section>
   <section class="vue page-claire" id="vue-tableau-bord-preco"></section>
+  <section class="vue page-claire" id="vue-dashboard"></section>
 
   <section class="vue page-claire" id="vue-calendrier">
     <div class="col-tete">
@@ -1598,10 +1634,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789572959"></script>
-<script src="imports.js?v=1789572959"></script>
-<script src="merch-shopify.js?v=1789572959"></script>
-<script src="moteur-merch.js?v=1789572959"></script>
+<script src="config.js?v=1789909570"></script>
+<script src="imports.js?v=1789909570"></script>
+<script src="merch-shopify.js?v=1789909570"></script>
+<script src="moteur-merch.js?v=1789909570"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1755,6 +1791,7 @@ async function init() {
   NAVIGATION = navigation;
   // le menu Précommandes n'apparaît que si une campagne est ouverte à ce magasin
   chargerMesCampagnes();
+  activerLienDashboard();
 
   document.getElementById("recherche").oninput = e => { texteRecherche = e.target.value.trim().toLowerCase(); rendreCollection(); };
   document.getElementById("btn-panier").onclick = () => basculer("panier", true);
@@ -2008,6 +2045,9 @@ function router() {
   } else if (route === "precommandes-admin") {
     document.getElementById("vue-precommandes-admin").classList.add("active");
     rendrePrecommandesAdmin(decodeURIComponent(args.join("/")));
+  } else if (route === "dashboard") {
+    document.getElementById("vue-dashboard").classList.add("active");
+    rendreDashboard();
   } else if (route === "tableau-bord-preco") {
     document.getElementById("vue-tableau-bord-preco").classList.add("active");
     rendreTableauBordPreco(decodeURIComponent(args.join("/")));
@@ -2080,7 +2120,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789572959";
+    v.src = "hero.mp4?v=1789909570";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -4342,7 +4382,13 @@ async function rendreUtilisateurs() {
   // référentiel sociétés pour la saisie (l'admin les voit toutes)
   initialiserExclusions();
 
-  const liste = await api("/rest/v1/rpc/admin_utilisateurs", { corps: {} });
+  const [liste, magasinsDash, accesDash] = await Promise.all([
+    api("/rest/v1/rpc/admin_utilisateurs", { corps: {} }),
+    api("/rest/v1/magasins?select=code,nom,groupe,ordre&actif=eq.true&order=ordre,nom").catch(() => []),
+    api("/rest/v1/rpc/dash_acces_liste", { corps: {} }).catch(() => []),
+  ]);
+  DASH_MAGASINS_REF = magasinsDash || [];
+  DASH_ACCES = Object.fromEntries((accesDash || []).map(a => [a.user_id, a.magasins || []]));
   document.getElementById("liste-utilisateurs").innerHTML = (liste || []).map(u => `
     <div class="rang-util" data-user="${u.user_id}">
       <div class="qui"><b>${u.email}</b><span>${u.nom || "—"} · ${u.role}</span></div>
@@ -4369,6 +4415,7 @@ async function rendreUtilisateurs() {
           <span class="compte-produits" id="etat-${u.user_id}"></span>
         </div>
         <div class="chips" id="edit-${u.user_id}">${chipsHTML(u.societes.map(s => s.compte), true, `retirerAcces_${u.user_id.replaceAll("-", "_")}`)}</div>` : ""}
+        ${u.role !== "admin" ? blocAccesDashboard(u) : `<div class="compte-produits" style="margin-top:8px">Dashboard magasins : tous les magasins (administrateur).</div>`}
       </div>
     </div>`).join("");
 
@@ -8654,6 +8701,306 @@ function genererFichier(numeroServeur) {
 }
 
 init();
+/* ---- accès au Dashboard magasins (écran Utilisateurs) ----
+   Le dashboard montre les ventes et le stock d'un magasin : il ne s'ouvre pas tout seul.
+   L'administrateur (et l'administration commerciale) donne l'accès magasin par magasin ;
+   un compte magasin garde d'office le sien, sans rien accorder. */
+let DASH_MAGASINS_REF = [], DASH_ACCES = {};
+
+function blocAccesDashboard(u) {
+  const codes = DASH_ACCES[u.user_id] || [];
+  const id = u.user_id.replaceAll("-", "_");
+  const groupes = [...new Set(DASH_MAGASINS_REF.map(m => m.groupe).filter(Boolean))];
+  return `<div class="acces-dash" style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--hairline)">
+    <div class="compte-produits" style="margin:0 0 6px">Dashboard magasins — accès accordés
+      ${u.societes.length ? `<span title="un compte magasin voit toujours son propre magasin">(en plus de ses propres magasins)</span>` : ""}</div>
+    <div class="chips" id="dash-acces-${u.user_id}">${chipsAccesDash(codes, id)}</div>
+    <div class="formu" style="margin-top:8px">
+      <select class="qte-claire" style="width:260px; text-align:left" id="dash-ajout-${u.user_id}"
+              onchange="ajouterAccesDash('${u.user_id}', this.value); this.value='';">
+        <option value="">ajouter un magasin…</option>
+        ${groupes.map(g => `<optgroup label="${echapperHTML(g)}">${DASH_MAGASINS_REF.filter(m => m.groupe === g)
+          .map(m => `<option value="${echapperHTML(m.code)}">${echapperHTML(m.nom || m.code)}</option>`).join("")}</optgroup>`).join("")}
+      </select>
+      <button class="puce-claire" onclick="ajouterAccesDash('${u.user_id}', '*')">Tous les magasins</button>
+      <button class="puce-claire" onclick="enregistrerAccesDash('${u.user_id}')">Enregistrer l'accès dashboard</button>
+      <span class="compte-produits" id="dash-etat-${u.user_id}"></span>
+    </div>
+  </div>`;
+}
+
+function chipsAccesDash(codes, id) {
+  if (!codes.length) return `<span class="compte-produits" style="margin:0">Aucun magasin accordé.</span>`;
+  return codes.map(c => {
+    const m = DASH_MAGASINS_REF.find(x => x.code === c);
+    return `<span class="chip" onclick="retirerAccesDash('${id}', '${echapperHTML(c)}')" title="retirer">${
+      echapperHTML(m?.nom || c)} ✕</span>`;
+  }).join("");
+}
+
+function majChipsAccesDash(userId) {
+  const zone = document.getElementById(`dash-acces-${userId}`);
+  if (zone) zone.innerHTML = chipsAccesDash(DASH_ACCES[userId] || [], userId.replaceAll("-", "_"));
+}
+function ajouterAccesDash(userId, code) {
+  const actuels = DASH_ACCES[userId] || [];
+  DASH_ACCES[userId] = code === "*" ? DASH_MAGASINS_REF.map(m => m.code)
+    : (!code || actuels.includes(code) ? actuels : actuels.concat(code));
+  majChipsAccesDash(userId);
+}
+function retirerAccesDash(id, code) {
+  const userId = Object.keys(DASH_ACCES).find(u => u.replaceAll("-", "_") === id)
+    || [...document.querySelectorAll("[id^='dash-acces-']")].map(e => e.id.slice(11)).find(u => u.replaceAll("-", "_") === id);
+  if (!userId) return;
+  DASH_ACCES[userId] = (DASH_ACCES[userId] || []).filter(c => c !== code);
+  majChipsAccesDash(userId);
+}
+async function enregistrerAccesDash(userId) {
+  const etat = document.getElementById(`dash-etat-${userId}`);
+  etat.textContent = "enregistrement…";
+  try {
+    await api("/rest/v1/rpc/dash_acces_definir", { corps: { p_user: userId, p_magasins: DASH_ACCES[userId] || [] } });
+    const n = (DASH_ACCES[userId] || []).length;
+    etat.textContent = n ? `accès enregistré ✓ — ${n} magasin${n > 1 ? "s" : ""}` : "accès retiré ✓";
+  } catch (e) {
+    etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 120);
+  }
+}
+
+/* ================= Dashboard magasins =================
+   Ce que vendent et ce que détiennent les boutiques, en face du réseau. Tout le calcul
+   est fait par les fonctions SQL dash_* (elles appliquent aussi les droits : un magasin
+   ne voit que le sien). Ici on ne fait que choisir le périmètre et l'afficher. */
+const DASH_CATS = [["FOOTWEAR", "Footwear"], ["FOOT", "Football"], ["FK", "Footkorner"],
+                   ["SPORTSWEAR", "Sportswear"], ["ENFANT", "Enfant"], ["AUTRE", "Autre"]];
+const DASH_PERIODES = [["s-1", "Semaine dernière"], ["mois", "Mois en cours"], ["35j", "35 derniers jours"]];
+let DASH = { magasins: [], choisis: [], periode: "35j", categorie: null, chargement: 0 };
+
+// Les bornes d'une période : lundi→dimanche révolus, 1er du mois→hier, ou 35 jours glissants.
+function dashDates(periode) {
+  const jour = d => d.toISOString().slice(0, 10);
+  const hier = new Date(); hier.setDate(hier.getDate() - 1);
+  if (periode === "s-1") {
+    const fin = new Date(); // dimanche de la semaine révolue
+    fin.setDate(fin.getDate() - ((fin.getDay() + 6) % 7) - 1);
+    const debut = new Date(fin); debut.setDate(debut.getDate() - 6);
+    return { du: jour(debut), au: jour(fin) };
+  }
+  if (periode === "mois") {
+    const debut = new Date(); debut.setDate(1);
+    return { du: jour(debut), au: jour(hier) };
+  }
+  const debut = new Date(); debut.setDate(debut.getDate() - 35);
+  return { du: jour(debut), au: jour(hier) };
+}
+
+// Le menu n'apparaît que pour qui a au moins un magasin (droits calculés en SQL).
+async function activerLienDashboard() {
+  try {
+    const codes = await api("/rest/v1/rpc/dash_mes_magasins", { corps: {} });
+    if ((codes || []).length) document.getElementById("lien-dashboard").style.display = "";
+  } catch (e) { /* pas de dashboard pour ce compte */ }
+}
+
+async function rendreDashboard() {
+  const vue = document.getElementById("vue-dashboard");
+  if (!DASH.magasins.length) {
+    vue.innerHTML = `<div class="col-tete"><h1>DASHBOARD MAGASINS</h1><div class="compte-produits">Chargement…</div></div>`;
+    let codes = [];
+    try { codes = await api("/rest/v1/rpc/dash_mes_magasins", { corps: {} }) || []; }
+    catch (e) { vue.innerHTML = `<div class="col-tete"><h1>DASHBOARD MAGASINS</h1><div class="compte-produits">Accès impossible : ${echapperHTML((e.donnees?.message || e.message || "").slice(0, 160))}</div></div>`; return; }
+    if (!codes.length) { vue.innerHTML = `<div class="col-tete"><h1>DASHBOARD MAGASINS</h1><div class="compte-produits">Aucun magasin ne vous est ouvert sur ce dashboard. L'accès se donne magasin par magasin : demandez-le à un administrateur (écran Utilisateurs).</div></div>`; return; }
+    const liste = await api("/rest/v1/magasins?select=code,nom,groupe,ordre&actif=eq.true&order=ordre,nom").catch(() => []);
+    const connus = new Map((liste || []).map(m => [m.code, m]));
+    DASH.magasins = codes.map(c => connus.get(c) || { code: c, nom: c, groupe: "", ordre: 999 })
+      .sort((a, b) => (a.ordre ?? 999) - (b.ordre ?? 999) || a.nom.localeCompare(b.nom, "fr"));
+    // un seul magasin : il est d'office le périmètre, on ne demande rien
+    if (DASH.magasins.length === 1) DASH.choisis = [DASH.magasins[0].code];
+    else { try { DASH.choisis = JSON.parse(localStorage.getItem("fkb2b-dash-magasins") || "[]").filter(c => connus.has(c) || codes.includes(c)); } catch (e) { DASH.choisis = []; } }
+  }
+  const { du, au } = dashDates(DASH.periode);
+  vue.innerHTML = `
+    <div class="col-tete">
+      <h1>DASHBOARD MAGASINS</h1>
+      <div class="compte-produits">Ce qui se vend chez vous comparé au réseau, ce qu'il reste en stock,
+        et ce qui marche ailleurs sans être chez vous. Ventes du ${new Date(du).toLocaleDateString("fr-FR")}
+        au ${new Date(au).toLocaleDateString("fr-FR")}.</div>
+      <div class="dash-filtres" id="dash-filtres"></div>
+    </div>
+    <div class="dash-kpis" id="dash-kpis"></div>
+    <div id="dash-corps"><div class="dash-section"><div class="compte-produits">Chargement…</div></div></div>`;
+  rendreFiltresDash();
+  await chargerDashboard();
+}
+
+function rendreFiltresDash() {
+  const zone = document.getElementById("dash-filtres");
+  if (!zone) return;
+  const groupes = [...new Set(DASH.magasins.map(m => m.groupe).filter(Boolean))];
+  const multi = DASH.magasins.length > 1;
+  zone.innerHTML = `
+    ${multi ? `<div class="dash-ligne">
+      <span class="compte-produits" style="margin:0">Magasins :</span>
+      <button class="puce-claire dash-chip${DASH.choisis.length ? "" : " on"}" onclick="choisirMagasinsDash([])">Tous · ${DASH.magasins.length}</button>
+      ${groupes.map(g => `<button class="puce-claire dash-chip" onclick="choisirGroupeDash('${echapperHTML(g)}')">${echapperHTML(g)}</button>`).join("")}
+      <span class="tb-sep"></span>
+      ${DASH.magasins.map(m => `<button class="puce-claire dash-chip${DASH.choisis.includes(m.code) ? " on" : ""}"
+          onclick="basculerMagasinDash('${echapperHTML(m.code)}')" title="${echapperHTML(m.groupe || "")}">${echapperHTML(m.nom || m.code)}</button>`).join("")}
+    </div>` : `<div class="dash-ligne"><span class="compte-produits" style="margin:0">Magasin : <b>${echapperHTML(DASH.magasins[0]?.nom || "")}</b></span></div>`}
+    <div class="dash-ligne">
+      <span class="compte-produits" style="margin:0">Période :</span>
+      ${DASH_PERIODES.map(([cle, lib]) => `<button class="puce-claire dash-chip${DASH.periode === cle ? " on" : ""}"
+          onclick="choisirPeriodeDash('${cle}')">${lib}</button>`).join("")}
+      <button class="puce-claire" onclick="rendreDashboard()">↻ Actualiser</button>
+    </div>`;
+}
+
+function memoriserMagasinsDash() {
+  try { localStorage.setItem("fkb2b-dash-magasins", JSON.stringify(DASH.choisis)); } catch (e) { /* sans mémoire locale */ }
+}
+function choisirMagasinsDash(liste) { DASH.choisis = liste.slice(); memoriserMagasinsDash(); rendreFiltresDash(); chargerDashboard(); }
+function choisirGroupeDash(groupe) { choisirMagasinsDash(DASH.magasins.filter(m => m.groupe === groupe).map(m => m.code)); }
+function basculerMagasinDash(code) {
+  choisirMagasinsDash(DASH.choisis.includes(code) ? DASH.choisis.filter(c => c !== code) : DASH.choisis.concat(code));
+}
+function choisirPeriodeDash(p) { DASH.periode = p; rendreDashboard(); }
+function choisirCategorieDash(c) { DASH.categorie = c === DASH.categorie ? null : c; rendreTopsDash(); }
+
+async function chargerDashboard() {
+  const corps = document.getElementById("dash-corps");
+  if (!corps) return;
+  const { du, au } = dashDates(DASH.periode);
+  const p_magasins = DASH.choisis.length ? DASH.choisis : null;
+  const jeton = ++DASH.chargement;      // une réponse en retard ne doit pas écraser la dernière
+  corps.innerHTML = `<div class="dash-section"><div class="compte-produits">Chargement…</div></div>`;
+  const appel = (nom, extra = {}) => api("/rest/v1/rpc/" + nom, { corps: { p_magasins, p_du: du, p_au: au, ...extra } })
+    .catch(e => { console.warn(nom, e); return null; });
+  const [kpis, tops, retard, central] = await Promise.all([
+    appel("dash_kpis"),
+    appel("dash_top_produits", { p_categorie: null, p_n: 10 }),
+    appel("dash_retard_reseau", { p_n: 20 }),
+    appel("dash_central_non_implante", { p_n: 30, p_stock_central_min: 20 }),
+  ]);
+  if (jeton !== DASH.chargement) return;
+  DASH.donnees = { kpis: (kpis || [])[0] || null, tops: tops || [], retard: retard || [], central: central || [] };
+  rendreKpisDash();
+  corps.innerHTML = `
+    <div class="dash-section" id="dash-tops"></div>
+    <div class="dash-section" id="dash-retard"></div>
+    <div class="dash-section" id="dash-central"></div>`;
+  rendreTopsDash(); rendreRetardDash(); rendreCentralDash();
+}
+
+const dashNb = n => Math.round(Number(n) || 0).toLocaleString("fr-FR");
+const dashRos = n => (Math.round(Number(n || 0) * 10) / 10).toString().replace(".", ",");
+
+function rendreKpisDash() {
+  const zone = document.getElementById("dash-kpis"); if (!zone) return;
+  const k = DASH.donnees?.kpis;
+  if (!k) { zone.innerHTML = ""; return; }
+  const kpi = (valeur, libelle, titre) => `<div class="dash-kpi" title="${echapperHTML(titre)}"><b>${valeur}</b><span>${libelle}</span></div>`;
+  zone.innerHTML = kpi(dashNb(k.pieces), "pièces vendues", "sur la période et le périmètre choisis")
+    + kpi(eur(Number(k.ca || 0)), "CA TTC", "chiffre d'affaires TTC des magasins retenus")
+    + kpi(dashNb(k.stock_pieces), "pièces en stock", "stock des magasins retenus, dernière photo connue")
+    + kpi(k.couverture_jours == null ? "—" : dashNb(k.couverture_jours) + " j", "couverture", "stock ÷ ventes moyennes par jour")
+    + kpi(dashNb(k.nb_magasins), "magasins", "magasins compris dans le périmètre");
+}
+
+// Une carte produit : photo, identité, et les chiffres qui font décider.
+function carteDash(p, options = {}) {
+  const vert = Number(p.ros_mag) >= Number(p.ros_reseau);
+  const stockGlobal = p.stock_global ?? ((Number(p.stock_mag) || 0) + (Number(p.stock_central) || 0));
+  return `<div class="dash-carte">
+    ${options.rang ? `<span class="dash-rang">${options.rang}</span>` : ""}
+    ${p.photo_url ? `<img class="photo" loading="lazy" src="${echapperHTML(p.photo_url)}" alt="">` : `<span class="photo"></span>`}
+    <div class="corps">
+      <span class="marque">${echapperHTML(p.marque || "")}</span>
+      <span class="nom">${echapperHTML(p.designation || p.reference)}</span>
+      <span class="ref">${echapperHTML(p.reference)}${p.prix_vente ? " · " + eur(Number(p.prix_vente)) : ""}</span>
+      <div class="chiffres">
+        ${p.ros_mag != null ? `<span><i>ROS mag</i><br><span class="dash-badge ${vert ? "ok" : "alerte"}">${dashRos(p.ros_mag)}/sem</span></span>` : ""}
+        ${p.ros_reseau != null ? `<span><i>ROS réseau</i><br>${dashRos(p.ros_reseau)}/sem</span>` : ""}
+        ${p.stock_mag != null ? `<span><i>Stock mag</i><br>${dashNb(p.stock_mag)}</span>` : ""}
+        ${options.global ? `<span><i>Stock global</i><br>${dashNb(stockGlobal)}</span>`
+          : `<span><i>Stock central</i><br>${dashNb(p.stock_central)}</span>`}
+        ${p.ventes != null ? `<span><i>Ventes</i><br>${dashNb(p.ventes)}</span>` : ""}
+        ${p.indice != null ? `<span><i>Indice</i><br><span class="dash-badge rouge">${dashRos(p.indice)}</span></span>` : ""}
+        ${p.nb_mag_vendeurs != null ? `<span><i>Magasins vendeurs</i><br>${dashNb(p.nb_mag_vendeurs)}</span>` : ""}
+        ${p.tendance != null ? `<span><i>Tendance</i><br>${Number(p.tendance) >= 0 ? "↑ +" : "↓ "}${dashNb(p.tendance)} %</span>` : ""}
+      </div>
+      <div class="actions">
+        ${Number(p.stock_central) > 0 ? `<button class="puce-claire" onclick="commanderDash('${echapperHTML(p.reference)}', this)">Commander</button>` : ""}
+        <button class="puce-claire" onclick="location.hash='#/produit/' + encodeURIComponent('${echapperHTML(p.reference)}')">Fiche</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function rendreTopsDash() {
+  const zone = document.getElementById("dash-tops"); if (!zone) return;
+  const tops = DASH.donnees?.tops || [];
+  const presentes = DASH_CATS.filter(([c]) => tops.some(p => p.categorie === c));
+  const active = DASH.categorie && presentes.some(([c]) => c === DASH.categorie) ? DASH.categorie : (presentes[0]?.[0] || null);
+  DASH.categorie = active;
+  const liste = tops.filter(p => p.categorie === active);
+  zone.innerHTML = `<h3>Top produits</h3>
+    <div class="compte-produits">Les meilleures ventes du périmètre, catégorie par catégorie. Le ROS est en pièces par magasin et par semaine : vert si vous faites au moins aussi bien que le réseau.</div>
+    <div class="dash-ligne" style="margin-top:10px">
+      ${presentes.map(([c, lib]) => `<button class="puce-claire dash-chip${c === active ? " on" : ""}" onclick="choisirCategorieDash('${c}')">${lib} · ${tops.filter(p => p.categorie === c).length}</button>`).join("")}
+    </div>
+    ${liste.length ? `<div class="dash-grille">${liste.map(p => carteDash(p, { rang: p.rang, global: true })).join("")}</div>`
+      : `<div class="dash-vide">Aucune vente sur la période pour ce périmètre.</div>`}`;
+}
+
+function rendreRetardDash() {
+  const zone = document.getElementById("dash-retard"); if (!zone) return;
+  const liste = DASH.donnees?.retard || [];
+  zone.innerHTML = `<h3>En retard sur le réseau</h3>
+    <div class="compte-produits">Vous l'avez en stock, le réseau le vend bien, vous nettement moins (indice = votre ROS ÷ ROS réseau).
+      À remettre en avant en magasin avant de recommander.</div>
+    ${liste.length ? `<div class="dash-grille">${liste.map(p => carteDash(p)).join("")}</div>`
+      : `<div class="dash-vide">Rien à signaler : aucun produit du stock ne décroche par rapport au réseau.</div>`}`;
+}
+
+function rendreCentralDash() {
+  const zone = document.getElementById("dash-central"); if (!zone) return;
+  const liste = DASH.donnees?.central || [];
+  zone.innerHTML = `<h3>Dispo au central, pas chez vous</h3>
+    <div class="compte-produits">Ni en stock ni vendu chez vous sur la période, mais en stock au central et qui tourne ailleurs.</div>
+    ${liste.length ? `<div class="dash-grille">${liste.map(p => carteDash(p)).join("")}</div>`
+      : `<div class="dash-vide">Rien de disponible au central qui manque à ce périmètre.</div>`}`;
+}
+
+/* « Commander » : on reprend le produit du catalogue B2B au tarif de la société, et on
+   met 1 pièce sur chaque taille disponible. Tout reste modifiable dans le panier — le
+   bouton ne fait qu'éviter la ressaisie. */
+async function commanderDash(ref, bouton) {
+  if (estStaff || !clientActif?.id) { signalerMagasin("Le panier B2B est rattaché à un magasin : connectez-vous avec un compte magasin pour commander."); return; }
+  const libelle = bouton ? bouton.textContent : "";
+  if (bouton) { bouton.disabled = true; bouton.textContent = "…"; }
+  let p = produitConnu(ref);
+  if (!p) {
+    try {
+      const lot = await api("/rest/v1/rpc/catalogue", { corps: { limite: 1, p_societe: clientActif.id, p_references: [ref] } });
+      lot.forEach(trierTailles); memoriser(lot); p = lot[0];
+    } catch (e) { /* traité juste après */ }
+  }
+  if (bouton) { bouton.disabled = false; bouton.textContent = libelle; }
+  if (!p) { signalerMagasin(`${ref} n'est pas (encore) au catalogue B2B : demandez son ouverture au commercial.`); return; }
+  const servies = p.tailles.filter(t => t.stock > 0 || t.precommande);
+  const tailles = servies.length ? servies : p.tailles;
+  let ajoutees = 0;
+  for (const t of tailles) {
+    const cle = ref + "|" + t.taille;
+    if (panier.has(cle)) continue;          // déjà au panier : on ne réécrit pas la saisie
+    panier.set(cle, { produit: p, taille: t.taille, qte: 1, prix: prixDe(t) });
+    ajoutees++;
+  }
+  rendrePanier(); majBoutonsEpingle();
+  signalerMagasin(ajoutees ? `${p.designation || ref} ajouté au panier : 1 pièce sur ${ajoutees} taille${ajoutees > 1 ? "s" : ""}, à ajuster dans le panier.`
+                           : `${p.designation || ref} est déjà dans votre panier.`);
+}
+
 </script>
 </body>
 </html>
