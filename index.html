@@ -1714,8 +1714,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789992987"></script>
-<script src="imports.js?v=1789992987"></script>
+<script src="config.js?v=1789993311"></script>
+<script src="imports.js?v=1789993311"></script>
 <script src="merch-shopify.js?v=1789992987"></script>
 <script src="moteur-merch.js?v=1789992987"></script>
 <script>
@@ -9795,10 +9795,10 @@ async function chargerDashboard() {
                    tops: tops || [], retard: retard || [], central: central || [] };
   rendreKpisDash();
   corps.innerHTML = `
-    <div class="dash-section" id="dash-reassort"></div>
     <div class="dash-section" id="dash-tops"></div>
     <div class="dash-section" id="dash-retard"></div>
-    <div class="dash-section" id="dash-central"></div>`;
+    <div class="dash-section" id="dash-central"></div>
+    <div class="preco-barre" id="dash-reassort" hidden></div>`;
   rendreTopsDash(); rendreRetardDash(); rendreCentralDash();
   chargerReaLocal();
   rendreRappelReassort();                  // la sélection de réassort survit au rechargement
@@ -10022,25 +10022,33 @@ function basculerReassort(ref, bouton) {
     if (!REA.magasin) REA.magasin = DASH.choisis.length === 1 ? DASH.choisis[0] : (reaSucc()[0]?.code || null);
   }
   memoriserRea();
+  // la carte n'est pas redessinée, mais on relève la vignette avant de toucher à la barre
+  const source = bouton && reaDansSelection(ref) ? sourceAnimation(bouton.closest(".dash-carte")) : null;
   if (bouton) {
     bouton.textContent = reaDansSelection(ref) ? "✓ Réassort" : "Réassort";
     bouton.classList.toggle("dash-chip", reaDansSelection(ref));
     bouton.classList.toggle("on", reaDansSelection(ref));
   }
   rendreRappelReassort();
+  if (source) animerVersGrille(source, document.querySelector("#dash-reassort .btn-blanc"));
 }
 
-/* Le rappel en haut du dashboard : ce qui est retenu, et le lien vers la grille. */
+/* La barre du réassort, jumelle de celle des précommandes : collée en bas de l'écran, elle dit
+   pour quel magasin on prépare, ce qui est retenu, et ouvre la grille de saisie. */
 function rendreRappelReassort() {
-  const zone = document.getElementById("dash-reassort"); if (!zone) return;
-  if (!REA.selection.length) { zone.innerHTML = ""; return; }
-  zone.innerHTML = `<div class="dash-ligne">
-      <span class="compte-produits" style="margin:0"><b>${REA.selection.length}</b>
-        produit${REA.selection.length > 1 ? "s" : ""} retenu${REA.selection.length > 1 ? "s" : ""} pour le réassort${
-        reaPieces() ? ` · <b>${dashNb(reaPieces())}</b> pièces saisies` : ""}</span>
-      <button class="puce-claire dash-chip on" onclick="location.hash='#/reassort'">Ouvrir la grille de saisie</button>
-      <button class="puce-claire" onclick="viderReassort()">Vider</button>
-    </div>`;
+  const barre = document.getElementById("dash-reassort"); if (!barre) return;
+  const n = REA.selection.length;
+  barre.hidden = !n;
+  if (!n) { barre.innerHTML = ""; return; }
+  const magasin = DASH.magasins.find(m => m.code === REA.magasin);
+  const pieces = reaPieces();
+  barre.innerHTML = `
+    ${magasin ? `<span><span class="sous">réassort</span> <b>${echapperHTML(magasin.nom || magasin.code)}</b></span>` : ""}
+    <span><b>${n}</b> <span class="sous">produit${n > 1 ? "s" : ""} sélectionné${n > 1 ? "s" : ""}</span></span>
+    <span><b>${dashNb(pieces)}</b> <span class="sous">pièce${pieces > 1 ? "s" : ""} saisie${pieces > 1 ? "s" : ""}</span></span>
+    <button class="puce-claire" style="margin-left:auto;background:transparent;color:#fff;border-color:rgba(255,255,255,.35)"
+            onclick="viderReassort()">Vider</button>
+    <button class="btn-blanc" onclick="location.hash='#/reassort'">OUVRIR LA GRILLE DE SAISIE</button>`;
 }
 
 function viderReassort() {
