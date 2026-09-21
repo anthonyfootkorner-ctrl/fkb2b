@@ -7,6 +7,15 @@ const MODELES_IMPORT = {
     sep: ";", encodage: "windows-1252",
     signature: ["Magasin", "Fournisseur", "Reference_Article", "Gencod", "Produit"],
   },
+  stock_transit: {
+    /* Réceptions en attente (export Fastmag « fastmag (n).csv ») : les BL partis du central que
+       le magasin n'a pas encore réceptionnés. C'est le stock en transit du Dashboard magasins. */
+    libelle: "Stock en transit — BL expédiés non réceptionnés",
+    sep: ";", encodage: "windows-1252",
+    signature: ["CodeMag", "Origine", "BarCode", "Taille", "Qte", "Recu", "Expedie"],
+    remplacement_complet: true,
+    remplacement_libelle: "remplace la photo du stock en transit — aucun autre stock n'est touché",
+  },
   stock_magasins: {
     /* Photo hebdomadaire du stock des boutiques (export STOCKPOURSTOCKFLOW) : elle
        alimente le Dashboard magasins. Le stock CENTRAL et WEB, lui, continue d'arriver
@@ -411,6 +420,8 @@ function mapperVersTables(analyse) {
       }
       return [{ table: "objectifs_magasins", rows: [...parCle.values()] }];
     }
+    case "stock_transit":
+      return [{ table: "stock_transit", rows: lignesTransit(L) }];
     case "stock_magasins": {
       // simulation : ce qui sera réellement écrit (hors CENTRAL/WEB, hors stock nul)
       const parCle = new Map();
@@ -653,6 +664,7 @@ async function executerImport(analyse, surProgres) {
   if (analyse.modele === "stock_b2b") return executerStockB2B(analyse, surProgres);
   if (analyse.modele === "stock_fastmag") return executerStockFastmag(analyse, surProgres);
   if (analyse.modele === "stock_magasins") return executerStockMagasins(analyse, surProgres);
+  if (analyse.modele === "stock_transit") return executerStockTransit(analyse, surProgres);
   if (analyse.modele === "objectifs") return executerObjectifs(analyse, surProgres);
   if (analyse.modele === "stock_web_egonet") return executerStockWebEgonet(analyse, surProgres);
   if (analyse.modele === "comptes") return executerComptes(analyse, surProgres);
@@ -763,6 +775,49 @@ async function executerObjectifs(analyse, surProgres) {
 /* Stock des boutiques : une photo complète, donc on vide puis on réécrit. CENTRAL et
    WEB sont ignorés (ils viennent de l'état de stock Fastmag) et un stock nul ou négatif
    n'a rien à faire dans une photo de stock. */
+/* Une ligne par magasin, référence, taille et BL. On ne garde que ce qui n'est pas encore reçu. */
+function lignesTransit(L) {
+  const parCle = new Map();
+  for (const l of L) {
+    const magasin = (l.CodeMag || "").trim().toUpperCase();
+    const reference = (l.BarCode || "").trim();
+    const q = parseInt(parseFloat(String(l.Qte ?? "0").replace(",", ".")), 10) || 0;
+    const recu = parseFloat(String(l.Recu ?? "0").replace(",", ".")) || 0;
+    if (!magasin || !reference || q <= 0 || recu > 0) continue;
+    const taille = (l.Taille || "").trim();
+    // le même écran Fastmag sort aussi les réceptions fournisseur du central : seul un BL
+    // (« -> NEGOCE - BL000… ») est un envoi vers un magasin
+    const bl = ((l.Origine || "").match(/BL\d+/) || [""])[0];
+    if (!bl) continue;
+    const j = (l.Date || "").trim();
+    const cle = `${magasin}|${reference}|${taille}|${bl}`;
+    const e = parCle.get(cle) || { magasin, reference, taille, bl, quantite: 0,
+      expedie_le: j.length === 10 ? `${j.slice(6, 10)}-${j.slice(3, 5)}-${j.slice(0, 2)}` : null };
+    e.quantite += q;
+    parCle.set(cle, e);
+  }
+  return [...parCle.values()];
+}
+
+async function executerStockTransit(analyse, surProgres) {
+  const rows = lignesTransit(analyse.lignes);
+  if (!rows.length) throw new Error("aucun BL en attente de réception dans ce fichier : c'est sans doute l'export des réceptions fournisseur du central, pas celui des envois vers les magasins");
+  surProgres("remplacement de la photo précédente…");
+  await api("/rest/v1/stock_transit?quantite=gte.-2147483647", { methode: "DELETE" });
+  let total = 0;
+  for (let i = 0; i < rows.length; i += 2000) {
+    const lot = rows.slice(i, i + 2000);
+    await api("/rest/v1/stock_transit", { corps: lot });
+    total += lot.length;
+    surProgres(`stock en transit : ${total}/${rows.length} lignes…`);
+  }
+  await apiFonction("journal", { entree: {
+    fichier: analyse.fichier, modele: "stock_transit", empreinte: analyse.empreinte,
+    lignes_lues: analyse.lues, crees: total, maj: 0, inchanges: 0,
+    quarantaine: analyse.quarantaine.length, statut: "OK" } });
+  return total;
+}
+
 async function executerStockMagasins(analyse, surProgres) {
   const parCle = new Map();
   let ignorees = 0;
