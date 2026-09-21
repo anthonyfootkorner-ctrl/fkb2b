@@ -1659,8 +1659,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789930439"></script>
-<script src="imports.js?v=1789930439"></script>
+<script src="config.js?v=1789974469"></script>
+<script src="imports.js?v=1789974469"></script>
 <script src="merch-shopify.js?v=1789911674"></script>
 <script src="moteur-merch.js?v=1789911674"></script>
 <script>
@@ -9088,13 +9088,13 @@ async function activerLienHebdo() {
    ou repris du dernier dépôt quand il ne change pas chaque semaine. Le calcul ne se
    lance que lorsque tout est là et que les contrôles de contenu sont passés. */
 const HEBDO_ATTENDUS = [
-  { genre: "ventes", libelle: "VENTE", detail: "jour × magasin × marque, avec les colonnes « Past Year »", motif: "VENTE….csv", type: "requis", controle: "ventes" },
+  { genre: "ventes", libelle: "VENTE", detail: "jour × magasin × marque, avec les colonnes « Past Year »", motif: "VENTE….csv", type: "requis", controle: "ventes", reseau: 60 },
   { genre: "objectifs", libelle: "OBJECTIF", detail: "objectifs et tickets par jour", motif: "OBJECTIF….csv", type: "requis", controle: "dates" },
   { genre: "stock", libelle: "STOCK", detail: "stock par magasin, référence et taille", motif: "STOCK….csv", type: "requis" },
   { genre: "fréquentation", libelle: "Analyse fréquentation", detail: "passages et tickets par heure", motif: "Analyse…fréquentation….csv", type: "requis", controle: "frequentation" },
   { genre: "heures travaillées", libelle: "Productivité", detail: "heures réelles, un onglet par magasin", motif: "Productivité….xlsx", type: "requis" },
   { genre: "vendeurs", libelle: "VENDEUR", detail: "CA par vendeur (fiches magasins)", motif: "VENDEUR….csv", type: "requis" },
-  { genre: "ventes par référence", libelle: "REF", detail: "jour × magasin × référence (flash produits)", motif: "REF….csv", type: "requis", controle: "dates" },
+  { genre: "ventes par référence", libelle: "REF", detail: "jour × magasin × référence (flash produits)", motif: "REF….csv", type: "requis", controle: "dates", reseau: 45 },
   { genre: "désignations (HEBDO REF)", libelle: "Désignations et saisons", detail: "lues dans la base produits du portail ; un classeur HEBDO REF déposé pour la semaine prime sur la base", motif: "rien à déposer", type: "auto" },
   { genre: "référentiel réseau", libelle: "FICHIER GLOBAL MAG", detail: "référentiel de tous les magasins du réseau", motif: "FICHIER GLOBAL MAG….xlsx", type: "durable" },
   { genre: "fréquentation N-1", libelle: "fastmag (fréquentation 2025)", detail: "passages de l'an dernier — un fichier par mois de 2025, ils se cumulent", motif: "fastmag….csv", type: "cumul", controle: "frequentation_n1" },
@@ -9111,7 +9111,7 @@ const imprepLundi = (annee, semaine) => {            // lundi d'une semaine ISO
 
 /* Contrôle de contenu d'un export CSV, fait dans le navigateur avant l'envoi.
    Renvoie { refus } quand le fichier ne doit pas entrer, sinon { du, au, lignes, alertes }. */
-async function imprepControler(fichier, controle, lundi) {
+async function imprepControler(fichier, controle, lundi, reseauMini = 0) {
   if (!controle) return {};
   const texte = (await fichier.text()).replace(/^﻿/, "");
   const lignes = texte.split(/\r?\n/).filter(l => l.trim() !== "");
@@ -9155,6 +9155,7 @@ async function imprepControler(fichier, controle, lundi) {
     iCA = col("Total MtVenteRetailTTC");
   }
   let du = null, au = null, nSemaine = 0;
+  const magasinsSemaine = new Set(), iCode = col("Code_Origine");
   // même garde-fou que le pipeline : le dimanche est comparé au dimanche d'avant
   // (CA et nombre de magasins ayant vendu), pas à un seuil absolu
   const iMag = col("Code_Origine"), nombre = v => parseFloat(String(v || "").replace(/\s/g, "").replace(",", ".")) || 0;
@@ -9166,7 +9167,7 @@ async function imprepControler(fichier, controle, lundi) {
     if (!d) continue;
     if (!du || d < du) du = d;
     if (!au || d > au) au = d;
-    if (d >= lundi && d <= dimanche) nSemaine++;
+    if (d >= lundi && d <= dimanche) { nSemaine++; if (iCode >= 0) magasinsSemaine.add((c[iCode] || "").trim()); }
     if (controle === "ventes" && iCA >= 0) {
       const cible = d.getTime() === dimanche.getTime() ? jour.dim : d.getTime() === veille7.getTime() ? jour.ref : null;
       const ca = cible ? nombre(c[iCA]) : 0;
@@ -9177,6 +9178,11 @@ async function imprepControler(fichier, controle, lundi) {
   let bloquant = false;
   if (au < dimanche) { alertes.push(`s'arrête au ${imprepDate(au)} : il doit couvrir jusqu'au dimanche ${imprepDate(dimanche)}`); bloquant = true; }
   if (du > lundi) { alertes.push(`commence le ${imprepDate(du)}, après le lundi ${imprepDate(lundi)}`); bloquant = true; }
+  // leçon du pipeline : un export filtré sur les succursales sort un reporting ENSEIGNE faux sans prévenir
+  if (reseauMini && magasinsSemaine.size < reseauMini) {
+    alertes.push(`export filtré : ${magasinsSemaine.size} magasins seulement sur la semaine, alors que le réseau complet est attendu (succursales + franchisés + web) — retirer le filtre dans Copilot et réexporter`);
+    bloquant = true;
+  }
   if (controle === "ventes" && au >= dimanche) {
     // leçon S36 : le dimanche arrive parfois sans son CA (retard Copilot) — comparer 6 jours à 7 fausse tout
     const nDim = jour.dim.mags.size, nRef = jour.ref.mags.size;
@@ -9185,7 +9191,7 @@ async function imprepControler(fichier, controle, lundi) {
       bloquant = true;
     }
   }
-  return { du: imprepDate(du), au: imprepDate(au), lignes: lignes.length - 1, lignes_semaine: nSemaine, alertes, bloquant,
+  return { du: imprepDate(du), au: imprepDate(au), lignes: lignes.length - 1, lignes_semaine: nSemaine, magasins: magasinsSemaine.size, alertes, bloquant,
            ...(controle === "ventes" ? { dimanche: { ca: Math.round(jour.dim.ca), magasins: jour.dim.mags.size,
                                                      ca_ref: Math.round(jour.ref.ca), magasins_ref: jour.ref.mags.size } } : {}) };
 }
@@ -9295,7 +9301,7 @@ function rendreListeImportReporting() {
         <div class="compte-produits" style="margin:2px 0 0">${echapperHTML(b.motif)}${b.type === "durable" ? " · à redéposer seulement quand il change" : ""}</div></td>
       <td>${pastille(b)}</td>
       <td style="white-space:normal">${b.fichier ? `${echapperHTML(b.fichier.nom)} · ${hebdoTaille(b.fichier.taille)} · ${dateHeure(b.fichier.depose_le)}
-          ${b.fichier.meta?.du ? `<div class="compte-produits" style="margin:2px 0 0">couvre du ${b.fichier.meta.du} au ${b.fichier.meta.au} · ${Number(b.fichier.meta.lignes || 0).toLocaleString("fr-FR")} lignes</div>` : ""}`
+          ${b.fichier.meta?.du ? `<div class="compte-produits" style="margin:2px 0 0">couvre du ${b.fichier.meta.du} au ${b.fichier.meta.au} · ${Number(b.fichier.meta.lignes || 0).toLocaleString("fr-FR")} lignes${b.fichier.meta.magasins ? ` · ${b.fichier.meta.magasins} magasins` : ""}</div>` : ""}`
           : b.etat === "repris" ? `${echapperHTML(b.dernier.nom)} · déposé ${dateHeure(b.dernier.depose_le)}`
           : b.etat === "auto" ? `base produits du portail${IMPREP.nbDesignations ? ` · ${Number(IMPREP.nbDesignations).toLocaleString("fr-FR")} références avec désignation` : ""}`
           : b.fichiers ? b.fichiers.map(x => `<div>${echapperHTML(x.nom)}${x.meta?.du ? ` <span class="compte-produits" style="margin:0">· du ${x.meta.du} au ${x.meta.au}</span>` : ""}</div>`).join("") : ""}
@@ -9352,7 +9358,7 @@ async function deposerImportReporting(liste, indexAttendu) {
     zone.textContent = `Contrôle ${++n}/${fichiers.length} — ${f.name}…`;
     let meta = {};
     if (c.categorie === "export" && regle?.controle && /\.csv$/i.test(f.name)) {
-      try { meta = await imprepControler(f, regle.controle, lundi); }
+      try { meta = await imprepControler(f, regle.controle, lundi, regle.reseau || 0); }
       catch (e) { meta = { alertes: ["contrôle impossible : " + e.message] }; }
       if (meta.refus) { comptes.push(`<div style="color:#b3261e">✕ ${echapperHTML(f.name)} refusé — ${echapperHTML(meta.refus)}</div>`); continue; }
     }
