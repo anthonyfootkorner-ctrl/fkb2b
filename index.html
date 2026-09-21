@@ -1729,8 +1729,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789998378"></script>
-<script src="imports.js?v=1789998378"></script>
+<script src="config.js?v=1789999967"></script>
+<script src="imports.js?v=1789999967"></script>
 <script src="merch-shopify.js?v=1789992987"></script>
 <script src="moteur-merch.js?v=1789992987"></script>
 <script>
@@ -3711,7 +3711,7 @@ function telechargerPrixZero() {
 /* Ces modèles remplacent ce qu'ils touchent (le jour pour les ventes, le magasin pour
    un stock) : les redéposer ne double rien et permet de corriger un import raté. Les
    autres restent bloqués par l'anti-rejeu. */
-const MODELES_REJOUABLES = ["stock_b2b", "ventes", "objectifs", "stock_magasins", "stock_transit", "stock_web_egonet", "stock_fastmag"];
+const MODELES_REJOUABLES = ["stock_b2b", "ventes", "objectifs", "stock_magasins", "stock_transit", "stock_preparation", "stock_web_egonet", "stock_fastmag"];
 
 async function traiterFichier(fichier) {
   const zone = document.getElementById("rapport-import");
@@ -9893,9 +9893,11 @@ function rendreKpisDash() {
 // Pièces parties du central et pas encore réceptionnées : elles arrivent, inutile de les recommander.
 function dashTransit(p) {
   const t = DASH.transit?.get(p.reference);
-  if (!t || !Number(t.transit)) return "";
-  return ` <span class="dash-badge" style="background:#e8f0fe;color:#1a56b0" title="en transit : expédié par le central${
-    t.premier_bl ? " depuis le " + new Date(t.premier_bl).toLocaleDateString("fr-FR") : ""}, pas encore réceptionné">+${dashNb(t.transit)} en transit</span>`;
+  if (!t) return "";
+  const pastille = (n, libelle, fond, encre, titre) => Number(n) ? ` <span class="dash-badge" style="background:${fond};color:${encre}" title="${titre}">+${dashNb(n)} ${libelle}</span>` : "";
+  return pastille(t.transit, "en transit", "#e8f0fe", "#1a56b0",
+           `expédié par le central${t.premier_bl ? " depuis le " + new Date(t.premier_bl).toLocaleDateString("fr-FR") : ""}, pas encore réceptionné`)
+       + pastille(t.preparation, "en prépa", "#f1ecfb", "#5b3aa6", "BL de réservation : en préparation au central, pas encore parti");
 }
 
 // Pastille promo posée sur la photo : remise moyenne constatée, arrondie à la dizaine — sur vos ventes
@@ -9973,11 +9975,12 @@ function corpsPopTailles(rep) {
   const cel = n => `<td class="${Number(n) ? "" : "zero"}">${dashNb(n)}</td>`;
   const tot = c => tri.reduce((s, l) => s + Number(l[c] || 0), 0);
   const avecTransit = tot("transit") > 0;          // la colonne n'apparaît que s'il y a quelque chose en route
+  const avecPrepa = tot("preparation") > 0;
   return `<b>Détail des tailles</b>
     <table>
-      <thead><tr><td>Taille</td><td>Mag</td>${avecTransit ? "<td>Transit</td>" : ""}<td>Central</td><td>Web</td></tr></thead>
-      <tbody>${tri.map(l => `<tr><td>${echapperHTML(l.taille || "—")}</td>${cel(l.mag)}${avecTransit ? cel(l.transit) : ""}${cel(l.central)}${cel(l.web)}</tr>`).join("")}</tbody>
-      <tfoot><tr><td>Total</td><td>${dashNb(tot("mag"))}</td>${avecTransit ? `<td>${dashNb(tot("transit"))}</td>` : ""}<td>${dashNb(tot("central"))}</td><td>${dashNb(tot("web"))}</td></tr></tfoot>
+      <thead><tr><td>Taille</td><td>Mag</td>${avecTransit ? "<td>Transit</td>" : ""}${avecPrepa ? "<td>Prépa</td>" : ""}<td>Central</td><td>Web</td></tr></thead>
+      <tbody>${tri.map(l => `<tr><td>${echapperHTML(l.taille || "—")}</td>${cel(l.mag)}${avecTransit ? cel(l.transit) : ""}${avecPrepa ? cel(l.preparation) : ""}${cel(l.central)}${cel(l.web)}</tr>`).join("")}</tbody>
+      <tfoot><tr><td>Total</td><td>${dashNb(tot("mag"))}</td>${avecTransit ? `<td>${dashNb(tot("transit"))}</td>` : ""}${avecPrepa ? `<td>${dashNb(tot("preparation"))}</td>` : ""}<td>${dashNb(tot("central"))}</td><td>${dashNb(tot("web"))}</td></tr></tfoot>
     </table>`;
 }
 

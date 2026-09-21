@@ -7,6 +7,15 @@ const MODELES_IMPORT = {
     sep: ";", encodage: "windows-1252",
     signature: ["Magasin", "Fournisseur", "Reference_Article", "Gencod", "Produit"],
   },
+  stock_preparation: {
+    /* Export Fastmag des BL (« fastmag - <date>.xls ») : les BL de réservation sont les commandes
+       que le central prépare, pas encore parties. Le client Fastmag est ramené au code magasin. */
+    libelle: "Stock en préparation — BL de réservation du central",
+    sep: "\t", encodage: "windows-1252",
+    signature: ["nature", "CLIENT", "barcode", "taille", "quantite", "Piece", "TypeBL"],
+    remplacement_complet: true,
+    remplacement_libelle: "remplace la photo des pièces en préparation — le transit et les stocks ne sont pas touchés",
+  },
   stock_transit: {
     /* Réceptions en attente (export Fastmag « fastmag (n).csv ») : les BL partis du central que
        le magasin n'a pas encore réceptionnés. C'est le stock en transit du Dashboard magasins. */
@@ -422,6 +431,9 @@ function mapperVersTables(analyse) {
     }
     case "stock_transit":
       return [{ table: "stock_transit", rows: lignesTransit(L) }];
+    case "stock_preparation":
+      // simulation : tous les BL de réservation ; le rattachement client → magasin se fait à l'exécution
+      return [{ table: "stock_transit", rows: lignesPreparation(L, null) }];
     case "stock_magasins": {
       // simulation : ce qui sera réellement écrit (hors CENTRAL/WEB, hors stock nul)
       const parCle = new Map();
@@ -665,6 +677,7 @@ async function executerImport(analyse, surProgres) {
   if (analyse.modele === "stock_fastmag") return executerStockFastmag(analyse, surProgres);
   if (analyse.modele === "stock_magasins") return executerStockMagasins(analyse, surProgres);
   if (analyse.modele === "stock_transit") return executerStockTransit(analyse, surProgres);
+  if (analyse.modele === "stock_preparation") return executerStockPreparation(analyse, surProgres);
   if (analyse.modele === "objectifs") return executerObjectifs(analyse, surProgres);
   if (analyse.modele === "stock_web_egonet") return executerStockWebEgonet(analyse, surProgres);
   if (analyse.modele === "comptes") return executerComptes(analyse, surProgres);
@@ -791,7 +804,7 @@ function lignesTransit(L) {
     if (!bl) continue;
     const j = (l.Date || "").trim();
     const cle = `${magasin}|${reference}|${taille}|${bl}`;
-    const e = parCle.get(cle) || { magasin, reference, taille, bl, quantite: 0,
+    const e = parCle.get(cle) || { statut: "transit", magasin, reference, taille, bl, quantite: 0,
       expedie_le: j.length === 10 ? `${j.slice(6, 10)}-${j.slice(3, 5)}-${j.slice(0, 2)}` : null };
     e.quantite += q;
     parCle.set(cle, e);
@@ -799,11 +812,55 @@ function lignesTransit(L) {
   return [...parCle.values()];
 }
 
+/* BL de réservation non soldés. codeParClient (n° client Fastmag → code magasin) manque en simulation :
+   on garde alors le n° client à la place du code. */
+function lignesPreparation(L, codeParClient) {
+  const parCle = new Map();
+  for (const l of L) {
+    if ((l.nature || "").trim() !== "BL" || !/r[ée]servation/i.test(l.TypeBL || "") || String(l.Soldee || "0").trim() === "1") continue;
+    const client = String(l.CLIENT || "").trim();
+    const magasin = codeParClient ? codeParClient.get(client) : client;
+    const reference = (l.barcode || "").trim();
+    const q = parseInt(parseFloat(String(l.quantite ?? "0").replace(",", ".")), 10) || 0;
+    if (!magasin || !reference || q <= 0) continue;
+    const taille = (l.taille || "").trim(), bl = (l.Piece || "").trim(), j = (l.Date || "").trim();
+    const cle = `${magasin}|${reference}|${taille}|${bl}`;
+    const e = parCle.get(cle) || { statut: "preparation", magasin, reference, taille, bl, quantite: 0,
+      expedie_le: j.length === 10 ? `${j.slice(6, 10)}-${j.slice(3, 5)}-${j.slice(0, 2)}` : null };
+    e.quantite += q;
+    parCle.set(cle, e);
+  }
+  return [...parCle.values()];
+}
+
+async function executerStockPreparation(analyse, surProgres) {
+  const magasins = await api("/rest/v1/magasins?select=code,id_fastmag&id_fastmag=not.is.null");
+  const codeParClient = new Map((magasins || []).map(m => [String(m.id_fastmag), m.code]));
+  const toutes = lignesPreparation(analyse.lignes, null);
+  const rows = lignesPreparation(analyse.lignes, codeParClient);
+  if (!toutes.length) throw new Error("aucun BL de réservation dans ce fichier");
+  const pieces = l => l.reduce((s, r) => s + r.quantite, 0);
+  surProgres(`remplacement de la photo précédente… (${pieces(toutes) - pieces(rows)} pièces pour des clients hors dashboard ignorées)`);
+  await api("/rest/v1/stock_transit?statut=eq.preparation", { methode: "DELETE" });
+  let total = 0;
+  for (let i = 0; i < rows.length; i += 2000) {
+    const lot = rows.slice(i, i + 2000);
+    await api("/rest/v1/stock_transit", { corps: lot });
+    total += lot.length;
+    surProgres(`en préparation : ${total}/${rows.length} lignes…`);
+  }
+  await apiFonction("journal", { entree: {
+    fichier: analyse.fichier, modele: "stock_preparation", empreinte: analyse.empreinte,
+    lignes_lues: analyse.lues, crees: total, maj: 0, inchanges: 0,
+    quarantaine: analyse.quarantaine.length, statut: "OK" } });
+  return total;
+}
+
 async function executerStockTransit(analyse, surProgres) {
   const rows = lignesTransit(analyse.lignes);
   if (!rows.length) throw new Error("aucun BL en attente de réception dans ce fichier : c'est sans doute l'export des réceptions fournisseur du central, pas celui des envois vers les magasins");
   surProgres("remplacement de la photo précédente…");
-  await api("/rest/v1/stock_transit?quantite=gte.-2147483647", { methode: "DELETE" });
+  await api("/rest/v1/stock_transit?statut=eq.transit", { methode: "DELETE" });
   let total = 0;
   for (let i = 0; i < rows.length; i += 2000) {
     const lot = rows.slice(i, i + 2000);
