@@ -1659,8 +1659,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789974469"></script>
-<script src="imports.js?v=1789974469"></script>
+<script src="config.js?v=1789975413"></script>
+<script src="imports.js?v=1789975413"></script>
 <script src="merch-shopify.js?v=1789911674"></script>
 <script src="moteur-merch.js?v=1789911674"></script>
 <script>
@@ -8988,8 +8988,11 @@ async function ouvrirSemaineHebdo(annee, semaine) {
   corps.innerHTML = `<div class="dash-section"><div class="compte-produits">Chargement…</div></div>`;
   const fichiers = await api("/rest/v1/rpc/reporting_fichiers_semaine",
                              { corps: { p_annee: annee, p_semaine: semaine } }).catch(() => []);
+  const commentaires = await api("/rest/v1/rpc/reporting_commentaires_semaine",
+                                 { corps: { p_annee: annee, p_semaine: semaine } }).catch(() => []);
   if (jeton !== HEBDO.chargement) return;
   HEBDO.fichiers = fichiers || [];
+  HEBDO.commentaires = commentaires || [];
   await rendreSemaineCorpsHebdo();
 }
 
@@ -9033,7 +9036,8 @@ async function rendreSemaineCorpsHebdo() {
       ${deLaPortee.length ? "" : `<div class="dash-vide" style="margin-top:10px">Rien de publié pour cette portée sur cette semaine.</div>`}
     </div>
     ${mail ? `<div class="dash-section"><h3>Le mail de la semaine</h3>
-      <iframe id="hebdo-mail" sandbox="" style="width:100%;border:1px solid var(--hairline);border-radius:14px;background:#fff;min-height:420px"></iframe></div>` : ""}
+      <iframe id="hebdo-mail" sandbox="" style="width:100%;border:1px solid var(--hairline);border-radius:14px;background:#fff;min-height:420px"></iframe>
+      <div id="hebdo-redaction"></div></div>` : ""}
     ${image ? `<div class="dash-section"><h3>${HEBDO.onglet === "succ" ? "Tableau détaillé" : "Classement"}</h3>
       <img id="hebdo-image" alt="" style="max-width:100%;border:1px solid var(--hairline);border-radius:14px;background:#fff"></div>` : ""}
     ${tableau("Fichiers de la semaine", deLaPortee)}
@@ -9043,7 +9047,10 @@ async function rendreSemaineCorpsHebdo() {
   if (mail) {
     try {
       const rep = await fetch(await hebdoLien(mail.chemin));
-      const html = await rep.text();
+      HEBDO.mailBrut = await rep.text();
+      HEBDO.mailNom = mail.nom;
+      const html = hebdoMailFinal();
+      rendreRedactionHebdo();
       const cadre = document.getElementById("hebdo-mail");
       if (cadre) {
         // srcdoc + sandbox vide : le HTML du pipeline s'affiche, sans script ni accès à la page
@@ -9057,6 +9064,66 @@ async function rendreSemaineCorpsHebdo() {
   if (image) {
     try { document.getElementById("hebdo-image").src = await hebdoLien(image.chemin); } catch (e) { /* idem */ }
   }
+}
+
+/* Les scripts laissent [COMMENTAIRE] (un ou deux) et [SYNTHESE] dans le mail. Le texte vient de la base :
+   proposé par le calcul, réécrit au besoin par un administrateur. **gras** et retours à la ligne admis. */
+const HEBDO_CLES = { commentaire_1: "Commentaire — performance commerciale", commentaire_2: "Commentaire — marge", synthese: "À retenir" };
+function hebdoTexteVersHtml(t) {
+  return echapperHTML(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\r?\n/g, "<br>");
+}
+function hebdoCommentaire(cle) {
+  return (HEBDO.commentaires || []).find(c => c.portee === HEBDO.onglet && c.cle === cle);
+}
+function hebdoMailFinal() {
+  let n = 0;
+  return (HEBDO.mailBrut || "")
+    .replace(/\[COMMENTAIRE\]/g, () => { const c = hebdoCommentaire("commentaire_" + (++n)); return c?.texte ? hebdoTexteVersHtml(c.texte) : "[COMMENTAIRE]"; })
+    .replace(/\[SYNTHESE\]/g, () => { const c = hebdoCommentaire("synthese"); return c?.texte ? hebdoTexteVersHtml(c.texte) : "[SYNTHESE]"; });
+}
+function rendreRedactionHebdo() {
+  const zone = document.getElementById("hebdo-redaction"); if (!zone) return;
+  const trous = [...(HEBDO.mailBrut || "").matchAll(/\[(COMMENTAIRE|SYNTHESE)\]/g)];
+  let n = 0;
+  const cles = trous.map(m => m[1] === "SYNTHESE" ? "synthese" : "commentaire_" + (++n));
+  if (!cles.length) { zone.innerHTML = ""; return; }
+  if (!HEBDO.acces.includes("admin")) { zone.innerHTML = ""; return; }
+  zone.innerHTML = `
+    <div class="compte-produits" style="margin:14px 0 6px">Textes du mail — proposés par le calcul à partir des chiffres, à relire avant diffusion.
+      <b>**gras**</b> pour mettre un chiffre en avant, une ligne par point dans « À retenir ».</div>
+    ${cles.map(cle => { const c = hebdoCommentaire(cle); return `
+      <div style="margin-bottom:10px">
+        <div class="compte-produits" style="margin:0 0 4px"><b>${HEBDO_CLES[cle] || cle}</b>${c?.modifie ? " · réécrit" : c?.auto ? " · texte automatique" : " · vide"}</div>
+        <textarea id="hebdo-texte-${cle}" rows="${cle === "synthese" ? 6 : 3}" style="width:100%;font:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--hairline);border-radius:10px">${echapperHTML(c?.texte || "")}</textarea>
+        <div class="dash-ligne" style="margin-top:4px">
+          <button class="puce-claire" onclick="enregistrerCommentaireHebdo('${cle}')">Enregistrer</button>
+          ${c?.modifie ? `<button class="puce-claire" onclick="enregistrerCommentaireHebdo('${cle}', true)">Revenir au texte automatique</button>` : ""}
+          <span class="compte-produits" style="margin:0" id="hebdo-etat-${cle}"></span>
+        </div>
+      </div>`; }).join("")}
+    <button class="puce-claire" onclick="telechargerMailFinalHebdo()">⬇ Télécharger le mail final (HTML)</button>`;
+}
+async function enregistrerCommentaireHebdo(cle, automatique) {
+  const etat = document.getElementById("hebdo-etat-" + cle);
+  etat.textContent = "enregistrement…";
+  try {
+    await api("/rest/v1/rpc/reporting_commentaire_enregistrer", { corps: {
+      p_annee: HEBDO.courante.annee, p_semaine: HEBDO.courante.semaine, p_portee: HEBDO.onglet, p_cle: cle,
+      p_texte: automatique ? null : document.getElementById("hebdo-texte-" + cle).value } });
+    HEBDO.commentaires = await api("/rest/v1/rpc/reporting_commentaires_semaine",
+      { corps: { p_annee: HEBDO.courante.annee, p_semaine: HEBDO.courante.semaine } }) || [];
+    const cadre = document.getElementById("hebdo-mail");
+    if (cadre) cadre.srcdoc = hebdoMailFinal();
+    rendreRedactionHebdo();
+    document.getElementById("hebdo-etat-" + cle).textContent = "enregistré ✓";
+  } catch (e) { etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 140); }
+}
+function telechargerMailFinalHebdo() {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([hebdoMailFinal()], { type: "text/html;charset=utf-8" }));
+  a.download = (HEBDO.mailNom || "mail.html").replace(/\.html$/i, "") + "_final.html";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
 function ongletHebdo(p) { HEBDO.onglet = p; rendreSemaineCorpsHebdo(); }
