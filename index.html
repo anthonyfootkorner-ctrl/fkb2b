@@ -1714,10 +1714,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789992615"></script>
-<script src="imports.js?v=1789992615"></script>
-<script src="merch-shopify.js?v=1789992615"></script>
-<script src="moteur-merch.js?v=1789992615"></script>
+<script src="config.js?v=1789992987"></script>
+<script src="imports.js?v=1789992987"></script>
+<script src="merch-shopify.js?v=1789992987"></script>
+<script src="moteur-merch.js?v=1789992987"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -9869,31 +9869,40 @@ function masquerPopTailles() {
 function survolTaillesDash(ancre, ref) {
   clearTimeout(POP_TAILLES.minuteur);
   POP_TAILLES.ref = ref;
+  // la bulle s'ouvre tout de suite : s'il y a un souci, elle le dit au lieu de rester muette
+  afficherPopTailles(ancre, `<b>Détail des tailles</b><span style="color:var(--gris)">Chargement…</span>`);
   POP_TAILLES.minuteur = setTimeout(async () => {
     const cle = (DASH.choisis.join(",") || "tous") + "|" + ref;
     if (!POP_TAILLES.cache.has(cle)) {
       POP_TAILLES.cache.set(cle, api("/rest/v1/rpc/dash_stock_tailles",
-        { corps: { p_magasins: DASH.choisis.length ? DASH.choisis : null, p_reference: ref } }).catch(() => []));
+        { corps: { p_magasins: DASH.choisis.length ? DASH.choisis : null, p_reference: ref } })
+        .catch(e => ({ erreur: String(e.donnees?.message || e.message || e) })));
     }
-    const lignes = await POP_TAILLES.cache.get(cle);
+    const rep = await POP_TAILLES.cache.get(cle);
     if (POP_TAILLES.ref !== ref || !ancre.isConnected) return;   // la souris est déjà repartie
-    afficherPopTailles(ancre, lignes || []);
-  }, 120);
+    afficherPopTailles(ancre, corpsPopTailles(rep));
+  }, 80);
 }
 
-function afficherPopTailles(ancre, lignes) {
-  document.getElementById("dash-pop")?.remove();
-  const tri = [...lignes].sort((a, b) => cleTaille(a.taille) - cleTaille(b.taille));
+function corpsPopTailles(rep) {
+  if (rep && rep.erreur) return `<b>Stock indisponible</b><span style="color:var(--gris)">${echapperHTML(rep.erreur)}</span>`;
+  const tri = [...(Array.isArray(rep) ? rep : [])].sort((a, b) => cleTaille(a.taille) - cleTaille(b.taille));
+  if (!tri.length) return `<b>Aucun stock</b><span style="color:var(--gris)">ni en magasin, ni au central, ni sur le web.</span>`;
   const cel = n => `<td class="${Number(n) ? "" : "zero"}">${dashNb(n)}</td>`;
   const tot = c => tri.reduce((s, l) => s + Number(l[c] || 0), 0);
-  const pop = document.createElement("div");
-  pop.className = "dash-pop"; pop.id = "dash-pop";
-  pop.innerHTML = tri.length ? `<b>Détail des tailles</b>
+  return `<b>Détail des tailles</b>
     <table>
       <thead><tr><td>Taille</td><td>Mag</td><td>Central</td><td>Web</td></tr></thead>
       <tbody>${tri.map(l => `<tr><td>${echapperHTML(l.taille || "—")}</td>${cel(l.mag)}${cel(l.central)}${cel(l.web)}</tr>`).join("")}</tbody>
       <tfoot><tr><td>Total</td><td>${dashNb(tot("mag"))}</td><td>${dashNb(tot("central"))}</td><td>${dashNb(tot("web"))}</td></tr></tfoot>
-    </table>` : `<b>Aucun stock</b><span style="color:var(--gris)">ni en magasin, ni au central, ni sur le web.</span>`;
+    </table>`;
+}
+
+function afficherPopTailles(ancre, contenu) {
+  document.getElementById("dash-pop")?.remove();
+  const pop = document.createElement("div");
+  pop.className = "dash-pop"; pop.id = "dash-pop";
+  pop.innerHTML = contenu;
   document.body.appendChild(pop);
   if (!POP_TAILLES.branche) {          // la bulle est posée en absolu : elle disparaît au défilement
     window.addEventListener("scroll", masquerPopTailles, { passive: true });
