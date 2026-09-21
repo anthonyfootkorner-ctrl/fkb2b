@@ -1680,10 +1680,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789987768"></script>
-<script src="imports.js?v=1789987768"></script>
-<script src="merch-shopify.js?v=1789987768"></script>
-<script src="moteur-merch.js?v=1789987768"></script>
+<script src="config.js?v=1789988250"></script>
+<script src="imports.js?v=1789988250"></script>
+<script src="merch-shopify.js?v=1789988250"></script>
+<script src="moteur-merch.js?v=1789988250"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -9758,10 +9758,14 @@ async function chargerDashboard() {
                    tops: tops || [], retard: retard || [], central: central || [] };
   rendreKpisDash();
   corps.innerHTML = `
+    <div class="dash-section" id="dash-reassort"></div>
     <div class="dash-section" id="dash-tops"></div>
     <div class="dash-section" id="dash-retard"></div>
     <div class="dash-section" id="dash-central"></div>`;
   rendreTopsDash(); rendreRetardDash(); rendreCentralDash();
+  chargerReaLocal();
+  rendreReassortDash();                    // le panier de réassort survit au rechargement
+  chargerHistoriqueRea().then(rendreReassortDash);
 }
 
 const dashNb = n => Math.round(Number(n) || 0).toLocaleString("fr-FR");
@@ -9884,6 +9888,203 @@ function detailParMagasinDash(parMagasin, lignes) {
     </table>`;
 }
 
+/* ---- Réassort succursale ----
+   Le magasin pioche dans le stock de l'entrepôt central, saisit ses quantités taille par
+   taille, et repart avec le fichier d'import Fastmag (critère REAMANU + date). Pas
+   d'approbation : reassort_creer recontrôle le stock, enregistre, et rend les lignes. */
+let REA = { magasin: null, lignes: [], historique: [] };
+
+function chargerReaLocal() {
+  try {
+    const brut = JSON.parse(localStorage.getItem("fkb2b-reassort") || "null");
+    if (brut && Array.isArray(brut.lignes)) REA = { ...REA, magasin: brut.magasin || null, lignes: brut.lignes };
+  } catch (e) { /* sans mémoire locale : panier vide */ }
+}
+function memoriserRea() {
+  try { localStorage.setItem("fkb2b-reassort", JSON.stringify({ magasin: REA.magasin, lignes: REA.lignes })); }
+  catch (e) { /* sans mémoire locale */ }
+}
+const reaSucc = () => DASH.magasins.filter(m => m.groupe === "SUCC");
+const reaPieces = () => REA.lignes.reduce((s, l) => s + Number(l.quantite || 0), 0);
+const reaTotal = () => REA.lignes.reduce((s, l) => s + Number(l.quantite || 0) * Number(l.prix || 0), 0);
+
+/* La grille de saisie : le dispo au central en face de ce que le magasin détient déjà. */
+async function ouvrirReassortDash(ref) {
+  const produit = (DASH.donnees?.tops || []).concat(DASH.donnees?.retard || [], DASH.donnees?.central || [])
+    .find(p => p.reference === ref) || { reference: ref };
+  const entete = `<div class="entete">
+      <div><h4>${echapperHTML(produit.designation || ref)}</h4>
+        <div class="ref">${echapperHTML(produit.marque || "")}${produit.marque ? " · " : ""}${echapperHTML(ref)}</div></div>
+      <button class="puce-claire" onclick="fermerModaleDash()">Fermer</button>
+    </div>`;
+  const fond = ouvrirModaleDash(entete + `<div class="compte-produits" style="margin-top:14px">Chargement…</div>`);
+  const [dispo, chezMoi] = await Promise.all([
+    api("/rest/v1/rpc/reassort_dispo", { corps: { p_reference: ref } }).catch(() => null),
+    api("/rest/v1/rpc/dash_stock_tailles", { corps: { p_magasins: DASH.choisis.length ? DASH.choisis : null, p_reference: ref } }).catch(() => null),
+  ]);
+  if (!fond.isConnected) return;
+  const boite = fond.querySelector(".boite");
+  if (!dispo?.length) {
+    boite.innerHTML = entete + `<div class="dash-vide">Plus rien au central sur cette référence.</div>`;
+    return;
+  }
+  const enMagasin = new Map((chezMoi || []).map(l => [l.taille, Number(l.mag || 0)]));
+  const lignes = [...dispo].sort((a, b) => cleTaille(a.taille) - cleTaille(b.taille));
+  const deja = new Map(REA.lignes.filter(l => l.reference === ref).map(l => [l.taille, l.quantite]));
+  boite.innerHTML = entete + `
+    <table>
+      <thead><tr><th>Taille</th><th>Chez vous</th><th>Dispo central</th><th>À commander</th></tr></thead>
+      <tbody>${lignes.map(l => `<tr>
+        <td>${echapperHTML(l.taille || "—")}</td>
+        <td class="${enMagasin.get(l.taille) ? "" : "zero"}">${dashNb(enMagasin.get(l.taille) || 0)}</td>
+        <td>${dashNb(l.dispo)}</td>
+        <td><input class="rea-qte" type="number" min="0" max="${l.dispo}" step="1"
+             value="${deja.get(l.taille) || ""}" placeholder="0"
+             data-taille="${echapperHTML(l.taille)}" data-prix="${l.prix}"
+             data-couleur="${echapperHTML(l.couleur || "")}" data-designation="${echapperHTML(l.designation || "")}"
+             style="width:70px; text-align:right"></td></tr>`).join("")}</tbody>
+    </table>
+    <div class="dash-ligne" style="margin-top:14px; justify-content:flex-end">
+      <span class="compte-produits" style="margin:0">Prix de gros : ${eur(Number(lignes[0].prix || 0))}</span>
+      <button class="puce-claire" onclick="ajouterReassort('${echapperHTML(ref)}', '${echapperHTML(produit.marque || "")}')">Ajouter au réassort</button>
+    </div>`;
+}
+
+function ajouterReassort(ref, marque) {
+  const saisies = [...document.querySelectorAll(".rea-qte")].map(i => ({
+    reference: ref, marque, taille: i.dataset.taille, prix: Number(i.dataset.prix || 0),
+    couleur: i.dataset.couleur, designation: i.dataset.designation,
+    quantite: Math.min(Math.max(parseInt(i.value, 10) || 0, 0), Number(i.max) || 0),
+  }));
+  REA.lignes = REA.lignes.filter(l => l.reference !== ref).concat(saisies.filter(l => l.quantite > 0));
+  if (!REA.magasin) REA.magasin = DASH.choisis.length === 1 ? DASH.choisis[0] : (reaSucc()[0]?.code || null);
+  memoriserRea();
+  fermerModaleDash();
+  rendreReassortDash();
+  document.getElementById("dash-reassort")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function retirerReassort(ref, taille) {
+  REA.lignes = REA.lignes.filter(l => !(l.reference === ref && l.taille === taille));
+  memoriserRea(); rendreReassortDash();
+}
+function majQteReassort(ref, taille, valeur) {
+  const l = REA.lignes.find(x => x.reference === ref && x.taille === taille);
+  if (!l) return;
+  l.quantite = Math.max(parseInt(valeur, 10) || 0, 0);
+  if (!l.quantite) return retirerReassort(ref, taille);
+  memoriserRea(); rendreReassortDash();
+}
+function viderReassort() { REA.lignes = []; memoriserRea(); rendreReassortDash(); }
+function choisirMagasinRea(code) { REA.magasin = code; memoriserRea(); rendreReassortDash(); }
+
+function rendreReassortDash() {
+  const zone = document.getElementById("dash-reassort"); if (!zone) return;
+  const succ = reaSucc();
+  if (!REA.lignes.length) {
+    zone.innerHTML = REA.historique.length ? historiqueReassortDash() : "";
+    return;
+  }
+  if (!succ.some(m => m.code === REA.magasin)) REA.magasin = succ[0]?.code || null;
+  const dest = succ.find(m => m.code === REA.magasin);
+  const lignes = [...REA.lignes].sort((a, b) => a.reference.localeCompare(b.reference) || cleTaille(a.taille) - cleTaille(b.taille));
+  zone.innerHTML = `<h3>Réassort en cours</h3>
+    <div class="compte-produits">Le stock disponible est celui de l'entrepôt central, aux prix de gros. À la validation, le fichier d'import Fastmag est téléchargé avec le critère <b>REAMANU</b> et la date du jour.</div>
+    <div class="dash-ligne" style="margin-top:10px">
+      <span class="compte-produits" style="margin:0">Magasin livré :</span>
+      ${succ.map(m => `<button class="puce-claire dash-chip${m.code === REA.magasin ? " on" : ""}"
+          onclick="choisirMagasinRea('${echapperHTML(m.code)}')">${echapperHTML(m.nom || m.code)}</button>`).join("")}
+    </div>
+    <table class="dash-table-rea" style="width:100%; border-collapse:collapse; margin-top:12px; font-size:12.5px">
+      <thead><tr style="text-align:left; color:var(--encre2)">
+        <th style="padding:5px 6px">Référence</th><th style="padding:5px 6px">Taille</th>
+        <th style="padding:5px 6px; text-align:right">Qté</th><th style="padding:5px 6px; text-align:right">PU gros</th>
+        <th style="padding:5px 6px; text-align:right">Total</th><th></th></tr></thead>
+      <tbody>${lignes.map(l => `<tr style="border-top:1px solid var(--hairline)">
+        <td style="padding:5px 6px"><b>${echapperHTML(l.designation || l.reference)}</b><br>
+          <span style="color:var(--encre2)">${echapperHTML(l.reference)}</span></td>
+        <td style="padding:5px 6px">${echapperHTML(l.taille)}</td>
+        <td style="padding:5px 6px; text-align:right"><input type="number" min="0" step="1" value="${l.quantite}"
+          onchange="majQteReassort('${echapperHTML(l.reference)}','${echapperHTML(l.taille)}', this.value)"
+          style="width:64px; text-align:right"></td>
+        <td style="padding:5px 6px; text-align:right">${eur(Number(l.prix))}</td>
+        <td style="padding:5px 6px; text-align:right">${eur(Number(l.prix) * Number(l.quantite))}</td>
+        <td style="padding:5px 6px; text-align:right"><button class="dash-lien"
+          onclick="retirerReassort('${echapperHTML(l.reference)}','${echapperHTML(l.taille)}')">retirer</button></td></tr>`).join("")}</tbody>
+    </table>
+    <div class="dash-ligne" style="margin-top:12px">
+      <span class="compte-produits" style="margin:0"><b>${dashNb(reaPieces())}</b> pièces · <b>${eur(reaTotal())}</b> HT
+        ${dest ? ` · livré à <b>${echapperHTML(dest.nom || dest.code)}</b>` : ""}</span>
+      <button class="puce-claire" onclick="viderReassort()">Vider</button>
+      <button class="puce-claire dash-chip on" id="rea-valider" onclick="validerReassort(this)">Valider et télécharger le fichier</button>
+    </div>
+    ${historiqueReassortDash()}`;
+}
+
+function historiqueReassortDash() {
+  if (!REA.historique.length) return "";
+  return `<h5 style="margin-top:22px; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--encre2)">Derniers réassorts</h5>
+    <div class="dash-ligne" style="margin-top:8px">
+      ${REA.historique.map(r => `<button class="puce-claire" onclick="retelechargerReassort('${r.id}')"
+        title="Retélécharger le fichier">${echapperHTML(r.numero)} · ${dashNb(r.nb_pieces)} p. · ${new Date(r.cree_le).toLocaleDateString("fr-FR")} ⬇</button>`).join("")}
+    </div>`;
+}
+
+async function validerReassort(btn) {
+  if (!REA.magasin) return signalerMagasin("Choisissez le magasin à livrer.");
+  const libelle = btn.textContent;
+  btn.disabled = true; btn.textContent = "…";
+  try {
+    const res = await api("/rest/v1/rpc/reassort_creer", {
+      corps: { p_magasin: REA.magasin, p_lignes: REA.lignes.map(l => ({ reference: l.reference, taille: l.taille, quantite: l.quantite })) },
+    });
+    fichierReassort(res);
+    REA.lignes = []; memoriserRea();
+    await chargerHistoriqueRea();
+    rendreReassortDash();
+    signalerMagasin(`Réassort ${res.numero} enregistré : ${res.nb_pieces} pièces, fichier téléchargé.`);
+  } catch (e) {
+    signalerMagasin(String(e.donnees?.message || e.message));
+  }
+  btn.disabled = false; btn.textContent = libelle;
+}
+
+async function retelechargerReassort(id) {
+  const r = REA.historique.find(x => x.id === id);
+  if (r) fichierReassort(r);
+}
+
+async function chargerHistoriqueRea() {
+  REA.historique = await api("/rest/v1/rpc/reassort_historique",
+    { corps: { p_magasins: DASH.choisis.length ? DASH.choisis : null, p_n: 10 } }).catch(() => []) || [];
+}
+
+/* Le fichier d'import Fastmag du réassort : même modèle que les commandes clients
+   (TSV ISO-8859-1, 26 colonnes), avec REAMANU + la date en référence de commande. */
+function fichierReassort(res) {
+  const quand = res.cree_le ? new Date(res.cree_le) : new Date();
+  const dj = String(quand.getDate()).padStart(2, "0"), dm = String(quand.getMonth() + 1).padStart(2, "0");
+  const date = `${dj}/${dm}/${quand.getFullYear()}`;
+  const critere = `REAMANU${dj}${dm}${quand.getFullYear()}`;
+  const entete = ["Numéro de commande","Date","CLIENT","Commande","escompte","filler","port","frais postaux",
+    "adlivraison","devise","date de liv sou","date de liv prev","Référence PRECO FW15","filler","BarCode",
+    "COULEUR","Taille","DESIGNATION","QUANTITE","PU","remise","total HT","TOTAL TAXES","taux devises","filler","filler"];
+  const lignes = [entete.join("\t")];
+  for (const l of res.lignes) {
+    lignes.push([res.numero, date, res.id_fastmag, "COMMANDE", "0", "", "0", "0", "LIVRAISON", "EUR", date, date,
+      critere, "", l.reference, l.couleur || "", l.taille, l.designation || "",
+      l.quantite, Number(l.prix).toFixed(2), "0", "0", "0", "1", "", ""].join("\t"));
+  }
+  const texte = lignes.join("\r\n") + "\r\n";
+  const octets = new Uint8Array(texte.length);
+  for (let i = 0; i < texte.length; i++) { const c = texte.charCodeAt(i); octets[i] = c <= 0xFF ? c : 0x3F; }
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(new Blob([octets], { type: "text/plain;charset=iso-8859-1" }));
+  lien.download = `IMPORT_FASTMAG_REAMANU_${res.magasin}_${dj}${dm}${quand.getFullYear()}.txt`;
+  lien.click();
+  URL.revokeObjectURL(lien.href);
+}
+
 function carteDash(p, options = {}) {
   const vert = Number(p.ros_mag) >= Number(p.ros_reseau);
   const couverture = p.stock_mag != null ? dashCouverture(p.stock_mag, p.ventes ?? p.ventes_mag) : null;
@@ -9907,7 +10108,8 @@ function carteDash(p, options = {}) {
         ${p.tendance != null ? `<span><i>Tendance</i><br>${Number(p.tendance) >= 0 ? "↑ +" : "↓ "}${dashNb(p.tendance)} %</span>` : ""}
       </div>
       <div class="actions">
-        ${Number(p.stock_central) > 0 ? `<button class="puce-claire" onclick="commanderDash('${echapperHTML(p.reference)}', this)">Commander</button>` : ""}
+        ${Number(p.stock_central) > 0 && reaSucc().length ? `<button class="puce-claire" onclick="ouvrirReassortDash('${echapperHTML(p.reference)}')">Réassort</button>` : ""}
+        ${Number(p.stock_central) > 0 && !estStaff && clientActif?.id ? `<button class="puce-claire" onclick="commanderDash('${echapperHTML(p.reference)}', this)">Commander</button>` : ""}
         <button class="puce-claire" onclick="location.hash='#/produit/' + encodeURIComponent('${echapperHTML(p.reference)}')">Fiche</button>
       </div>
     </div>
