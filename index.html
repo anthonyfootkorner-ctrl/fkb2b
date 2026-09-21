@@ -1131,6 +1131,18 @@
   .dash-modale td.zero { color: var(--gris); }
   .dash-modale h5 { margin: 18px 0 0; font-size: 10.5px; letter-spacing: .14em;
                     text-transform: uppercase; color: var(--encre2); }
+  /* Le détail des tailles au survol : une bulle posée à côté du chiffre, sans clic. */
+  .dash-pop { position: fixed; z-index: 96; background: #fff; border: 1px solid var(--hairline);
+              border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.14); padding: 10px 12px;
+              min-width: 190px; max-width: 280px; font-size: 12px; pointer-events: none; }
+  .dash-pop b { display: block; font-size: 11px; margin-bottom: 6px; }
+  .dash-pop table { width: 100%; border-collapse: collapse; }
+  .dash-pop td { padding: 2px 4px; text-align: right; }
+  .dash-pop td:first-child { text-align: left; font-weight: 600; }
+  .dash-pop thead td { font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+                       color: var(--encre2); font-weight: 500; }
+  .dash-pop tfoot td { border-top: 1px solid var(--hairline); font-weight: 600; }
+  .dash-pop td.zero { color: var(--gris); font-weight: 400; }
   @media (max-width: 640px) {
     .dash-kpis, .dash-section { margin-left: 14px; margin-right: 14px; }
     .dash-grille { grid-template-columns: repeat(auto-fill, minmax(144px, 1fr)); gap: 8px; }
@@ -1680,10 +1692,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789988250"></script>
-<script src="imports.js?v=1789988250"></script>
-<script src="merch-shopify.js?v=1789988250"></script>
-<script src="moteur-merch.js?v=1789988250"></script>
+<script src="config.js?v=1789992474"></script>
+<script src="imports.js?v=1789992474"></script>
+<script src="merch-shopify.js?v=1789992474"></script>
+<script src="moteur-merch.js?v=1789992474"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -9814,8 +9826,61 @@ function rendreKpisDash() {
 // Une carte produit : photo, identité, et les chiffres qui font décider.
 /* Les stocks affichés sur une carte sont des totaux : un clic ouvre le détail des tailles,
    c'est là qu'on voit si la référence est encore vendable ou s'il ne reste que les extrêmes. */
-const lienTaillesDash = (ref, valeur) => `<button class="dash-lien" title="Voir le détail des tailles"
+const lienTaillesDash = (ref, valeur) => `<button class="dash-lien" title="Détail des tailles"
+  onmouseenter="survolTaillesDash(this, '${echapperHTML(ref)}')" onmouseleave="masquerPopTailles()"
+  onfocus="survolTaillesDash(this, '${echapperHTML(ref)}')" onblur="masquerPopTailles()"
   onclick="detailTaillesDash('${echapperHTML(ref)}')">${dashNb(valeur)}</button>`;
+
+/* Survol d'un chiffre de stock : la répartition des tailles arrive dans une bulle.
+   Une seule requête par référence (mise en cache), et un délai court pour ne pas
+   déclencher un appel à chaque passage de souris. Le clic ouvre la version détaillée. */
+const POP_TAILLES = { cache: new Map(), minuteur: null, ref: null };
+
+function masquerPopTailles() {
+  clearTimeout(POP_TAILLES.minuteur);
+  POP_TAILLES.ref = null;
+  document.getElementById("dash-pop")?.remove();
+}
+
+function survolTaillesDash(ancre, ref) {
+  clearTimeout(POP_TAILLES.minuteur);
+  POP_TAILLES.ref = ref;
+  POP_TAILLES.minuteur = setTimeout(async () => {
+    const cle = (DASH.choisis.join(",") || "tous") + "|" + ref;
+    if (!POP_TAILLES.cache.has(cle)) {
+      POP_TAILLES.cache.set(cle, api("/rest/v1/rpc/dash_stock_tailles",
+        { corps: { p_magasins: DASH.choisis.length ? DASH.choisis : null, p_reference: ref } }).catch(() => []));
+    }
+    const lignes = await POP_TAILLES.cache.get(cle);
+    if (POP_TAILLES.ref !== ref || !ancre.isConnected) return;   // la souris est déjà repartie
+    afficherPopTailles(ancre, lignes || []);
+  }, 120);
+}
+
+function afficherPopTailles(ancre, lignes) {
+  document.getElementById("dash-pop")?.remove();
+  const tri = [...lignes].sort((a, b) => cleTaille(a.taille) - cleTaille(b.taille));
+  const cel = n => `<td class="${Number(n) ? "" : "zero"}">${dashNb(n)}</td>`;
+  const tot = c => tri.reduce((s, l) => s + Number(l[c] || 0), 0);
+  const pop = document.createElement("div");
+  pop.className = "dash-pop"; pop.id = "dash-pop";
+  pop.innerHTML = tri.length ? `<b>Détail des tailles</b>
+    <table>
+      <thead><tr><td>Taille</td><td>Mag</td><td>Central</td><td>Web</td></tr></thead>
+      <tbody>${tri.map(l => `<tr><td>${echapperHTML(l.taille || "—")}</td>${cel(l.mag)}${cel(l.central)}${cel(l.web)}</tr>`).join("")}</tbody>
+      <tfoot><tr><td>Total</td><td>${dashNb(tot("mag"))}</td><td>${dashNb(tot("central"))}</td><td>${dashNb(tot("web"))}</td></tr></tfoot>
+    </table>` : `<b>Aucun stock</b><span style="color:var(--gris)">ni en magasin, ni au central, ni sur le web.</span>`;
+  document.body.appendChild(pop);
+  if (!POP_TAILLES.branche) {          // la bulle est posée en absolu : elle disparaît au défilement
+    window.addEventListener("scroll", masquerPopTailles, { passive: true });
+    POP_TAILLES.branche = true;
+  }
+  // posée sous le chiffre, ramenée dans la fenêtre si elle déborde
+  const r = ancre.getBoundingClientRect(), b = pop.getBoundingClientRect();
+  const x = Math.min(Math.max(8, r.left), window.innerWidth - b.width - 8);
+  const y = r.bottom + 6 + b.height > window.innerHeight ? Math.max(8, r.top - b.height - 6) : r.bottom + 6;
+  pop.style.left = x + "px"; pop.style.top = y + "px";
+}
 
 function fermerModaleDash() {
   document.querySelector(".dash-modale")?.remove();
