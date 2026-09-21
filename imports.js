@@ -38,11 +38,13 @@ const MODELES_IMPORT = {
   stock_shopify: {
     // Ce dépôt alimente le stock WEB (Duhamel) qui sert au merch, PAS le stock vendable
     // du catalogue B2B — le libellé disait l'inverse et a prêté à confusion le 21/08.
-    libelle: "Stock Shopify — emplacement Duhamel (stock web du merch)",
+    // Le même export porte aussi les photos, le prix web, le prix barré et la promo : le libellé
+    // ne parlait que de stock, ce qui a fait douter du bon modèle le 21/09.
+    libelle: "Export Shopify (Matrixify Products) — photos, prix web, promo et stock Duhamel",
     sep: ",", encodage: "utf-8",
     signature: ["ID", "Handle", "Variant ID", "Option1 Value", "Inventory Available: Duhamel"],
     remplacement_complet: true,
-    remplacement_libelle: "remplace le stock web Duhamel — le catalogue B2B n'est pas touché",
+    remplacement_libelle: "met à jour photos, prix web et promo · remplace le stock web Duhamel — le stock vendable du catalogue B2B n'est pas touché",
   },
   comptes: {
     // Classeur de création de comptes : une ligne = un accès au portail.
