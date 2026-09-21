@@ -1107,7 +1107,18 @@
   .dash-badge.rouge { background: #fdeaea; color: #a32626; }
   .dash-carte .actions { display: flex; gap: 6px; flex-wrap: wrap; }
   .dash-carte .actions .puce-claire { flex: 1 1 auto; padding: 6px 10px; font-size: 11.5px; }
-  .dash-rang { position: absolute; top: 0; left: 0; }
+  .dash-rang { position: absolute; top: 0; left: 0; z-index: 2; }
+  /* [hidden] ne suffit pas : .preco-barre impose display:flex, la barre vide restait à l'écran */
+  .preco-barre[hidden] { display: none; }
+  .dash-carte .media { position: relative; display: block; cursor: pointer; }
+  .dash-promo { position: absolute; left: 8px; bottom: 8px; background: #c8102e; color: #fff; border-radius: 999px;
+                font-size: 12px; font-weight: 700; padding: 3px 9px; letter-spacing: .02em; }
+  .dash-ajout { position: absolute; top: 8px; right: 8px; z-index: 2; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--hairline);
+                background: #fff; color: #111; display: grid; place-items: center; cursor: pointer; padding: 0;
+                box-shadow: 0 2px 8px rgba(0,0,0,.10); transition: transform .12s ease, background .12s ease; }
+  .dash-ajout:hover { transform: scale(1.08); }
+  .dash-ajout.on { background: #111; color: #fff; border-color: #111; }
+  .dash-ajout svg { width: 17px; height: 17px; }
   .dash-rang { position: absolute; margin: 8px; background: #111; color: #fff; border-radius: 999px; font-size: 11px; padding: 2px 8px; }
   .dash-vide { color: var(--gris); font-size: 13px; padding: 10px 0; }
   /* Un chiffre de stock se clique : il ouvre le détail taille par taille. */
@@ -1717,8 +1728,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789993699"></script>
-<script src="imports.js?v=1789993699"></script>
+<script src="config.js?v=1789994178"></script>
+<script src="imports.js?v=1789994178"></script>
 <script src="merch-shopify.js?v=1789992987"></script>
 <script src="moteur-merch.js?v=1789992987"></script>
 <script>
@@ -9857,17 +9868,31 @@ function rendreKpisDash() {
     + kpi(dashNb(k.nb_magasins), "magasins", "magasins compris dans le périmètre");
 }
 
-// Remise constatée sur les ventes, arrondie à la dizaine : chez vous si vous vendez la référence,
-// sinon dans le réseau. Rien ne s'affiche tant que l'export des ventes n'a pas donné le prix de base.
-function dashRemise(p) {
+// Pastille promo posée sur la photo : remise moyenne constatée, arrondie à la dizaine — sur vos ventes
+// si vous vendez la référence, sinon dans le réseau. Sous 10 %, rien : le produit est à plein tarif.
+function dashPromo(p) {
   const r = DASH.remises?.get(p.reference);
   const chezMoi = r?.remise_pct != null;
   const taux = chezMoi ? Number(r.remise_pct) : r?.remise_reseau_pct != null ? Number(r.remise_reseau_pct) : null;
-  if (taux == null) return "";
-  const ou = chezMoi ? "sur vos ventes de la période" : "dans le réseau (vous ne l'avez pas vendue sur la période)";
-  return `<span title="remise moyenne constatée ${ou} : prix payé comparé au prix de base"><i>Remise</i><br>${
-    taux >= 10 ? `<span class="dash-badge ${taux >= 30 ? "rouge" : "alerte"}">-${taux} %</span>`
-               : `<span class="dash-badge ok">plein tarif</span>`}</span>`;
+  if (taux == null || taux < 10) return "";
+  return `<span class="dash-promo" title="remise moyenne constatée ${chezMoi ? "sur vos ventes de la période" : "dans le réseau"} : prix payé comparé au prix de base">-${taux} %</span>`;
+}
+
+// L'ajout se fait depuis la photo, comme sur une boutique : une icône en haut à droite. Pour une
+// succursale elle retient la référence au réassort, pour un compte magasin elle la met au panier B2B.
+const DASH_ICONE_AJOUT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/><path d="M12 12v5M9.5 14.5h5"/></svg>`;
+const DASH_ICONE_FAIT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+function dashBoutonAjout(p) {
+  if (!(Number(p.stock_central) > 0)) return "";
+  const ref = echapperHTML(p.reference);
+  if (reaSucc().length) {
+    const dedans = reaDansSelection(p.reference);
+    return `<button class="dash-ajout${dedans ? " on" : ""}" title="${dedans ? "Retirer du réassort" : "Ajouter au réassort"}"
+              onclick="basculerReassort('${ref}', this)">${dedans ? DASH_ICONE_FAIT : DASH_ICONE_AJOUT}</button>`;
+  }
+  if (!estStaff && clientActif?.id)
+    return `<button class="dash-ajout" title="Ajouter au panier" onclick="commanderDash('${ref}', this)">${DASH_ICONE_AJOUT}</button>`;
+  return "";
 }
 
 // Une carte produit : photo, identité, et les chiffres qui font décider.
@@ -10048,9 +10073,10 @@ function basculerReassort(ref, bouton) {
   // la carte n'est pas redessinée, mais on relève la vignette avant de toucher à la barre
   const source = bouton && reaDansSelection(ref) ? sourceAnimation(bouton.closest(".dash-carte")) : null;
   if (bouton) {
-    bouton.textContent = reaDansSelection(ref) ? "✓ Réassort" : "Réassort";
-    bouton.classList.toggle("dash-chip", reaDansSelection(ref));
-    bouton.classList.toggle("on", reaDansSelection(ref));
+    const dedans = reaDansSelection(ref);
+    bouton.classList.toggle("on", dedans);
+    bouton.innerHTML = dedans ? DASH_ICONE_FAIT : DASH_ICONE_AJOUT;
+    bouton.title = dedans ? "Retirer du réassort" : "Ajouter au réassort";
   }
   rendreRappelReassort();
   if (source) animerVersGrille(source, document.querySelector("#dash-reassort .btn-blanc"));
@@ -10270,13 +10296,16 @@ function carteDash(p, options = {}) {
   const couverture = p.stock_mag != null ? dashCouverture(p.stock_mag, p.ventes ?? p.ventes_mag) : null;
   return `<div class="dash-carte">
     ${options.rang ? `<span class="dash-rang">${options.rang}</span>` : ""}
-    ${p.photo_url ? `<img class="photo" loading="lazy" src="${echapperHTML(p.photo_url)}" alt="">` : `<span class="photo"></span>`}
+    <span class="media" title="Ouvrir la fiche produit" onclick="location.hash='#/produit/' + encodeURIComponent('${echapperHTML(p.reference)}')">
+      ${p.photo_url ? `<img class="photo" loading="lazy" src="${echapperHTML(p.photo_url)}" alt="">` : `<span class="photo"></span>`}
+      ${dashPromo(p)}
+    </span>
+    ${dashBoutonAjout(p)}
     <div class="corps">
       <span class="marque">${echapperHTML(p.marque || "")}</span>
       <span class="nom">${echapperHTML(p.designation || p.reference)}</span>
       <span class="ref">${echapperHTML(p.reference)}${p.prix_vente ? " · " + eur(Number(p.prix_vente)) : ""}</span>
       <div class="chiffres">
-        ${dashRemise(p)}
         ${p.ros_mag != null ? `<span><i>ROS mag</i><br><span class="dash-badge ${vert ? "ok" : "alerte"}">${dashRos(p.ros_mag)}/sem</span></span>` : ""}
         ${p.ros_reseau != null ? `<span title="moyenne des magasins qui vendent la référence — web et central exclus"><i>ROS réseau</i><br>${dashRos(p.ros_reseau)}/sem</span>` : ""}
         ${p.stock_mag != null ? `<span><i>Stock mag</i><br>${lienTaillesDash(p.reference, p.stock_mag)}</span>` : ""}
@@ -10287,12 +10316,6 @@ function carteDash(p, options = {}) {
         ${p.indice != null ? `<span><i>Indice</i><br><span class="dash-badge rouge">${dashRos(p.indice)}</span></span>` : ""}
         ${p.nb_mag_vendeurs != null ? `<span><i>Magasins vendeurs</i><br>${dashNb(p.nb_mag_vendeurs)}</span>` : ""}
         ${p.tendance != null ? `<span><i>Tendance</i><br>${Number(p.tendance) >= 0 ? "↑ +" : "↓ "}${dashNb(p.tendance)} %</span>` : ""}
-      </div>
-      <div class="actions">
-        ${Number(p.stock_central) > 0 && reaSucc().length ? `<button class="puce-claire${reaDansSelection(p.reference) ? " dash-chip on" : ""}"
-          onclick="basculerReassort('${echapperHTML(p.reference)}', this)">${reaDansSelection(p.reference) ? "✓ Réassort" : "Réassort"}</button>` : ""}
-        ${Number(p.stock_central) > 0 && !estStaff && clientActif?.id ? `<button class="puce-claire" onclick="commanderDash('${echapperHTML(p.reference)}', this)">Commander</button>` : ""}
-        <button class="puce-claire" onclick="location.hash='#/produit/' + encodeURIComponent('${echapperHTML(p.reference)}')">Fiche</button>
       </div>
     </div>
   </div>`;
@@ -10311,7 +10334,9 @@ function rendreTopsDash() {
   const liste = (active === "TOUS" ? [...tops] : tops.filter(p => p.categorie === active)).sort(parRos);
   const seuil = dashRos(DASH_ROS_MIN);
   zone.innerHTML = `<h3>Produits qui tournent</h3>
-    <div class="compte-produits">Tous les produits du périmètre qui dépassent <b>${seuil} de ROS</b>, du plus fort au plus faible (et au minimum les ${DASH_ROS_MIN_LIGNES} meilleurs, même si la semaine est calme). Le ROS est en pièces par magasin et par semaine (vert si vous faites au moins aussi bien que le réseau) ; la couverture dit combien de semaines le stock tient au rythme actuel — <b>rouge sous 2 semaines</b>, orange sous 4. Cliquez sur un stock pour voir le détail des tailles.</div>
+    <div class="compte-produits">Tous les produits du périmètre qui dépassent <b>${seuil} de ROS</b>, du plus fort au plus faible (et au minimum les ${DASH_ROS_MIN_LIGNES} meilleurs, même si la semaine est calme). Le ROS est en pièces par magasin et par semaine (vert si vous faites au moins aussi bien que le réseau) ; la couverture dit combien de semaines le stock tient au rythme actuel — <b>rouge sous 2 semaines</b>, orange sous 4. Cliquez sur un stock pour voir le détail des tailles, sur la photo pour la fiche.
+      ${DASH.remises?.size ? `La pastille rouge sur la photo donne la remise moyenne constatée, arrondie à la dizaine.`
+        : `<b>Pastilles promo indisponibles</b> : les ventes en base n'ont pas encore leur prix de base — redéposez le dernier VENTESTOCKFLOW dans Back Office → Imports.`}</div>
     <div class="dash-ligne" style="margin-top:10px">
       <button class="puce-claire dash-chip${active === "TOUS" ? " on" : ""}" onclick="choisirCategorieDash('TOUS')">Tous · ${tops.length}</button>
       ${presentes.map(([c, lib]) => `<button class="puce-claire dash-chip${c === active ? " on" : ""}" onclick="choisirCategorieDash('${c}')">${lib} · ${tops.filter(p => p.categorie === c).length}</button>`).join("")}
@@ -10344,8 +10369,8 @@ function rendreCentralDash() {
    bouton ne fait qu'éviter la ressaisie. */
 async function commanderDash(ref, bouton) {
   if (estStaff || !clientActif?.id) { signalerMagasin("Le panier B2B est rattaché à un magasin : connectez-vous avec un compte magasin pour commander."); return; }
-  const libelle = bouton ? bouton.textContent : "";
-  if (bouton) { bouton.disabled = true; bouton.textContent = "…"; }
+  const libelle = bouton ? bouton.innerHTML : "";
+  if (bouton) bouton.disabled = true;
   let p = produitConnu(ref);
   if (!p) {
     try {
@@ -10353,7 +10378,7 @@ async function commanderDash(ref, bouton) {
       lot.forEach(trierTailles); memoriser(lot); p = lot[0];
     } catch (e) { /* traité juste après */ }
   }
-  if (bouton) { bouton.disabled = false; bouton.textContent = libelle; }
+  if (bouton) { bouton.disabled = false; bouton.innerHTML = libelle; }
   if (!p) { signalerMagasin(`${ref} n'est pas (encore) au catalogue B2B : demandez son ouverture au commercial.`); return; }
   const servies = p.tailles.filter(t => t.stock > 0 || t.precommande);
   const tailles = servies.length ? servies : p.tailles;
