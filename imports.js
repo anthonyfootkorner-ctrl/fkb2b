@@ -556,8 +556,12 @@ function mapperVersTables(analyse) {
         const jour = `${j.slice(6, 10)}-${j.slice(3, 5)}-${j.slice(0, 2)}`;
         const cle = `${l.Code_Origine}|${ref}|${l.Taille}|${jour}`;
         const e = parCle.get(cle) || { magasin: l.Code_Origine, reference: ref,
-          taille: l.Taille || "", jour, quantite: 0, montant_ttc: 0, cout_achat: null };
-        e.quantite += parseInt(parseFloat(l["Total QteVenteRetail"] || 0), 10) || 0;
+          taille: l.Taille || "", jour, quantite: 0, montant_ttc: 0, cout_achat: null, montant_base: null };
+        const qteLigne = parseInt(parseFloat(l["Total QteVenteRetail"] || 0), 10) || 0;
+        e.quantite += qteLigne;
+        // prix de base × quantité : c'est ce qui donne le taux de remise du dashboard
+        const prixBase = parseFloat(String(l.PrixVente ?? "").replace(",", "."));
+        if (Number.isFinite(prixBase) && prixBase > 0) e.montant_base = (e.montant_base || 0) + qteLigne * prixBase;
         // l'export s'appelle tantôt MtVenteRetailTTC, tantôt Total MtVenteRetailTTC :
         // ne lire que le premier nom a effacé le CA des imports d'août et septembre
         e.montant_ttc += parseFloat(l["Total MtVenteRetailTTC"] ?? l.MtVenteRetailTTC ?? 0) || 0;

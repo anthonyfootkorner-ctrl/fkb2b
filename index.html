@@ -1134,7 +1134,10 @@
   /* Le détail des tailles au survol : une bulle posée à côté du chiffre, sans clic. */
   .dash-pop { position: fixed; z-index: 96; background: #fff; border: 1px solid var(--hairline);
               border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.14); padding: 10px 12px;
-              min-width: 190px; max-width: 280px; font-size: 12px; pointer-events: none; }
+              min-width: 190px; max-width: 280px; font-size: 12px; pointer-events: none;
+              /* la bulle est accrochée à <body>, dont le texte est clair (thème sombre) :
+                 sans couleur propre, les chiffres sortaient blanc sur blanc */
+              color: #111; }
   .dash-pop b { display: block; font-size: 11px; margin-bottom: 6px; }
   .dash-pop table { width: 100%; border-collapse: collapse; }
   .dash-pop td { padding: 2px 4px; text-align: right; }
@@ -1714,8 +1717,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1789993466"></script>
-<script src="imports.js?v=1789993466"></script>
+<script src="config.js?v=1789993699"></script>
+<script src="imports.js?v=1789993699"></script>
 <script src="merch-shopify.js?v=1789992987"></script>
 <script src="moteur-merch.js?v=1789992987"></script>
 <script>
@@ -9795,6 +9798,11 @@ async function chargerDashboard() {
   if (jeton !== DASH.chargement) return;
   DASH.donnees = { kpis: (kpis || [])[0] || null, objectifs: (objectifs || [])[0] || null,
                    tops: tops || [], retard: retard || [], central: central || [] };
+  // taux de remise constaté des produits affichés (prix de base de l'export des ventes)
+  const refsAffichees = [...new Set([...(tops || []), ...(retard || []), ...(central || [])].map(p => p.reference))];
+  const remises = refsAffichees.length ? await appel("dash_remises", { p_references: refsAffichees }) : [];
+  if (jeton !== DASH.chargement) return;
+  DASH.remises = new Map((remises || []).map(r => [r.reference, r]));
   rendreKpisDash();
   corps.innerHTML = `
     <div class="dash-section" id="dash-tops"></div>
@@ -9847,6 +9855,19 @@ function rendreKpisDash() {
 
     + kpi(k.couverture_jours == null ? "—" : dashNb(k.couverture_jours) + " j", "couverture", "stock ÷ ventes moyennes par jour")
     + kpi(dashNb(k.nb_magasins), "magasins", "magasins compris dans le périmètre");
+}
+
+// Remise constatée sur les ventes, arrondie à la dizaine : chez vous si vous vendez la référence,
+// sinon dans le réseau. Rien ne s'affiche tant que l'export des ventes n'a pas donné le prix de base.
+function dashRemise(p) {
+  const r = DASH.remises?.get(p.reference);
+  const chezMoi = r?.remise_pct != null;
+  const taux = chezMoi ? Number(r.remise_pct) : r?.remise_reseau_pct != null ? Number(r.remise_reseau_pct) : null;
+  if (taux == null) return "";
+  const ou = chezMoi ? "sur vos ventes de la période" : "dans le réseau (vous ne l'avez pas vendue sur la période)";
+  return `<span title="remise moyenne constatée ${ou} : prix payé comparé au prix de base"><i>Remise</i><br>${
+    taux >= 10 ? `<span class="dash-badge ${taux >= 30 ? "rouge" : "alerte"}">-${taux} %</span>`
+               : `<span class="dash-badge ok">plein tarif</span>`}</span>`;
 }
 
 // Une carte produit : photo, identité, et les chiffres qui font décider.
@@ -10255,6 +10276,7 @@ function carteDash(p, options = {}) {
       <span class="nom">${echapperHTML(p.designation || p.reference)}</span>
       <span class="ref">${echapperHTML(p.reference)}${p.prix_vente ? " · " + eur(Number(p.prix_vente)) : ""}</span>
       <div class="chiffres">
+        ${dashRemise(p)}
         ${p.ros_mag != null ? `<span><i>ROS mag</i><br><span class="dash-badge ${vert ? "ok" : "alerte"}">${dashRos(p.ros_mag)}/sem</span></span>` : ""}
         ${p.ros_reseau != null ? `<span title="moyenne des magasins qui vendent la référence — web et central exclus"><i>ROS réseau</i><br>${dashRos(p.ros_reseau)}/sem</span>` : ""}
         ${p.stock_mag != null ? `<span><i>Stock mag</i><br>${lienTaillesDash(p.reference, p.stock_mag)}</span>` : ""}
