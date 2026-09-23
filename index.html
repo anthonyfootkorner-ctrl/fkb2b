@@ -1435,8 +1435,12 @@
     </div>
 
     <div class="bloc-clair" style="margin: 0 22px 60px">
-      <h3 class="titre-bloc">Historique des imports</h3>
-      <div id="journal-imports"></div>
+      <h3 class="titre-bloc">État des données</h3>
+      <div class="compte-produits" style="margin-bottom:12px">Chaque source, sa fréquence attendue et son dernier dépôt.
+        Rouge : à remettre à jour sans attendre.</div>
+      <div id="etat-imports"></div>
+      <details style="margin-top:16px"><summary class="compte-produits" style="cursor:pointer">Historique détaillé des derniers dépôts</summary>
+        <div id="journal-imports" style="margin-top:8px"></div></details>
     </div>
   </section>
 
@@ -1730,8 +1734,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1790002537"></script>
-<script src="imports.js?v=1790002537"></script>
+<script src="config.js?v=1790158840"></script>
+<script src="imports.js?v=1790158840"></script>
 <script src="merch-shopify.js?v=1789992987"></script>
 <script src="moteur-merch.js?v=1789992987"></script>
 <script>
@@ -3654,10 +3658,41 @@ async function supprimerCampagnePreco(campagne) {
   }
 }
 
+/* L'état des données : une ligne par source, son dernier dépôt et sa fraîcheur attendue.
+   Un fichier « chaque lundi » vieux de 10 jours est rouge ; un référentiel mensuel non. */
+const SOURCES_IMPORT = [
+  ["ventes", "Ventes", "chaque lundi", 8],
+  ["stock_magasins", "Stock des boutiques", "chaque lundi", 8],
+  ["objectifs", "Objectifs journaliers", "chaque lundi", 8],
+  ["stock_fastmag", "État de stock Fastmag (central)", "chaque jour", 3],
+  ["stock_web_egonet", "Stock web (EGONet)", "chaque jour", 3],
+  ["stock_transit", "Stock en transit (BL expédiés)", "chaque jour", 3],
+  ["stock_preparation", "Stock en préparation (BL de réservation)", "chaque jour", 3],
+  ["stock_shopify", "Export Shopify (photos, prix web, promo)", "chaque semaine", 10],
+  ["stock_b2b", "Stock B2B vendable", "à chaque dépôt Footkorner", 35],
+  ["tarifs", "Tarifs", "à chaque changement", 60],
+  ["fiches_produits", "Fiches produits", "à chaque changement", 60],
+  ["clients", "Comptes clients Fastmag", "à chaque changement", 90],
+];
 async function rendreJournalImports() {
-  const rows = await api("/rest/v1/journal_imports?select=horodatage,fichier,modele,lignes_lues,quarantaine,statut&order=horodatage.desc&limit=10").catch(() => []);
+  const rows = await api("/rest/v1/journal_imports?select=horodatage,fichier,modele,lignes_lues,quarantaine,statut&order=horodatage.desc&limit=300").catch(() => []);
+  const dernier = {};
+  for (const j of rows) if (j.statut === "OK" && !dernier[j.modele]) dernier[j.modele] = j;
+  const maintenant = Date.now();
+  const jours = d => Math.floor((maintenant - new Date(d)) / 86400000);
+  const age = j => { const n = jours(j.horodatage); return n === 0 ? "aujourd'hui" : n === 1 ? "hier" : `il y a ${n} jours`; };
+  document.getElementById("etat-imports").innerHTML = `<div class="rep-table"><table>
+    <thead><tr><th>Source</th><th>Attendu</th><th>Dernier dépôt</th><th>Fichier</th><th></th></tr></thead>
+    <tbody>${SOURCES_IMPORT.map(([modele, libelle, frequence, limite]) => {
+      const j = dernier[modele];
+      const etat = !j ? "rouge" : jours(j.horodatage) > limite ? "rouge" : jours(j.horodatage) > limite * 0.7 ? "alerte" : "ok";
+      return `<tr>
+        <td><b>${libelle}</b></td><td class="compte-produits" style="margin:0">${frequence}</td>
+        <td>${j ? `${new Date(j.horodatage).toLocaleDateString("fr-FR")} <span class="compte-produits" style="margin:0">· ${age(j)}</span>` : "jamais"}</td>
+        <td style="white-space:normal;color:var(--encre2)">${j ? echapperHTML(j.fichier) : ""}</td>
+        <td><span class="dash-badge ${etat}">${etat === "ok" ? "✓ à jour" : etat === "alerte" ? "bientôt" : "✕ à mettre à jour"}</span></td></tr>`; }).join("")}</tbody></table></div>`;
   document.getElementById("journal-imports").innerHTML = rows.length
-    ? rows.map(j => `<div class="rang-util"><div class="qui"><b>${j.fichier}</b>
+    ? rows.slice(0, 12).map(j => `<div class="rang-util"><div class="qui"><b>${echapperHTML(j.fichier)}</b>
         <span>${new Date(j.horodatage).toLocaleString("fr-FR")} · ${j.modele}</span></div>
         <div class="fin" style="margin-left:auto; font-size:12px; color:var(--encre2)">
           ${j.lignes_lues} lignes · ${j.quarantaine} en quarantaine · ${j.statut}</div></div>`).join("")
