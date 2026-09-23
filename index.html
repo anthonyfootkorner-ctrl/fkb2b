@@ -1114,7 +1114,15 @@
   .dash-promo { position: absolute; left: 8px; bottom: 8px; background: #c8102e; color: #fff; border-radius: 999px;
                 font-size: 12px; font-weight: 700; padding: 3px 9px; letter-spacing: .02em; }
   .dash-promo.web { background: #111; }
-  .dash-venir { background: #e8f0fe; color: #1a56b0; border: 0; cursor: pointer; font: inherit; font-size: 11px; }
+  .dash-venir { background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 11px; padding: 0; display: inline-flex; gap: 3px; flex-wrap: wrap; vertical-align: middle; }
+  /* transit (parti du central) en bleu, préparation (BL de réservation, pas encore parti) en violet */
+  .dash-venir .tr, .dash-arr-statut .tr { background: #e8f0fe; color: #1a56b0; border-radius: 999px; padding: 1px 7px; font-weight: 600; }
+  .dash-venir .pr, .dash-arr-statut .pr { background: #f0eafd; color: #5b3aa8; border-radius: 999px; padding: 1px 7px; font-weight: 600; }
+  .dash-pop td.tr, .dash-modale td.tr { color: #1a56b0; font-weight: 600; }
+  .dash-pop td.pr, .dash-modale td.pr { color: #5b3aa8; font-weight: 600; }
+  .dash-arr-statut { display: flex; gap: 4px; flex-wrap: wrap; font-size: 11px; }
+  .dash-arr-date { font-size: 11px; color: var(--encre2); }
+  .dash-neuf { position: absolute; left: 8px; top: 8px; background: #5b3aa8; color: #fff; border-radius: 999px; font-size: 11px; font-weight: 700; padding: 2px 8px; }
   .dash-ajout { position: absolute; top: 8px; right: 8px; z-index: 2; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--hairline);
                 background: #fff; color: #111; display: grid; place-items: center; cursor: pointer; padding: 0;
                 box-shadow: 0 2px 8px rgba(0,0,0,.10); transition: transform .12s ease, background .12s ease; }
@@ -1734,10 +1742,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1790158840"></script>
-<script src="imports.js?v=1790158840"></script>
-<script src="merch-shopify.js?v=1789992987"></script>
-<script src="moteur-merch.js?v=1789992987"></script>
+<script src="config.js?v=1790160153"></script>
+<script src="imports.js?v=1790160153"></script>
+<script src="merch-shopify.js?v=1790160153"></script>
+<script src="moteur-merch.js?v=1790160153"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2234,7 +2242,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1789911674";
+    v.src = "hero.mp4?v=1790160153";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -9731,6 +9739,7 @@ const DASH_PERIODES = [["s-1", "Semaine dernière"], ["mois", "Mois en cours"], 
 // Seuil du bloc « Produits qui tournent » : on ne montre plus un top figé mais tous les
 // produits qui dépassent ce ROS (pièces par magasin et par semaine) — décision Anthony 21/09/2026.
 const DASH_ROS_MIN = 1.5;
+const DASH_ARR_MAX = 400, DASH_ARR_PAGE = 24;   // bloc Arrivages : références chargées, cartes par page
 const DASH_ROS_MIN_LIGNES = 18;    // plancher : une semaine calme doit quand même remplir la page
 const DASH_ROS_MAX_LIGNES = 300;   // garde-fou : une sélection large ne doit pas la noyer
 let DASH = { magasins: [], choisis: [], periode: "35j", categorie: null, chargement: 0 };
@@ -9851,18 +9860,20 @@ async function chargerDashboard() {
   const p_magasins = DASH.choisis.length ? DASH.choisis : null;
   const jeton = ++DASH.chargement;      // une réponse en retard ne doit pas écraser la dernière
   corps.innerHTML = `<div class="dash-section"><div class="compte-produits">Chargement…</div></div>`;
+  DASH.arrVoir = DASH_ARR_PAGE;
   const appel = (nom, extra = {}) => api("/rest/v1/rpc/" + nom, { corps: { p_magasins, p_du: du, p_au: au, ...extra } })
     .catch(e => { console.warn(nom, e); return null; });
-  const [kpis, objectifs, tops, retard, central] = await Promise.all([
+  const [kpis, objectifs, tops, retard, central, arrivages] = await Promise.all([
     appel("dash_kpis"),
     appel("dash_objectifs"),
     appel("dash_top_produits", { p_categorie: null, p_n: DASH_ROS_MAX_LIGNES, p_ros_min: DASH_ROS_MIN, p_min: DASH_ROS_MIN_LIGNES }),
     appel("dash_retard_reseau", { p_n: 20 }),
     appel("dash_central_non_implante", { p_n: 30, p_stock_central_min: 20 }),
+    appel("dash_arrivages", { p_n: DASH_ARR_MAX }),
   ]);
   if (jeton !== DASH.chargement) return;
   DASH.donnees = { kpis: (kpis || [])[0] || null, objectifs: (objectifs || [])[0] || null,
-                   tops: tops || [], retard: retard || [], central: central || [] };
+                   tops: tops || [], retard: retard || [], central: central || [], arrivages: arrivages || [] };
   // taux de remise constaté des produits affichés (prix de base de l'export des ventes)
   const refsAffichees = [...new Set([...(tops || []), ...(retard || []), ...(central || [])].map(p => p.reference))];
   const [remises, transit] = refsAffichees.length ? await Promise.all([
@@ -9872,13 +9883,16 @@ async function chargerDashboard() {
   if (jeton !== DASH.chargement) return;
   DASH.remises = new Map((remises || []).map(r => [r.reference, r]));
   DASH.transit = new Map((transit || []).map(r => [r.reference, r]));
+  // les arrivages portent déjà leurs quantités : pas besoin de les redemander
+  (arrivages || []).forEach(a => { if (!DASH.transit.has(a.reference)) DASH.transit.set(a.reference, a); });
   rendreKpisDash();
   corps.innerHTML = `
     <div class="dash-section" id="dash-tops"></div>
+    <div class="dash-section" id="dash-arrivages"></div>
     <div class="dash-section" id="dash-retard"></div>
     <div class="dash-section" id="dash-central"></div>
     <div class="preco-barre" id="dash-reassort" hidden></div>`;
-  rendreTopsDash(); rendreRetardDash(); rendreCentralDash();
+  rendreTopsDash(); rendreArrivagesDash(); rendreRetardDash(); rendreCentralDash();
   chargerReaLocal();
   rendreRappelReassort();                  // la sélection de réassort survit au rechargement
 }
@@ -9929,13 +9943,14 @@ function rendreKpisDash() {
 // Pièces parties du central et pas encore réceptionnées : elles arrivent, inutile de les recommander.
 function dashTransit(p) {
   const t = DASH.transit?.get(p.reference);
-  const total = Number(t?.transit || 0) + Number(t?.preparation || 0);
-  if (!total) return "";
+  const tr = Number(t?.transit || 0), pr = Number(t?.preparation || 0);
+  if (!tr && !pr) return "";
   const ref = echapperHTML(p.reference);
-  return ` <button class="dash-badge dash-venir" title="${dashNb(t.transit)} en transit · ${dashNb(t.preparation)} en préparation — survolez pour le détail par taille"
+  // deux pastilles distinctes : le transit arrive dans les jours qui viennent, la préparation n'est pas encore partie
+  return ` <button class="dash-venir" title="${dashNb(tr)} en transit (expédié, pas encore réceptionné) · ${dashNb(pr)} en préparation au central (BL de réservation) — survolez pour le détail par taille"
     onmouseenter="survolTaillesDash(this, '${ref}')" onmouseleave="masquerPopTailles()"
     onfocus="survolTaillesDash(this, '${ref}')" onblur="masquerPopTailles()"
-    onclick="detailTaillesDash('${ref}')">+${dashNb(total)} à venir</button>`;
+    onclick="detailTaillesDash('${ref}')">${tr ? `<span class="tr">+${dashNb(tr)} transit</span>` : ""}${pr ? `<span class="pr">+${dashNb(pr)} prépa</span>` : ""}</button>`;
 }
 
 // Pastille promo posée sur la photo : remise moyenne constatée, arrondie à la dizaine — sur vos ventes
@@ -10012,16 +10027,16 @@ function corpsPopTailles(rep) {
   if (!tri.length) return `<b>Aucun stock</b><span style="color:var(--gris)">ni en magasin, ni au central, ni sur le web.</span>`;
   const cel = n => `<td class="${Number(n) ? "" : "zero"}">${dashNb(n)}</td>`;
   const tot = c => tri.reduce((s, l) => s + Number(l[c] || 0), 0);
-  // transit et préparation sont regroupés : pour décider d'un réassort, seul compte « ce qui arrive »
-  const aVenir = l => Number(l.transit || 0) + Number(l.preparation || 0);
-  const totVenir = tri.reduce((t, l) => t + aVenir(l), 0);
+  // transit et préparation ont chacun leur colonne (affichée seulement s'il y a quelque chose)
+  const avecTr = tot("transit") > 0, avecPr = tot("preparation") > 0;
+  const celV = (n, c) => `<td class="${Number(n) ? c : "zero"}">${dashNb(n)}</td>`;
   return `<b>Détail des tailles</b>
     <table>
-      <thead><tr><td>Taille</td><td>Mag</td>${totVenir ? "<td>À venir</td>" : ""}<td>Central</td><td>Web</td></tr></thead>
-      <tbody>${tri.map(l => `<tr><td>${echapperHTML(l.taille || "—")}</td>${cel(l.mag)}${totVenir ? cel(aVenir(l)) : ""}${cel(l.central)}${cel(l.web)}</tr>`).join("")}</tbody>
-      <tfoot><tr><td>Total</td><td>${dashNb(tot("mag"))}</td>${totVenir ? `<td>${dashNb(totVenir)}</td>` : ""}<td>${dashNb(tot("central"))}</td><td>${dashNb(tot("web"))}</td></tr></tfoot>
+      <thead><tr><td>Taille</td><td>Mag</td>${avecTr ? "<td>Transit</td>" : ""}${avecPr ? "<td>Prépa</td>" : ""}<td>Central</td><td>Web</td></tr></thead>
+      <tbody>${tri.map(l => `<tr><td>${echapperHTML(l.taille || "—")}</td>${cel(l.mag)}${avecTr ? celV(l.transit, "tr") : ""}${avecPr ? celV(l.preparation, "pr") : ""}${cel(l.central)}${cel(l.web)}</tr>`).join("")}</tbody>
+      <tfoot><tr><td>Total</td><td>${dashNb(tot("mag"))}</td>${avecTr ? `<td>${dashNb(tot("transit"))}</td>` : ""}${avecPr ? `<td>${dashNb(tot("preparation"))}</td>` : ""}<td>${dashNb(tot("central"))}</td><td>${dashNb(tot("web"))}</td></tr></tfoot>
     </table>
-    ${totVenir ? `<span style="color:var(--gris);display:block;margin-top:6px">À venir : ${dashNb(tot("transit"))} en transit · ${dashNb(tot("preparation"))} en préparation</span>` : ""}`;
+    ${avecTr || avecPr ? `<span style="color:var(--gris);display:block;margin-top:6px">Transit : expédié, pas encore réceptionné · Prépa : BL de réservation au central</span>` : ""}`;
 }
 
 function afficherPopTailles(ancre, contenu) {
@@ -10082,14 +10097,15 @@ async function detailTaillesDash(ref) {
   const cel = n => `<td class="${Number(n) ? "" : "zero"}">${dashNb(n)}</td>`;
   const total = c => lignes.reduce((s, l) => s + Number(l[c] || 0), 0);
   const magasins = [...new Set((parMagasin || []).map(l => l.magasin))];
-  const venir = total("transit") + total("preparation");
+  const avecTr = total("transit") > 0, avecPr = total("preparation") > 0;
+  const celV = (n, c) => `<td class="${Number(n) ? c : "zero"}">${dashNb(n)}</td>`;
   boite.innerHTML = entete + `
     <table>
-      <thead><tr><th>Taille</th><th>${magasins.length > 1 ? "Périmètre" : "Magasin"}</th>${venir ? "<th>À venir</th>" : ""}<th>Central</th><th>Web</th></tr></thead>
-      <tbody>${lignes.map(l => `<tr><td>${echapperHTML(l.taille || "—")}</td>${cel(l.mag)}${venir ? cel(Number(l.transit || 0) + Number(l.preparation || 0)) : ""}${cel(l.central)}${cel(l.web)}</tr>`).join("")}</tbody>
-      <tfoot><tr><td>Total</td><td>${dashNb(total("mag"))}</td>${venir ? `<td>${dashNb(venir)}</td>` : ""}<td>${dashNb(total("central"))}</td><td>${dashNb(total("web"))}</td></tr></tfoot>
+      <thead><tr><th>Taille</th><th>${magasins.length > 1 ? "Périmètre" : "Magasin"}</th>${avecTr ? "<th>Transit</th>" : ""}${avecPr ? "<th>Prépa</th>" : ""}<th>Central</th><th>Web</th></tr></thead>
+      <tbody>${lignes.map(l => `<tr><td>${echapperHTML(l.taille || "—")}</td>${cel(l.mag)}${avecTr ? celV(l.transit, "tr") : ""}${avecPr ? celV(l.preparation, "pr") : ""}${cel(l.central)}${cel(l.web)}</tr>`).join("")}</tbody>
+      <tfoot><tr><td>Total</td><td>${dashNb(total("mag"))}</td>${avecTr ? `<td>${dashNb(total("transit"))}</td>` : ""}${avecPr ? `<td>${dashNb(total("preparation"))}</td>` : ""}<td>${dashNb(total("central"))}</td><td>${dashNb(total("web"))}</td></tr></tfoot>
     </table>
-    ${venir ? `<div class="compte-produits" style="margin-top:8px">À venir : <b>${dashNb(total("transit"))}</b> en transit (expédié, pas encore réceptionné) · <b>${dashNb(total("preparation"))}</b> en préparation au central.</div>` : ""}
+    ${avecTr || avecPr ? `<div class="compte-produits" style="margin-top:8px"><b>${dashNb(total("transit"))}</b> en transit (expédié, pas encore réceptionné) · <b>${dashNb(total("preparation"))}</b> en préparation au central (BL de réservation, pas encore parti).</div>` : ""}
     ${magasins.length > 1 ? detailParMagasinDash(parMagasin, lignes) : ""}`;
 }
 
@@ -10379,16 +10395,18 @@ function carteDash(p, options = {}) {
     <span class="media" title="Ouvrir la fiche produit" onclick="location.hash='#/produit/' + encodeURIComponent('${echapperHTML(p.reference)}')">
       ${p.photo_url ? `<img class="photo" loading="lazy" src="${echapperHTML(p.photo_url)}" alt="">` : `<span class="photo"></span>`}
       ${dashPromo(p)}
+      ${options.arrivage && p.nouveau ? `<span class="dash-neuf" title="ni en stock ni vendu dans ce périmètre : c'est une nouveauté pour vous">Nouveau</span>` : ""}
     </span>
     ${dashBoutonAjout(p)}
     <div class="corps">
       <span class="marque">${echapperHTML(p.marque || "")}</span>
       <span class="nom">${echapperHTML(p.designation || p.reference)}</span>
       <span class="ref">${echapperHTML(p.reference)}${p.prix_vente ? " · " + eur(Number(p.prix_vente)) : ""}</span>
+      ${options.arrivage ? dashLigneArrivage(p) : ""}
       <div class="chiffres">
         ${p.ros_mag != null ? `<span><i>ROS mag</i><br><span class="dash-badge ${vert ? "ok" : "alerte"}">${dashRos(p.ros_mag)}/sem</span></span>` : ""}
         ${p.ros_reseau != null ? `<span title="moyenne des magasins qui vendent la référence — web et central exclus"><i>ROS réseau</i><br>${dashRos(p.ros_reseau)}/sem</span>` : ""}
-        ${p.stock_mag != null ? `<span><i>Stock mag</i><br>${lienTaillesDash(p.reference, p.stock_mag)}${dashTransit(p)}</span>` : dashTransit(p) ? `<span><i>En transit</i><br>${dashTransit(p)}</span>` : ""}
+        ${p.stock_mag != null ? `<span><i>Stock mag</i><br>${lienTaillesDash(p.reference, p.stock_mag)}${options.arrivage ? "" : dashTransit(p)}</span>` : !options.arrivage && dashTransit(p) ? `<span><i>À venir</i><br>${dashTransit(p)}</span>` : ""}
         <span title="ce que l'entrepôt central peut encore vous livrer"><i>Stock central</i><br>${lienTaillesDash(p.reference, p.stock_central)}</span>
         ${options.categorie && p.categorie ? `<span><i>Catégorie</i><br>${echapperHTML((DASH_CATS.find(([c]) => c === p.categorie) || [, p.categorie])[1])}</span>` : ""}
         ${p.ventes != null ? `<span><i>Ventes</i><br>${dashNb(p.ventes)}</span>` : ""}
@@ -10424,6 +10442,50 @@ function rendreTopsDash() {
     </div>
     ${liste.length ? `<div class="dash-grille">${liste.map((p, i) => carteDash(p, { rang: i + 1, global: true, categorie: active === "TOUS" })).join("")}</div>`
       : `<div class="dash-vide">Aucun produit au-dessus de ${seuil} de ROS sur la période pour ce périmètre.</div>`}`;
+}
+
+/* ---- Arrivages ----
+   Tout ce qui est en route vers le périmètre (transit) ou réservé pour lui au central (préparation),
+   y compris les nouveautés que le magasin n'a jamais eues : elles n'apparaissent dans aucun autre bloc. */
+const DASH_ARR_FILTRES = [
+  ["TOUS", "Tous", () => true],
+  ["TRANSIT", "En transit", a => Number(a.transit) > 0],
+  ["PREPA", "En préparation", a => Number(a.preparation) > 0],
+  ["NOUVEAU", "Nouveautés", a => a.nouveau],
+];
+const dashDateCourte = d => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) : "";
+
+function dashLigneArrivage(p) {
+  const tr = Number(p.transit || 0), pr = Number(p.preparation || 0);
+  return `<div class="dash-arr-statut">
+      ${tr ? `<span class="tr" title="expédié du central, pas encore réceptionné">${dashNb(tr)} en transit</span>` : ""}
+      ${pr ? `<span class="pr" title="BL de réservation au central, pas encore parti">${dashNb(pr)} en prépa</span>` : ""}
+    </div>
+    <span class="dash-arr-date">${[tr && p.date_transit ? "expédié le " + dashDateCourte(p.date_transit) : "",
+      pr && p.date_preparation ? "réservé le " + dashDateCourte(p.date_preparation) : ""].filter(Boolean).join(" · ")}</span>`;
+}
+
+function choisirFiltreArrivages(f) { DASH.arrFiltre = f; DASH.arrVoir = DASH_ARR_PAGE; rendreArrivagesDash(); }
+function voirPlusArrivages() { DASH.arrVoir = (DASH.arrVoir || DASH_ARR_PAGE) + DASH_ARR_PAGE * 2; rendreArrivagesDash(); }
+
+function rendreArrivagesDash() {
+  const zone = document.getElementById("dash-arrivages"); if (!zone) return;
+  const tous = DASH.donnees?.arrivages || [];
+  const filtre = DASH_ARR_FILTRES.find(([c]) => c === DASH.arrFiltre) || DASH_ARR_FILTRES[0];
+  const liste = tous.filter(filtre[2]);
+  const voir = DASH.arrVoir || DASH_ARR_PAGE;
+  const pieces = k => tous.reduce((s, a) => s + Number(a[k] || 0), 0);
+  zone.innerHTML = `<h3>Arrivages</h3>
+    <div class="compte-produits">Ce qui arrive dans votre périmètre : <span class="dash-arr-statut" style="display:inline-flex"><span class="tr">transit</span></span> = parti du central, pas encore réceptionné ;
+      <span class="dash-arr-statut" style="display:inline-flex"><span class="pr">prépa</span></span> = réservé pour vous au central (BL de réservation), pas encore parti.
+      « Nouveau » : ni en stock ni vendu chez vous — ces produits n'apparaissent dans aucun autre bloc.
+      ${tous.length ? `Au total <b>${dashNb(pieces("transit"))}</b> pièces en transit et <b>${dashNb(pieces("preparation"))}</b> en préparation, sur ${dashNb(tous.length)} référence${tous.length > 1 ? "s" : ""}${tous.length >= DASH_ARR_MAX ? ` (les ${DASH_ARR_MAX} plus grosses)` : ""}.` : ""}</div>
+    ${tous.length ? `<div class="dash-ligne" style="margin-top:10px">
+      ${DASH_ARR_FILTRES.map(([c, lib, f]) => `<button class="puce-claire dash-chip${c === filtre[0] ? " on" : ""}" onclick="choisirFiltreArrivages('${c}')">${lib} · ${tous.filter(f).length}</button>`).join("")}
+    </div>` : ""}
+    ${liste.length ? `<div class="dash-grille">${liste.slice(0, voir).map(p => carteDash(p, { arrivage: true })).join("")}</div>
+      ${liste.length > voir ? `<div style="margin-top:12px"><button class="puce-claire" onclick="voirPlusArrivages()">Voir plus · ${dashNb(liste.length - voir)} restant${liste.length - voir > 1 ? "s" : ""}</button></div>` : ""}`
+      : `<div class="dash-vide">${tous.length ? "Aucun produit dans ce filtre." : "Rien en transit ni en préparation pour ce périmètre. Les fichiers se déposent dans Back Office → Imports (réceptions en attente et export des BL)."}</div>`}`;
 }
 
 function rendreRetardDash() {
