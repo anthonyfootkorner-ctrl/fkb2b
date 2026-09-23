@@ -521,6 +521,9 @@
   .table-panier input { width: 54px; text-align: center; border: 1px solid #e2e0dc;
     border-radius: 6px; padding: 6px 4px; font-size: 13px; background: #fbfbfa; }
   .table-panier input:focus { outline: none; border-color: var(--encre); background: #fff; }
+  .table-panier td.pp-limite { white-space: nowrap; }
+  .table-panier .pp-dispo { display: block; font-size: 10px; color: var(--gris); margin-top: 2px; }
+  .table-panier input.pp-plafond { border-color: #c8102e; background: #fdeeee; }
   .table-panier td.absent { color: #d8d8d5; background: #faf9f8; }
   .table-panier th.th-total { background: #e3eefb; color: #1b5fa8; }
   .table-panier td.montant { color: #b5b5b0; font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
@@ -810,6 +813,12 @@
   /* légende des pastilles + description produit (modèle Blvck) */
   .legende { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 16px; padding: 12px 14px;
     background: #fafaf8; border: 1px solid var(--hairline); border-radius: 10px; }
+  .tailles-dispo { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .tailles-dispo span { display: inline-flex; flex-direction: column; align-items: center; min-width: 46px; padding: 6px 8px;
+    border: 1px solid var(--hairline); border-radius: 8px; font-size: 12px; background: #fff; }
+  .tailles-dispo span b { font-size: 11px; color: var(--encre2); font-weight: 600; margin-bottom: 2px; }
+  .tailles-dispo span.vide { opacity: .4; }
+  .tailles-dispo span.libre { border-color: #3d6fb4; }
   .legende span { font-size: 11.5px; color: var(--encre2); display: flex; align-items: center; gap: 7px; }
   .legende b { color: var(--encre); font-weight: 600; }
   .prod-galerie { display: flex; overflow-x: auto; scroll-snap-type: x mandatory;
@@ -1742,8 +1751,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1790176022"></script>
-<script src="imports.js?v=1790176022"></script>
+<script src="config.js?v=1790176399"></script>
+<script src="imports.js?v=1790176399"></script>
 <script src="merch-shopify.js?v=1790160593"></script>
 <script src="moteur-merch.js?v=1790160593"></script>
 <script>
@@ -4869,7 +4878,8 @@ function rendreGrillePreco() {
     ? `${produits.length} résultat${produits.length > 1 ? "s" : ""} pour « ${PRECO_RECHERCHE.trim()} » sur ${PRECO_PRODUITS.length} références`
     : `${produits.length} référence${produits.length > 1 ? "s" : ""} proposée${produits.length > 1 ? "s" : ""}`
     + (PRECO_RAYON || PRECO_CATEGORIE || PRECO_FAMILLE || PRECO_MARQUE ? ` sur ${PRECO_PRODUITS.length}` : "")
-    + " · livraison à la date annoncée, ces produits ne sont pas en stock";
+    + (PRECO_PRODUITS.some(p => p.tailles.some(t => t.precommande)) ? " · livraison à la date annoncée, ces produits ne sont pas en stock"
+                                                                   : " · quantités limitées au stock disponible");
   const zonePaniers = document.getElementById("preco-paniers");
   if (zonePaniers) zonePaniers.innerHTML = rendreSelecteurPanierPreco({ actions: true });
 
@@ -5430,9 +5440,12 @@ async function rendrePanierPreco(campagne) {
             const o = offre(p, t, d);
             if (!o) return `<td class="absent" title="taille non proposée sur cette livraison">·</td>`;
             const v = PRECO_SAISIE[cleSaisie(p.reference, t, d)] || "";
-            return `<td><input type="number" min="0" inputmode="numeric" value="${v}"
+            // quantité proposée : un plafond quand l'offre n'est pas illimitée (implantation, déstockage)
+            const dispo = o.illimite ? null : Number(o.quantite || 0);
+            return `<td class="${dispo != null ? "pp-limite" : ""}"><input type="number" min="0" inputmode="numeric" value="${v}"
+              ${dispo != null ? `max="${dispo}" placeholder="≤ ${dispo}" title="${dispo} disponible${dispo > 1 ? "s" : ""}"` : ""}
               data-l="${l}" data-c="${c}" data-ref="${echapperHTML(p.reference)}"
-              data-taille="${echapperHTML(t)}" data-livraison="${d || ""}"></td>`;
+              data-taille="${echapperHTML(t)}" data-livraison="${d || ""}">${dispo != null ? `<small class="pp-dispo">/ ${dispo}</small>` : ""}</td>`;
           }).join("")}
           <td class="pp-outils"><button class="pp-presse" data-presse-l="${l}" type="button"
                     onclick="pressePreco(${l})">Copier</button></td>
@@ -6550,11 +6563,24 @@ function repartirLignePanier(inp) {
     if (reste <= 0) break;
     base[o.i]++; reste--;
   }
+  // le disponible plafonne chaque taille : l'excédent est reporté sur les tailles qui ont encore de la place
+  const plafond = cases.map(c => c.max === "" ? total : Number(c.max));   // sans plafond : au plus le total
+  let excedent = 0;
+  cases.forEach((c, i) => { if (base[i] > plafond[i]) { excedent += base[i] - plafond[i]; base[i] = plafond[i]; } });
+  for (let tour = 0; excedent > 0 && tour < 3; tour++) {
+    const marge = cases.map((c, i) => Math.max(0, plafond[i] - base[i]) * (w[i] || 1));
+    const total_marge = marge.reduce((a, b) => a + b, 0);
+    if (!total_marge) break;
+    const encore = excedent; excedent = 0;
+    cases.forEach((c, i) => { base[i] += Math.min(plafond[i] - base[i], Math.round(encore * marge[i] / total_marge)); });
+    excedent = total - base.reduce((a, b) => a + b, 0);
+  }
   cases.forEach((c, i) => {
     c.value = base[i] || "";
     c.classList.remove("rempli"); void c.offsetWidth;   // relance l'animation même sur une reprise
     if (base[i]) c.classList.add("rempli");
   });
+  if (total - base.reduce((a, b) => a + b, 0) > 0) inp.title = `${total - base.reduce((a, b) => a + b, 0)} pièce(s) non placée(s) : le disponible est atteint`;
   majTotauxGrillePreco();
   planifierSauvegardeAuto();
 }
@@ -6588,7 +6614,10 @@ function brancherGrillePanier() {
   }
   const champs = [...document.querySelectorAll(".table-panier input[data-l]")];
   champs.forEach(inp => {
-    inp.addEventListener("input", () => { majTotauxGrillePreco(); planifierSauvegardeAuto(); });
+    inp.addEventListener("input", () => {
+      // au-delà du disponible, la saisie est ramenée au plafond
+      if (inp.max !== "" && Number(inp.value) > Number(inp.max)) { inp.value = inp.max; inp.classList.add("pp-plafond"); setTimeout(() => inp.classList.remove("pp-plafond"), 600); }
+      majTotauxGrillePreco(); planifierSauvegardeAuto(); });
     inp.addEventListener("paste", e => {
       const texte = (e.clipboardData || window.clipboardData).getData("text");
       if (!texte || !/[\t\n]/.test(texte)) return;   // une seule valeur : collage normal
@@ -7693,9 +7722,13 @@ async function rendreProduitPreco(campagne, reference) {
           p.coloris ? " · " + echapperHTML(p.coloris) : ""} · Saison ${echapperHTML(p.saison || "—")}</div>
         <div class="prixgros">dès ${eur(prixMini(p))} HT<span>votre tarif</span></div>
         ${pvcDe(p) ? `<div class="pvc"><b>${eur(pvcDe(p))}</b> TTC prix de vente conseillé${coefDe(p) ? `<span>coef ${pct(coefDe(p))}</span>` : ""}</div>` : ""}
-        <div class="legende">
+        ${p.tailles.some(t => !t.precommande) ? `
+        <div class="legende"><span><i class="pastille vert"></i><b>Stock disponible</b> — quantité maximale par taille</span></div>
+        <div class="tailles-dispo">${[...p.tailles].sort((a, b) => cleTaille(a.taille) - cleTaille(b.taille)).map(t =>
+          `<span class="${t.precommande ? "libre" : t.stock > 0 ? "" : "vide"}" title="${t.precommande ? "quantité libre" : t.stock + " disponible(s)"}"><b>${echapperHTML(t.taille)}</b>${t.precommande ? "∞" : t.stock}</span>`).join("")}</div>`
+        : `<div class="legende">
           <span><i class="pastille bleu"></i><b>Précommande</b> — quantité libre, livraison à la date choisie</span>
-        </div>
+        </div>`}
         <div class="repartition" style="margin-top:26px; gap:12px">
           <button class="${PRECO_PANIER.has(p.reference) ? "puce-claire actif" : "btn-noir"}" style="margin-left:0"
                   onclick="basculerDepuisFiche(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">${
