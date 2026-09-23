@@ -1751,8 +1751,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1790176843"></script>
-<script src="imports.js?v=1790176843"></script>
+<script src="config.js?v=1790177292"></script>
+<script src="imports.js?v=1790177292"></script>
 <script src="merch-shopify.js?v=1790160593"></script>
 <script src="moteur-merch.js?v=1790160593"></script>
 <script>
@@ -2721,7 +2721,7 @@ function cleRecence(saison) {
 /* Merch de précommande : « PRECO:<campagne> » range toute la campagne, « PRECO:<campagne>|BLOC:<bloc> »
    un bloc (Footwear, Running…). La cascade s'arrête à la campagne : une campagne n'hérite pas
    de l'ordre du site, elle a son propre repli (photo d'abord, puis référence). */
-let MERCH_CAMPAGNES = null;   // les campagnes ouvertes, pour le sélecteur (personnel)
+let MERCH_CAMPAGNES = null, MERCH_CAMPAGNES_FERMEES = new Set();   // toutes les campagnes, pour le sélecteur (personnel)
 const MERCH_PRECO = {};       // campagne -> produits (chargés à la demande)
 const estContextePreco = ctx => typeof ctx === "string" && ctx.startsWith("PRECO:");
 const campagneDuContexte = ctx => ctx.split("|")[0].slice("PRECO:".length);
@@ -2765,7 +2765,7 @@ function produitsDuContexte(ctx) {
   if (estContextePreco(ctx)) {
     const liste = MERCH_PRECO[campagneDuContexte(ctx)] || [];
     const bloc = (ctx.split("|")[1] || "").slice("BLOC:".length);
-    return bloc ? liste.filter(p => categorieDe(p) === bloc) : liste;
+    return bloc ? liste.filter(p => blocPrecoDe(liste, p) === bloc) : liste;
   }
   if (ctx === "TOUT") return DATA.produits;
   return ctx.split("|").reduce((liste, part) => {
@@ -2786,8 +2786,9 @@ function remplirAffinageMerch() {
     return;
   }
   if (estContextePreco(principal)) {
+    const liste = produitsDuContexte(principal);
     const blocs = ordreBlocsPreco(campagneDuContexte(principal),
-      [...new Set(produitsDuContexte(principal).map(categorieDe).filter(Boolean))].sort((a, b) => a.localeCompare(b)));
+      [...new Set(liste.map(p => blocPrecoDe(liste, p)).filter(Boolean))].sort((a, b) => a.localeCompare(b)));
     aff.disabled = false;
     aff.innerHTML = `<option value="">Toute la campagne</option>`
       + blocs.map(b => `<option value="BLOC:${echapperHTML(b)}">${echapperHTML(b)}</option>`).join("");
@@ -2828,11 +2829,11 @@ function rendreBlocsMerch() {
   const campagne = campagneDuContexte(principal);
   const produits = produitsDuContexte(principal);
   const compte = {};
-  for (const p of produits) { const c = categorieDe(p); if (c) compte[c] = (compte[c] || 0) + 1; }
+  for (const p of produits) { const c = blocPrecoDe(produits, p); if (c) compte[c] = (compte[c] || 0) + 1; }
   const blocs = ordreBlocsPreco(campagne, Object.keys(compte).sort((a, b) =>
     (a === "Autre") - (b === "Autre") || compte[b] - compte[a] || a.localeCompare(b)));
   if (blocs.length < 2) { zone.hidden = true; zone.innerHTML = ""; return; }
-  const photoDe = c => (ordonner(produits, contextePreco(campagne, c)).find(p => categorieDe(p) === c && p.photo) || {}).photo;
+  const photoDe = c => (ordonner(produits, contextePreco(campagne, c)).find(p => blocPrecoDe(produits, p) === c && p.photo) || {}).photo;
   const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
   zone.hidden = false;
   zone.className = "merch-blocs";
@@ -2933,12 +2934,14 @@ async function rendreMerch() {
     const marques = [...new Set(DATA.produits.map(p => p.marque).filter(Boolean))].sort();
     const familles = [...new Set(DATA.produits.map(p => p.famille).filter(Boolean))].sort();
     if (MERCH_CAMPAGNES === null) {
-      MERCH_CAMPAGNES = (await api("/rest/v1/rpc/campagnes_precommande", { corps: {} }).catch(() => []))
-        .filter(c => c.ouverte).map(c => c.campagne);
+      // fermées comprises : une campagne se range avant son ouverture
+      const toutes = await api("/rest/v1/rpc/campagnes_precommande", { corps: {} }).catch(() => []);
+      MERCH_CAMPAGNES = toutes.map(c => c.campagne);
+      MERCH_CAMPAGNES_FERMEES = new Set(toutes.filter(c => !c.ouverte).map(c => c.campagne));
     }
     sel.innerHTML = `<option value="TOUT">Tout le site</option>
       ${MERCH_CAMPAGNES.length ? `<optgroup label="Précommandes">${MERCH_CAMPAGNES.map(c =>
-        `<option value="PRECO:${echapperHTML(c)}">Précommande ${echapperHTML(c)}</option>`).join("")}</optgroup>` : ""}
+        `<option value="PRECO:${echapperHTML(c)}">Précommande ${echapperHTML(c)}${MERCH_CAMPAGNES_FERMEES.has(c) ? " (fermée)" : ""}</option>`).join("")}</optgroup>` : ""}
       <optgroup label="Catégories">${familles.map(f => `<option value="FAMILLE:${f}">${f}</option>`).join("")}</optgroup>
       <optgroup label="Marques">${marques.map(m => `<option value="MARQUE:${m}">${m}</option>`).join("")}</optgroup>`;
   }
@@ -2948,7 +2951,7 @@ async function rendreMerch() {
     document.getElementById("merch-etat").textContent = "chargement de la campagne…";
     try {
       const lot = await api("/rest/v1/rpc/catalogue_precommande",
-        { corps: { p_campagne: campagneDuContexte(principal), limite: 1000 } });
+        { corps: { p_campagne: campagneDuContexte(principal), limite: 5000 } });
       lot.forEach(trierTailles);
       MERCH_PRECO[campagneDuContexte(principal)] = lot;
     } catch (e) {
@@ -4815,6 +4818,15 @@ const BLOCS_PAR_FAMILLE = { FOOTWEAR: "Footwear", ACCESSOIRES: "Accessoires" };
 const RAYON_ALIAS = { YOUTH: "KIDS" };
 const rayonDe = p => RAYON_ALIAS[p.rayon] || p.rayon || "";
 const categorieDe = p => BLOCS_PAR_FAMILLE[(p.famille || "").toUpperCase()] || p.categorie || "";
+/* Le bloc d'un produit dans une campagne : la catégorie fournisseur pour une campagne mono-marque,
+   « marque · famille » pour une campagne multi-marques (implantation), comme sa vitrine. */
+const MULTI_MARQUES = new WeakMap();
+function estListeMultiMarques(liste) {
+  if (!MULTI_MARQUES.has(liste)) MULTI_MARQUES.set(liste, new Set(liste.map(p => p.marque).filter(Boolean)).size > 1);
+  return MULTI_MARQUES.get(liste);
+}
+const blocPrecoDe = (liste, p) => estListeMultiMarques(liste)
+  ? [p.marque, libelleFamille(p.famille)].filter(Boolean).join(" · ") : categorieDe(p);
 
 async function rendreCataloguePreco(campagne) {
   PRECO_COURANTE = campagne;
@@ -4867,7 +4879,9 @@ function rendreGrillePreco() {
   const mots = String(PRECO_RECHERCHE || "").split(/\s+/).map(normaliserRecherche).filter(Boolean);
   const q = mots.length > 0;
   // l'ordre merch du bloc, à défaut celui de la campagne, à défaut celui du serveur
-  const ctxMerch = contextePreco(PRECO_COURANTE, q ? null : PRECO_CATEGORIE);
+  const ctxMerch = contextePreco(PRECO_COURANTE, q ? null
+    : precoMultiMarques() ? (PRECO_MARQUE && PRECO_FAMILLE ? `${PRECO_MARQUE} · ${libelleFamille(PRECO_FAMILLE)}` : null)
+    : PRECO_CATEGORIE);
   const produits = ordonner(PRECO_PRODUITS, ctxMerch).filter(p =>
     q ? correspondPreco(p, mots)
       : (!PRECO_MARQUE || p.marque === PRECO_MARQUE)
