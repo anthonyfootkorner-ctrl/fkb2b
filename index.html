@@ -1742,8 +1742,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1790160593"></script>
-<script src="imports.js?v=1790160593"></script>
+<script src="config.js?v=1790176022"></script>
+<script src="imports.js?v=1790176022"></script>
 <script src="merch-shopify.js?v=1790160593"></script>
 <script src="moteur-merch.js?v=1790160593"></script>
 <script>
@@ -4790,7 +4790,10 @@ async function rendreCampagnesClient() {
     : `<div class="cmd-carte" style="color:var(--encre2)">Aucune campagne n'est ouverte à votre magasin pour le moment.</div>`;
 }
 
-let PRECO_COURANTE = null, PRECO_PRODUITS = [], PRECO_MARQUE = null, PRECO_RAYON = null, PRECO_CATEGORIE = null, PRECO_RECHERCHE = "";
+let PRECO_COURANTE = null, PRECO_PRODUITS = [], PRECO_MARQUE = null, PRECO_RAYON = null, PRECO_CATEGORIE = null, PRECO_FAMILLE = null, PRECO_RECHERCHE = "";
+// campagne multi-marques (implantation…) : la vitrine propose d'abord les marques, puis les familles de la marque
+const precoMultiMarques = () => new Set(PRECO_PRODUITS.map(p => p.marque).filter(Boolean)).size > 1;
+const libelleFamille = f => { const t = String(f || "").trim(); return t ? t[0].toUpperCase() + t.slice(1).toLowerCase() : ""; };
 let PRECO_INFOS = {};   // la fiche de la campagne (visuel, date limite), pour la vitrine
 let PRECO_VUE = "vitrine";   // « vitrine » : les gros blocs seuls ; « grille » : les produits
 /* Le fournisseur range chaussures et accessoires dans « Sportswear », « Running », « Jordan »…
@@ -4813,7 +4816,7 @@ async function rendreCataloguePreco(campagne) {
   try {
     const [produits, campagnes] = await Promise.all([
       api("/rest/v1/rpc/catalogue_precommande",
-        { corps: { p_campagne: campagne, limite: 1000, p_societe: clientActif?.id ?? null } }),
+        { corps: { p_campagne: campagne, limite: 5000, p_societe: clientActif?.id ?? null } }),
       api("/rest/v1/rpc/mes_campagnes", { corps: { p_societe: clientActif?.id ?? null } }).catch(() => []),
     ]);
     PRECO_PRODUITS = produits;
@@ -4827,6 +4830,7 @@ async function rendreCataloguePreco(campagne) {
   PRECO_MARQUE = null;
   PRECO_RAYON = null;
   PRECO_CATEGORIE = null;
+  PRECO_FAMILLE = null;
   PRECO_VUE = "vitrine";
   PRECO_RECHERCHE = "";
   const champ = document.getElementById("preco-recherche"); if (champ) champ.value = "";
@@ -4859,11 +4863,12 @@ function rendreGrillePreco() {
     q ? correspondPreco(p, mots)
       : (!PRECO_MARQUE || p.marque === PRECO_MARQUE)
         && (!PRECO_RAYON || rayonDe(p) === PRECO_RAYON)
-        && (!PRECO_CATEGORIE || categorieDe(p) === PRECO_CATEGORIE));
+        && (!PRECO_CATEGORIE || categorieDe(p) === PRECO_CATEGORIE)
+        && (!PRECO_FAMILLE || (p.famille || "").toUpperCase() === PRECO_FAMILLE));
   document.getElementById("preco-sous-titre").textContent = q
     ? `${produits.length} résultat${produits.length > 1 ? "s" : ""} pour « ${PRECO_RECHERCHE.trim()} » sur ${PRECO_PRODUITS.length} références`
     : `${produits.length} référence${produits.length > 1 ? "s" : ""} proposée${produits.length > 1 ? "s" : ""}`
-    + (PRECO_RAYON || PRECO_CATEGORIE ? ` sur ${PRECO_PRODUITS.length}` : "")
+    + (PRECO_RAYON || PRECO_CATEGORIE || PRECO_FAMILLE || PRECO_MARQUE ? ` sur ${PRECO_PRODUITS.length}` : "")
     + " · livraison à la date annoncée, ces produits ne sont pas en stock";
   const zonePaniers = document.getElementById("preco-paniers");
   if (zonePaniers) zonePaniers.innerHTML = rendreSelecteurPanierPreco({ actions: true });
@@ -4880,7 +4885,8 @@ function rendreGrillePreco() {
   const rayons = [...new Set(PRECO_PRODUITS.map(rayonDe).filter(Boolean))]
     .sort((a, b) => combien("rayon", b) - combien("rayon", a) || a.localeCompare(b));
   const marques = [...new Set(PRECO_PRODUITS.map(p => p.marque).filter(Boolean))].sort();
-  let barre = puce("← Catégories", false, "retourVitrine()");
+  let barre = puce(precoMultiMarques() ? "← Marques" : "← Catégories", false, "retourVitrine()");
+  if (PRECO_MARQUE && precoMultiMarques()) barre += puce(`← Familles ${PRECO_MARQUE}`, false, "retourFamillesVitrine()");
   if (q) {
     barre += `<button class="puce-claire actif" onclick="effacerRecherchePreco()">✕ Effacer la recherche « ${echapperHTML(PRECO_RECHERCHE.trim())} »</button>`;
   } else if (rayons.length > 1) {
@@ -4917,8 +4923,10 @@ function rendreGrillePreco() {
   document.getElementById("preco-filtres").hidden = enVitrine;
   document.getElementById("preco-grille").hidden = enVitrine;
   if (enVitrine) {
-    document.getElementById("preco-sous-titre").textContent =
-      `${PRECO_PRODUITS.length} référence${PRECO_PRODUITS.length > 1 ? "s" : ""} · choisissez une catégorie pour voir les produits`;
+    document.getElementById("preco-sous-titre").textContent = precoMultiMarques()
+      ? (PRECO_MARQUE ? `${PRECO_MARQUE} · choisissez une famille pour voir les produits`
+                      : `${PRECO_PRODUITS.length} références · choisissez une marque`)
+      : `${PRECO_PRODUITS.length} référence${PRECO_PRODUITS.length > 1 ? "s" : ""} · choisissez une catégorie pour voir les produits`;
     document.getElementById("preco-grille").innerHTML = "";
     return;
   }
@@ -4964,6 +4972,7 @@ function affinerPrecoCategorie(categorie) { PRECO_CATEGORIE = categorie; rendreG
 function rendreVitrinePreco() {
   const zone = document.getElementById("preco-vitrine");
   if (!zone) return;
+  if (precoMultiMarques()) return rendreVitrineMarques(zone);
   const compte = {};
   for (const p of PRECO_PRODUITS) { const c = categorieDe(p); if (c) compte[c] = (compte[c] || 0) + 1; }
   const cats = ordreBlocsPreco(PRECO_COURANTE, Object.keys(compte).sort((a, b) =>
@@ -4995,8 +5004,68 @@ function rendreVitrinePreco() {
     }).join("");
 }
 
+/* Campagne multi-marques : niveau 1 les marques, niveau 2 les familles de la marque choisie.
+   Chaque tuile prend pour fond la photo du premier produit du bloc. */
+function rendreVitrineMarques(zone) {
+  if (PRECO_VUE !== "vitrine" || String(PRECO_RECHERCHE || "").trim()) { zone.innerHTML = ""; zone.hidden = true; return; }
+  zone.hidden = false;
+  const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
+  const tuile = (label, n, photo, onclick, actif) => `<div class="vitrine-tuile${photo ? " photo" : ""}${actif ? " actif" : ""}" onclick="${onclick}">
+      ${photo ? `<img class="fond" loading="lazy" src="${photo}" alt="">` : `<div class="corps"><div class="nom">${echapperHTML(label)}</div></div>`}
+      <div class="voir">Voir ${echapperHTML(label)} <span>${n}</span></div></div>`;
+  const photoDe = liste => (liste.find(p => p.photo) || {}).photo;
+  if (!PRECO_MARQUE) {
+    const compte = {};
+    for (const p of PRECO_PRODUITS) if (p.marque) compte[p.marque] = (compte[p.marque] || 0) + 1;
+    const marques = Object.keys(compte).sort((a, b) => compte[b] - compte[a] || a.localeCompare(b));
+    const visuel = PRECO_INFOS.image;
+    zone.innerHTML = `
+      <div class="vitrine-tuile noir${visuel ? " photo" : ""}" onclick="choisirVitrine(null)">
+        ${visuel ? `<img class="fond" src="${echapperHTML(visuel)}" alt="">` : `<div class="corps">
+          <div class="sous">${echapperHTML(PRECO_COURANTE || "")}</div>
+          <div class="grand">${echapperHTML(PRECO_COURANTE || "")}</div>
+          <div class="sous">${PRECO_PRODUITS.length} références</div>
+        </div>`}
+        <div class="voir">Voir toute la campagne <span>${PRECO_PRODUITS.length}</span></div>
+      </div>`
+      + marques.map(m => tuile(m, compte[m], photoDe(PRECO_PRODUITS.filter(p => p.marque === m)), `choisirMarqueVitrine(${arg(m)})`, false)).join("");
+    return;
+  }
+  const deLaMarque = PRECO_PRODUITS.filter(p => p.marque === PRECO_MARQUE);
+  const compte = {};
+  for (const p of deLaMarque) { const f = (p.famille || "").toUpperCase(); if (f) compte[f] = (compte[f] || 0) + 1; }
+  const familles = Object.keys(compte).sort((a, b) => compte[b] - compte[a] || a.localeCompare(b));
+  zone.innerHTML = `
+    <div class="vitrine-tuile noir" onclick="choisirFamilleVitrine(null)">
+      <div class="corps"><div class="sous">${echapperHTML(PRECO_COURANTE || "")}</div>
+        <div class="grand">${echapperHTML(PRECO_MARQUE)}</div>
+        <div class="sous">${deLaMarque.length} références</div></div>
+      <div class="voir">Voir tout ${echapperHTML(PRECO_MARQUE)} <span>${deLaMarque.length}</span></div>
+    </div>
+    <div class="vitrine-tuile" onclick="retourVitrine()" style="height:auto;min-height:0">
+      <div class="corps" style="padding:14px"><div class="sous">← toutes les marques</div></div>
+    </div>`
+    + familles.map(f => tuile(libelleFamille(f), compte[f], photoDe(deLaMarque.filter(p => (p.famille || "").toUpperCase() === f)),
+                              `choisirFamilleVitrine(${arg(f)})`, false)).join("");
+}
+function choisirMarqueVitrine(marque) {
+  PRECO_MARQUE = marque; PRECO_FAMILLE = null; PRECO_VUE = "vitrine";
+  rendreGrillePreco();
+  window.scrollTo({ top: 0 });
+}
+function choisirFamilleVitrine(famille) {
+  PRECO_FAMILLE = famille || null; PRECO_RAYON = null; PRECO_CATEGORIE = null; PRECO_VUE = "grille";
+  rendreGrillePreco();
+  window.scrollTo({ top: 0 });
+}
+function retourFamillesVitrine() {
+  PRECO_FAMILLE = null; PRECO_VUE = "vitrine";
+  rendreGrillePreco();
+  window.scrollTo({ top: 0 });
+}
+
 function choisirVitrine(categorie) {
-  PRECO_RAYON = null;
+  PRECO_RAYON = null; PRECO_FAMILLE = null; PRECO_MARQUE = null;
   PRECO_CATEGORIE = categorie || null;
   PRECO_VUE = "grille";
   rendreGrillePreco();
@@ -5007,6 +5076,8 @@ function retourVitrine() {
   PRECO_VUE = "vitrine";
   PRECO_CATEGORIE = null;
   PRECO_RAYON = null;
+  PRECO_FAMILLE = null;
+  PRECO_MARQUE = null;
   rendreGrillePreco();
   window.scrollTo({ top: 0 });
 }
