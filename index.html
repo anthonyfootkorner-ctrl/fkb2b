@@ -1751,8 +1751,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1790177679"></script>
-<script src="imports.js?v=1790177679"></script>
+<script src="config.js?v=1790179449"></script>
+<script src="imports.js?v=1790179449"></script>
 <script src="merch-shopify.js?v=1790160593"></script>
 <script src="moteur-merch.js?v=1790160593"></script>
 <script>
@@ -4981,6 +4981,7 @@ function rendreGrillePreco() {
         <div class="nom">${echapperHTML(p.designation || p.reference)}</div>
         <div class="sousnom">${echapperHTML(p.marque || "")} · ${echapperHTML(p.reference)}${
           categorieDe(p) ? ` · ${echapperHTML(categorieDe(p))}` : ""}</div>
+        <div class="tailles-carte">${rubanTaillesPreco(p)}</div>
         <div class="prix">dès ${eur(prixMini(p))} HT</div>
         ${pvcDe(p) ? `<div class="prix pvc-court">PVC ${eur(pvcDe(p))} TTC</div>` : ""}
         <div class="sousnom" style="margin-top:6px; color:${saisi ? "#2e9e4f" : "var(--encre2)"}">${
@@ -4992,6 +4993,16 @@ function rendreGrillePreco() {
     || `<div class="vide" style="grid-column:1/-1;color:#777">${q
           ? `Aucune référence ne correspond à « ${echapperHTML(PRECO_RECHERCHE.trim())} »${PRECO_RAYON ? " dans ce rayon" : ""}.`
           : "Aucun produit dans cette campagne."}</div>`;
+}
+
+/* Les tailles sur la carte, colorées comme au catalogue : vert dès 5 pièces, orange en dessous,
+   barré si rien, bleu pour une quantité libre. On voit d'un coup d'œil ce qu'il reste. */
+function rubanTaillesPreco(p) {
+  return [...(p.tailles || [])].sort((a, b) => cleTaille(a.taille) - cleTaille(b.taille)).map(t => {
+    const vide = !t.precommande && !(t.stock > 0);
+    return `<b class="${vide ? "epuise" : ""}" style="color:${t.precommande ? "#3d6fb4" : couleurTaille(t.stock)}"
+      title="${t.precommande ? "quantité libre" : `${t.stock} disponible${t.stock > 1 ? "s" : ""}`}">${echapperHTML(t.taille)}</b>`;
+  }).join(" ");
 }
 
 function affinerPreco(marque) { PRECO_MARQUE = marque; rendreGrillePreco(); }
