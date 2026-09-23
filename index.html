@@ -1751,8 +1751,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1790177292"></script>
-<script src="imports.js?v=1790177292"></script>
+<script src="config.js?v=1790177679"></script>
+<script src="imports.js?v=1790177679"></script>
 <script src="merch-shopify.js?v=1790160593"></script>
 <script src="moteur-merch.js?v=1790160593"></script>
 <script>
@@ -4910,7 +4910,15 @@ function rendreGrillePreco() {
     .sort((a, b) => combien("rayon", b) - combien("rayon", a) || a.localeCompare(b));
   const marques = [...new Set(PRECO_PRODUITS.map(p => p.marque).filter(Boolean))].sort();
   let barre = puce(precoMultiMarques() ? "← Marques" : "← Catégories", false, "retourVitrine()");
-  if (PRECO_MARQUE && precoMultiMarques()) barre += puce(`← Familles ${PRECO_MARQUE}`, false, "retourFamillesVitrine()");
+  if (PRECO_MARQUE && precoMultiMarques()) {
+    const deLaMarque = PRECO_PRODUITS.filter(p => p.marque === PRECO_MARQUE);
+    const cf = {};
+    for (const p of deLaMarque) { const f = (p.famille || "").toUpperCase(); if (f) cf[f] = (cf[f] || 0) + 1; }
+    const familles = Object.keys(cf).sort((a, b) => cf[b] - cf[a] || a.localeCompare(b));
+    barre += `<span style="flex-basis:100%; height:0"></span>`
+      + puce(`Tout ${PRECO_MARQUE} (${deLaMarque.length})`, !PRECO_FAMILLE, "affinerPrecoFamille(null)")
+      + familles.map(f => puce(`${libelleFamille(f)} (${cf[f]})`, f === PRECO_FAMILLE, `affinerPrecoFamille(${arg(f)})`)).join("");
+  }
   if (q) {
     barre += `<button class="puce-claire actif" onclick="effacerRecherchePreco()">✕ Effacer la recherche « ${echapperHTML(PRECO_RECHERCHE.trim())} »</button>`;
   } else if (rayons.length > 1) {
@@ -4925,7 +4933,7 @@ function rendreGrillePreco() {
   const combienCat = v => dansRayon.filter(p => categorieDe(p) === v).length;
   const categories = ordreBlocsPreco(PRECO_COURANTE, [...new Set(dansRayon.map(categorieDe).filter(Boolean))]
     .sort((a, b) => combienCat(b) - combienCat(a) || a.localeCompare(b)));
-  if (!q && categories.length > 1) {
+  if (!q && categories.length > 1 && !precoMultiMarques()) {   // multi-marques : les familles de la marque remplacent les catégories
     if (barre) barre += `<span style="flex-basis:100%; height:0"></span>`;
     barre += puce(`Toutes les catégories (${dansRayon.length})`, !PRECO_CATEGORIE, "affinerPrecoCategorie(null)")
       + categories.map(c => puce(`${c} (${combienCat(c)})`, c === PRECO_CATEGORIE,
@@ -5073,7 +5081,7 @@ function rendreVitrineMarques(zone) {
                               `choisirFamilleVitrine(${arg(f)})`, false)).join("");
 }
 function choisirMarqueVitrine(marque) {
-  PRECO_MARQUE = marque; PRECO_FAMILLE = null; PRECO_VUE = "vitrine";
+  PRECO_MARQUE = marque; PRECO_FAMILLE = null; PRECO_RAYON = null; PRECO_CATEGORIE = null; PRECO_VUE = "grille";
   rendreGrillePreco();
   window.scrollTo({ top: 0 });
 }
@@ -5082,6 +5090,7 @@ function choisirFamilleVitrine(famille) {
   rendreGrillePreco();
   window.scrollTo({ top: 0 });
 }
+function affinerPrecoFamille(famille) { PRECO_FAMILLE = famille || null; rendreGrillePreco(); }
 function retourFamillesVitrine() {
   PRECO_FAMILLE = null; PRECO_VUE = "vitrine";
   rendreGrillePreco();
