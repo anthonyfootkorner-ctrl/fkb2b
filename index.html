@@ -1540,7 +1540,7 @@
           <option value="validee">À approuver</option>
           <option value="a_integrer">À intégrer dans Fastmag</option>
           <option value="integree">Intégrée Fastmag</option>
-          <option value="annulee">Annulée</option>
+          <option value="annulee">Refusée</option>
         </select>
         <button class="puce-claire" id="cmd-rafraichir">Rafraîchir</button>
       </div>
@@ -1751,8 +1751,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1790179449"></script>
-<script src="imports.js?v=1790179449"></script>
+<script src="config.js?v=1790264133"></script>
+<script src="imports.js?v=1790264133"></script>
 <script src="merch-shopify.js?v=1790160593"></script>
 <script src="moteur-merch.js?v=1790160593"></script>
 <script>
@@ -8001,13 +8001,16 @@ const cmdAIntegrer = (c) => A_INTEGRER.includes(c.statut) && peutIntegrer;
 // on doit pouvoir revenir en arrière : une case cochée par erreur se décoche
 const cmdADesapprouver = (c) => c.statut === "approuvee" && peutApprouver;
 const cmdADesintegrer = (c) => c.statut === "integree" && peutIntegrer;
-const cmdCochable = (c) => cmdAApprouver(c) || cmdAIntegrer(c) || cmdADesapprouver(c) || cmdADesintegrer(c);
+// refus : tant que la commande n'est pas intégrée dans Fastmag ; retour arrière possible sur un refus
+const cmdARefuser = (c) => ["validee", "approuvee", "transmise"].includes(c.statut) && peutApprouver;
+const cmdARetablir = (c) => c.statut === "annulee" && peutApprouver;
+const cmdCochable = (c) => cmdAApprouver(c) || cmdAIntegrer(c) || cmdADesapprouver(c) || cmdADesintegrer(c) || cmdARefuser(c) || cmdARetablir(c);
 
 async function rendreCommandesAdmin(file) {
   const liste = document.getElementById("cmd-liste");
   if (!COMMANDES_ADMIN.length) liste.innerHTML = `<div class="compte-produits">Chargement…</div>`;
   const [commandes, societes] = await Promise.all([
-    api("/rest/v1/commandes?select=id,numero,nom,statut,nb_pieces,total_ht,total_net,remise_pct,cree_le,societe_id,envoye_le,envoi_erreur,commentaire,approuvee_le,integree_le&order=cree_le.desc&limit=500").catch(() => []),
+    api("/rest/v1/commandes?select=id,numero,nom,statut,nb_pieces,total_ht,total_net,remise_pct,cree_le,societe_id,envoye_le,envoi_erreur,commentaire,approuvee_le,integree_le,refus_motif,refusee_le&order=cree_le.desc&limit=500").catch(() => []),
     api("/rest/v1/societes?select=id,nom,compte").catch(() => []),
   ]);
   const nomSociete = {};
@@ -8098,6 +8101,7 @@ function majBarreLot(vues) {
   const pourIntegrer = combien(cmdAIntegrer);
   const pourDesapprouver = combien(cmdADesapprouver);
   const pourDesintegrer = combien(cmdADesintegrer);
+  const pourRefuser = combien(cmdARefuser), pourRetablir = combien(cmdARetablir);
   barre.style.display = "flex";
   barre.innerHTML = `
     <button class="puce-claire" onclick="cocherToutesCommandes(VUES_COMMANDES)">Tout cocher / décocher</button>
@@ -8107,6 +8111,8 @@ function majBarreLot(vues) {
     ${pourIntegrer ? `<button class="puce-claire forte" onclick="integrerSelection()">Marquer intégrées dans Fastmag (${pourIntegrer})</button>` : ""}
     ${pourDesapprouver ? `<button class="puce-claire" onclick="desapprouverSelection()">Annuler l'approbation (${pourDesapprouver})</button>` : ""}
     ${pourDesintegrer ? `<button class="puce-claire" onclick="desintegrerSelection()">Annuler l'intégration (${pourDesintegrer})</button>` : ""}
+    ${pourRefuser ? `<button class="puce-claire danger" onclick="refuserSelection()">Refuser (${pourRefuser})</button>` : ""}
+    ${pourRetablir ? `<button class="puce-claire" onclick="retablirSelection()">Annuler le refus (${pourRetablir})</button>` : ""}
     <span class="cmd-etat" id="cmd-lot-etat"></span>`;
 }
 let VUES_COMMANDES = [];
@@ -8157,13 +8163,27 @@ async function desintegrerSelection() {
   await agirSurSelection("desintegrer_commandes", "desintegrees", "remise à intégrer", "remises à intégrer");
 }
 
-async function agirSurSelection(rpc, cle, motUn, motPlusieurs) {
+/* Refus : la commande passe « refusée », son stock réservé se libère, le motif est visible du
+   magasin dans « Mon compte » et gardé au journal. Réversible tant que rien n'est parti dans Fastmag. */
+async function refuserSelection() {
+  const n = [...SELECTION_CMD].filter(id => cmdARefuser(COMMANDES_ADMIN.find(c => c.id === id) || {})).length;
+  const motif = prompt(`Refuser ${n} commande${n > 1 ? "s" : ""} ?\n\nMotif (visible du magasin dans « Mon compte ») :`, "");
+  if (motif === null) return;
+  await agirSurSelection("refuser_commandes", "refusees", "refusée", "refusées", { p_motif: motif });
+}
+async function retablirSelection() {
+  const n = [...SELECTION_CMD].filter(id => cmdARetablir(COMMANDES_ADMIN.find(c => c.id === id) || {})).length;
+  if (!confirm(`Annuler le refus de ${n} commande${n > 1 ? "s" : ""} ?\n\nElles repartent dans la file « à approuver » et réservent à nouveau leur stock.`)) return;
+  await agirSurSelection("retablir_commandes", "retablies", "rétablie", "rétablies");
+}
+
+async function agirSurSelection(rpc, cle, motUn, motPlusieurs, extra = {}) {
   const etat = document.getElementById("cmd-lot-etat");
   const ids = [...SELECTION_CMD];
   if (!ids.length) { etat.textContent = "cochez au moins une commande"; return; }
   etat.textContent = "enregistrement…";
   try {
-    const r = await api(`/rest/v1/rpc/${rpc}`, { corps: { p_ids: ids } });
+    const r = await api(`/rest/v1/rpc/${rpc}`, { corps: { p_ids: ids, ...extra } });
     SELECTION_CMD.clear();
     await rendreCommandesAdmin();
     const n = r?.[cle] ?? 0;
@@ -8210,6 +8230,7 @@ function rangCommandeAdmin(c) {
     </div>
     ${c.envoi_erreur ? `<div class="cmd-note erreur">Dernier échec d'envoi : ${echapperHTML(c.envoi_erreur)}</div>` : ""}
     ${c.commentaire ? `<div class="cmd-note mot">Mot du client : ${echapperHTML(c.commentaire)}</div>` : ""}
+    ${c.statut === "annulee" ? `<div class="cmd-note" style="color:#b3261e">Refusée${c.refusee_le ? " le " + new Date(c.refusee_le).toLocaleDateString("fr-FR") : ""}${c.refus_motif ? " — " + echapperHTML(c.refus_motif) : ""}</div>` : ""}
     <div class="cmd-actions">
       <button class="puce-claire forte" onclick="telechargerRecapCommande('${c.id}')">Télécharger (Excel)</button>
       <button class="puce-claire" onclick="telechargerFichierCommande('${c.id}')"
@@ -8370,7 +8391,7 @@ async function renvoyerCommande(id) {
 /* ---------------- compte (données réelles, isolées par société) ---------------- */
 const LIBELLES_STATUT = { validee: ["À APPROUVER", "attente"], approuvee: ["À INTÉGRER", "attente"],
                           transmise: ["À INTÉGRER", "attente"],
-                          integree: ["INTÉGRÉE FASTMAG", "ok"], annulee: ["ANNULÉE", ""] };
+                          integree: ["INTÉGRÉE FASTMAG", "ok"], annulee: ["REFUSÉE", "alerte"] };
 
 async function rendreCompte() {
   const c = clientActif;
@@ -8382,7 +8403,7 @@ async function rendreCompte() {
     <div class="rang">Conditions de règlement<span class="fin">Sur facture — définies dans Fastmag</span></div>`;
 
   const [commandes, paniersSauves, precos] = await Promise.all([
-    api("/rest/v1/commandes?select=id,numero,nom,statut,nb_pieces,total_ht,total_net,remise_pct,cree_le,societe_id&order=cree_le.desc&limit=15").catch(() => []),
+    api("/rest/v1/commandes?select=id,numero,nom,statut,nb_pieces,total_ht,total_net,remise_pct,cree_le,societe_id,refus_motif&order=cree_le.desc&limit=15").catch(() => []),
     api("/rest/v1/paniers?select=lignes,modifie_le&order=modifie_le.desc&limit=3").catch(() => []),
     api("/rest/v1/rpc/mes_precommandes", { corps: {} }).catch(() => []),
   ]);
@@ -8396,7 +8417,7 @@ async function rendreCompte() {
         return `<div class="rang">
           <b>${echapperHTML(cm.numero)}</b>
           ${cm.nom ? `<span class="nom-cmd">« ${echapperHTML(cm.nom)} »</span>` : ""}
-          <span class="etiquette ${cls}">${lib}</span>
+          <span class="etiquette ${cls}">${lib}</span>${cm.statut === "annulee" && cm.refus_motif ? ` <span class="nom-cmd" title="motif du refus">— ${echapperHTML(cm.refus_motif)}</span>` : ""}
           ${MES_SOCIETES.length > 1 && mag ? `<span class="mag-cmd">${echapperHTML(etiquetteMagasin(mag))}</span>` : ""}
           <span class="fin">${d} · ${cm.nb_pieces} pièces · ${eur(Number(cm.total_net ?? cm.total_ht))} HT${
             Number(cm.remise_pct) > 0 ? ` (remise ${pct(Number(cm.remise_pct))} % déduite)` : ""}</span>
