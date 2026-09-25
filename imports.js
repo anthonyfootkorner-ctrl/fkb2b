@@ -99,6 +99,14 @@ const MODELES_IMPORT = {
     sep: ",", encodage: "utf-8",
     signature: ["Jours dans Date", "Code_Origine", "Total ObjectifJ"],
   },
+  ventes_web_fastmag: {
+    /* Export détaillé des ventes envoyé par le planificateur Fastmag (« Analyse_lignes ») :
+       une ligne par article vendu, avec les colonnes LIGNE_* et VENTE_*. Le fichier porte
+       aussi des données clients : elles ne sont jamais lues ni envoyées. */
+    libelle: "Ventes détaillées (export Fastmag du planificateur)",
+    sep: [";", "\t"], encodage: ["windows-1252", "utf-8"],
+    signature: ["LIGNE_BarCode", "LIGNE_Taille", "LIGNE_Quantite", "VENTE_date", "VENTE_nature"],
+  },
   ventes: {
     libelle: "Ventes quotidiennes (journal VENTE)",
     sep: ",", encodage: "utf-8",
@@ -570,6 +578,44 @@ function mapperVersTables(analyse) {
           }) },
         { table: "photos", rows: Object.values(photosParRef) },
       ];
+    }
+    case "ventes_web_fastmag": {
+      // Le planificateur date tantôt en jj/mm/aaaa, tantôt à l'américaine (8/20/2026 =
+      // 20 août) : on tranche sur tout le fichier avant de convertir une seule date.
+      const morceaux = L.map(l => (l.VENTE_date || "").trim().split("/")).filter(p => p.length === 3);
+      const americain = morceaux.some(p => +p[1] > 12) ? true
+                      : morceaux.some(p => +p[0] > 12) ? false : true;
+      const parCle = new Map();
+      for (const l of L) {
+        // ventes et avoirs (les retours se déduisent) ; les mouvements de stock ne sont
+        // pas des ventes, les frais de port ne sont pas des articles
+        const nature = (l.VENTE_nature || "").trim().toUpperCase();
+        if (nature !== "VENTE" && nature !== "AVOIR") continue;
+        const ref = (l.LIGNE_BarCode || "").trim();
+        if (!ref || ref === "FP" || ref === "SHIPPING" || (l.LIGNE_Famille || "").trim().startsWith("~")) continue;
+        const p = (l.VENTE_date || "").trim().split("/");
+        if (p.length !== 3 || p[2].length !== 4) continue;
+        const [mois, jourDuMois] = americain ? [p[0], p[1]] : [p[1], p[0]];
+        const jour = `${p[2]}-${String(mois).padStart(2, "0")}-${String(jourDuMois).padStart(2, "0")}`;
+        const magasin = (l.LIGNE_CodeMag || l.VENTE_codemag || "").trim().toUpperCase();
+        if (!magasin) continue;
+        const taille = (l.LIGNE_Taille || "").trim();
+        const cle = `${magasin}|${ref}|${taille}|${jour}`;
+        const e = parCle.get(cle) || { magasin, reference: ref, taille, jour,
+          quantite: 0, montant_ttc: 0, cout_achat: null, montant_base: null };
+        const nb = Math.trunc(parseFloat(String(l.LIGNE_Quantite || "0").replace(",", ".")) || 0);
+        e.quantite += nb;
+        e.montant_ttc += parseFloat(String(l.LIGNE_Total || "0").replace(",", ".")) || 0;
+        const prixBase = parseFloat(String(l.LIGNE_PrixVente ?? "").replace(",", "."));
+        if (Number.isFinite(prixBase) && prixBase > 0) e.montant_base = (e.montant_base || 0) + nb * prixBase;
+        const prixAchat = parseFloat(String(l.LIGNE_PrixAchat ?? "").replace(",", "."));
+        if (Number.isFinite(prixAchat) && prixAchat > 0) e.cout_achat = (e.cout_achat || 0) + nb * prixAchat;
+        parCle.set(cle, e);
+      }
+      const rows = [...parCle.values()].filter(r => r.quantite !== 0)
+        .map(r => ({ ...r, montant_ttc: Math.round(r.montant_ttc * 100) / 100 }));
+      if (!rows.length) throw new Error("aucune vente exploitable : ni ligne VENTE ni AVOIR dans ce fichier");
+      return [{ table: "ventes", rows }];
     }
     case "ventes": {
       // agrégation par magasin+référence+taille+jour (le journal contient des doublons)
