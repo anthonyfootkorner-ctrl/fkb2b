@@ -1763,8 +1763,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1790540847"></script>
-<script src="imports.js?v=1790540847"></script>
+<script src="config.js?v=1790671165"></script>
+<script src="imports.js?v=1790671165"></script>
 <script src="merch-shopify.js?v=1790343907"></script>
 <script src="moteur-merch.js?v=1790343907"></script>
 <script>
@@ -4594,6 +4594,31 @@ function retirerSocieteCreation(compte) {
   document.getElementById("nu-chips").innerHTML = chipsHTML(societesChoisies, true, "retirerSocieteCreation");
 }
 
+/* Changer le rôle d'un compte existant : réservé à l'administrateur, jamais sur son propre compte
+   (le serveur refuse de toute façon). Chaque changement est consigné. */
+const ROLES_LIBELLES = { responsable: "Responsable (client)", acheteur: "Acheteur (client)", commercial: "Commercial",
+  merch: "Merchandiser (interne)", admin_commercial: "Administrateur commercial (approuve, importe)",
+  admin_adv: "Administrateur ADV (intègre dans Fastmag)", admin: "Administrateur (tous droits)" };
+function selecteurRole(u) {
+  if (!estAdmin || u.user_id === monUserId()) return "";
+  return `<select class="qte-claire" style="width:230px; margin-top:8px; text-align:left" data-role-actuel="${u.role}"
+    onchange="changerRole('${u.user_id}', ${JSON.stringify(u.email).replaceAll('"', "&quot;")}, this)">
+    ${Object.entries(ROLES_LIBELLES).map(([v, l]) => `<option value="${v}" ${v === u.role ? "selected" : ""}>${l}</option>`).join("")}
+  </select>`;
+}
+async function changerRole(userId, email, sel) {
+  const ancien = sel.dataset.roleActuel, nouveau = sel.value;
+  if (nouveau === ancien) return;
+  const alerte = nouveau === "admin"
+    ? "\n\nUn administrateur a TOUS les droits : imports, utilisateurs, commandes, stocks, prix."
+    : "";
+  if (!confirm(`Passer ${email} de « ${ROLES_LIBELLES[ancien] || ancien} » à « ${ROLES_LIBELLES[nouveau]} » ?${alerte}`)) { sel.value = ancien; return; }
+  try {
+    await api("/rest/v1/rpc/admin_changer_role", { corps: { p_user: userId, p_role: nouveau } });
+    await rendreUtilisateurs();
+  } catch (e) { sel.value = ancien; alert("Changement impossible : " + (e.donnees?.message || e.message)); }
+}
+
 async function rendreUtilisateurs() {
   /* L'administration commerciale ouvre des accès magasin, pas des comptes internes :
      les rôles qu'elle n'a pas le droit de créer disparaissent du choix. Le serveur
@@ -4618,7 +4643,7 @@ async function rendreUtilisateurs() {
   REPORTING_ACCES = accesRep || {};
   document.getElementById("liste-utilisateurs").innerHTML = (liste || []).map(u => `
     <div class="rang-util" data-user="${u.user_id}">
-      <div class="qui"><b>${u.email}</b><span>${u.nom || "—"} · ${u.role}</span></div>
+      <div class="qui"><b>${u.email}</b><span>${u.nom || "—"} · ${u.role}</span>${selecteurRole(u)}</div>
       <span class="etiquette ${u.actif ? "ok" : "attente"}">${u.actif ? "ACTIF" : "EN ATTENTE"}</span>
       <span class="derniere-visite">${
         u.derniere_connexion ? "vu le " + dateCourte(u.derniere_connexion)
