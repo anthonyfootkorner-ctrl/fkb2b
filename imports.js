@@ -86,9 +86,12 @@ const MODELES_IMPORT = {
     /* Export du WMS (EGONet) : le stock réel de l'entrepôt web, une ligne par
        code-barres et par emplacement. Alimente le stock WEB (le central continue de
        venir de l'état de stock Fastmag). */
-    libelle: "Stock web — export WMS EGONet",
+    libelle: "Stock web — export WMS (EGONet ou FT2)",
     sep: ";", encodage: "utf-8",
-    signature: ["Stock à date", "Référence", "Quantité disponible", "Quantité totale", "Adresse de stockage"],
+    // deux générations du même export : EGONet (« Stock à date », « Quantité disponible »)
+    // et FT2 StocksDetail depuis octobre 2026 (« Date stock », « Qté disponible »)
+    signatures: [["Stock à date", "Référence", "Quantité disponible", "Quantité totale", "Adresse de stockage"],
+                 ["Date stock", "Référence", "Qté disponible", "Qté totale", "Adresse stockage"]],
     remplacement_complet: true,
     remplacement_libelle: "remplace le stock WEB connu — le stock central et le stock B2B ne sont pas touchés",
   },
@@ -246,14 +249,15 @@ function detecterModeleImport(tampon) {
     for (const encodage of [].concat(s.encodage)) {
       let essai;
       try { essai = new TextDecoder(encodage).decode(tampon); } catch (e) { continue; }
-      const premiere = essai.slice(0, 8000).split(/\r?\n/)[0].replace(/^\uFEFF/, "");
+      const premiere = essai.slice(0, 8000).split(/\r?\n/)[0].replace(/^\uFEFF+/, "");   // FT2 écrit parfois deux BOM
       for (const sep of [].concat(s.sep)) {
         const colonnes = decouperLigne(premiere, sep).map(col => col.trim());
         if (colonnes.length < 2) continue;
         // comparaison sans accent ni casse : un export qui écrit « Reference » ou
         // « Quantité Disponible » reste reconnu (les intitulés Fastmag bougent)
         const normalisees = colonnes.map(sansAccent);
-        if (s.signature.every(sig => colonnes.includes(sig) || normalisees.includes(sansAccent(sig)))) {
+        const signatures = s.signatures || [s.signature];
+        if (signatures.some(signature => signature.every(sig => colonnes.includes(sig) || normalisees.includes(sansAccent(sig))))) {
           return { modele: nom, spec: { ...s, sep, encodage }, texte: essai, entete: colonnes };
         }
       }
@@ -300,7 +304,7 @@ async function analyserFichierFastmag(fichier) {
   if (!d) return { erreur: "format non reconnu : l'en-t\u00eate ne correspond \u00e0 aucun mod\u00e8le connu", empreinte };
   const { modele, spec, texte, entete } = d;
 
-  const enregistrements = decouperTexte(texte.replace(/^\uFEFF/, ""), spec.sep);
+  const enregistrements = decouperTexte(texte.replace(/^\uFEFF+/, ""), spec.sep);
   const stats = { trim: 0, prefixe: 0, decimales: 0 };
   const quarantaine = [];
   const lignes = [];
@@ -420,7 +424,7 @@ function mapperVersTables(analyse) {
       for (const l of L) {
         const ean = (l["Référence"] || "").trim();
         if (!ean) continue;
-        const q = parseFloat(String(l["Quantité disponible"] ?? "0").replace(/\s/g, "").replace(",", ".")) || 0;
+        const q = parseFloat(String(l["Quantité disponible"] ?? l["Qté disponible"] ?? "0").replace(/\s/g, "").replace(",", ".")) || 0;
         parEan.set(ean, (parEan.get(ean) || 0) + q);
       }
       return [{ table: "stock_fastmag (WEB)", rows: [...parEan.entries()].filter(([, q]) => q > 0).map(([ean, q]) => ({ ean, quantite: Math.round(q) })) }];
@@ -771,7 +775,7 @@ async function executerStockWebEgonet(analyse, surProgres) {
   for (const l of analyse.lignes) {
     const ean = (l["Référence"] || "").trim();
     if (!ean) continue;
-    parEan.set(ean, (parEan.get(ean) || 0) + nombre(l["Quantité disponible"]));
+    parEan.set(ean, (parEan.get(ean) || 0) + nombre(l["Quantité disponible"] ?? l["Qté disponible"]));
   }
   const rows = [...parEan.entries()].filter(([, q]) => q > 0).map(([ean, quantite]) => ({ ean, quantite: Math.round(quantite) }));
   if (!rows.length) throw new Error("aucune quantité disponible dans ce fichier");
