@@ -1258,7 +1258,7 @@
         <a href="#/hebdo" id="lien-hebdo" style="display:none">Reporting hebdo (direction)</a>
       </div>
     </div>
-    <a href="#/receptions" id="lien-receptions">ARRIVAGES</a>
+    <a href="#/receptions" id="lien-receptions" style="display:none">ARRIVAGES</a>
     <a href="#/compte">MON COMPTE</a>
     <div class="menu-deroulant" id="lien-backoffice" style="display:none">
       <a style="color:#d9a441">BACK OFFICE ▾</a>
@@ -1784,8 +1784,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1791787248"></script>
-<script src="imports.js?v=1791787248"></script>
+<script src="config.js?v=1791787537"></script>
+<script src="imports.js?v=1791787537"></script>
 <script src="merch-shopify.js?v=1790343907"></script>
 <script src="moteur-merch.js?v=1790343907"></script>
 <script>
@@ -1931,6 +1931,8 @@ async function init() {
       || { nom: sessionCourante().email, famille_tarifaire: "", id_fastmag: null };
     rendreSelecteurSociete();
   }
+  // Arrivages : personnel et magasins Footkorner (succursales, franchisés) ; le serveur applique la même règle
+  montrer("lien-receptions", estStaff || (MES_SOCIETES || []).some(x => RESEAU_PRECOMMANDES.includes((x.reseau || "").toUpperCase())));
   const [produits, navigation] = await Promise.all([
     api("/rest/v1/rpc/catalogue", { corps: { limite: 300, p_societe: clientActif.id ?? null } }),
     api("/rest/v1/rpc/navigation_catalogue", { corps: { p_societe: clientActif.id ?? null } })
@@ -2165,7 +2167,7 @@ async function rendreReceptions() {
   let blocs;
   try { blocs = await api("/rest/v1/rpc/calendrier_receptions", { corps: {} }); }
   catch (e) { zone.innerHTML = `<div class="compte-produits">Impossible de charger les arrivages : ${echapperHTML(e.donnees?.message || e.message)}</div>`; return; }
-  if (!(blocs || []).length) { zone.innerHTML = `<div class="compte-produits">Aucune réception attendue pour le moment.</div>`; return; }
+  if (!(blocs || []).length) { zone.innerHTML = `<div class="compte-produits">${document.getElementById("lien-receptions").style.display === "none" ? "Cet onglet est réservé au personnel et aux magasins Footkorner." : "Aucune réception attendue pour le moment."}</div>`; return; }
   const date = d => new Date(d + "T00:00:00");
   const lundi = d => { const x = date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x.toISOString().slice(0, 10); };
   const fmt = d => date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
