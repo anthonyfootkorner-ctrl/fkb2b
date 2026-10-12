@@ -1112,6 +1112,12 @@
   .rec-tete .rec-etat { border-radius: 999px; padding: 2px 9px; border: 1px solid var(--hairline); font-size: 11px; }
   .rec-tete .rec-etat.ok { background: #e6f4ea; color: #1e6b34; border-color: #bfe3c8; }
   .rec-bloc .dash-grille { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .cal-tuile.rec-ouverte { outline: 3px solid #f2751f; outline-offset: -3px; }
+  .rec-detail { grid-column: 1 / -1; background: #fff; border: 1px solid var(--hairline); border-radius: 14px; padding: 14px 16px 16px; }
+  .rec-detail-tete { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .rec-detail-tete b { font-size: 16px; letter-spacing: .06em; }
+  .rec-detail-tete span { font-size: 12.5px; color: var(--encre2); }
+  .rec-detail .dash-grille { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
   .dash-carte { position: relative; background: #fff; border: 1px solid var(--hairline); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
   .dash-carte .photo { aspect-ratio: 1 / 1; background: #f4f4f2; display: block; width: 100%; object-fit: contain; }
   .dash-carte .corps { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
@@ -1784,8 +1790,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1791787537"></script>
-<script src="imports.js?v=1791787537"></script>
+<script src="config.js?v=1791787663"></script>
+<script src="imports.js?v=1791787663"></script>
 <script src="merch-shopify.js?v=1790343907"></script>
 <script src="moteur-merch.js?v=1790343907"></script>
 <script>
@@ -2161,23 +2167,44 @@ function signalerMagasin(texte) {
 /* Arrivages : les réceptions attendues au central, regroupées par marque (dates à 2 jours près)
    et classées par semaine d'arrivée en magasin. Les produits sont dans l'ordre des quantités
    attendues, mais aucune quantité n'est affichée. */
+let REC_BLOCS = null, REC_OUVERT = null;
 async function rendreReceptions() {
   const zone = document.getElementById("rec-corps");
   zone.innerHTML = `<div class="compte-produits">Chargement…</div>`;
-  let blocs;
-  try { blocs = await api("/rest/v1/rpc/calendrier_receptions", { corps: {} }); }
+  try { REC_BLOCS = await api("/rest/v1/rpc/calendrier_receptions", { corps: {} }); }
   catch (e) { zone.innerHTML = `<div class="compte-produits">Impossible de charger les arrivages : ${echapperHTML(e.donnees?.message || e.message)}</div>`; return; }
-  if (!(blocs || []).length) { zone.innerHTML = `<div class="compte-produits">${document.getElementById("lien-receptions").style.display === "none" ? "Cet onglet est réservé au personnel et aux magasins Footkorner." : "Aucune réception attendue pour le moment."}</div>`; return; }
+  if (!(REC_BLOCS || []).length) { zone.innerHTML = `<div class="compte-produits">${document.getElementById("lien-receptions").style.display === "none" ? "Cet onglet est réservé au personnel et aux magasins Footkorner." : "Aucune réception attendue pour le moment."}</div>`; return; }
+  REC_OUVERT = null;
+  dessinerReceptions();
+}
+
+function dessinerReceptions() {
+  const zone = document.getElementById("rec-corps");
   const date = d => new Date(d + "T00:00:00");
-  const lundi = d => { const x = date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x.toISOString().slice(0, 10); };
   const fmt = d => date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
-  const semaineCourante = lundi(new Date().toISOString().slice(0, 10));
-  const semaines = new Map();
-  for (const b of blocs) {
-    const k = lundi(b.magasin_du);
-    if (!semaines.has(k)) semaines.set(k, []);
-    semaines.get(k).push(b);
-  }
+  const aujourdhui = new Date(); aujourdhui.setHours(0, 0, 0, 0);
+  const jours = d => Math.round((date(d) - aujourdhui) / 864e5);
+  // le visuel : le premier produit (par quantité attendue) qui a une photo, hors accessoires
+  const accessoire = p => /ACCESSOIRE/i.test(p.rayon || "") || /ACCESSOIRE|CHAUSSETTE|BONNET|CASQUETTE|SAC|GANT/i.test(p.famille || "");
+  const visuel = b => (b.produits || []).find(p => p.photo_url && !accessoire(p)) || (b.produits || []).find(p => p.photo_url);
+  const cle = b => `${b.marque}|${b.du}`;
+  const tuile = b => {
+    const n = jours(b.magasin_du), fin = jours(b.magasin_au);
+    const [etat, ton] = fin < 0 ? ["arrivé", ""] : n <= 0 ? ["cette semaine", "chaud"] : n <= 3 ? [`J – ${n}`, "chaud"] : [`J – ${n}`, ""];
+    const v = visuel(b);
+    const fond = v ? `background-image:url('${echapperHTML(v.photo_url)}'); background-color:#1b1b1b;` : "background:#1b1b1b;";
+    return `<div class="cal-tuile ${REC_OUVERT === cle(b) ? "rec-ouverte" : ""}" style="${fond}" onclick="basculerReception(${JSON.stringify(cle(b)).replaceAll('"', "&quot;")})">
+      <div class="cal-date"><span class="j">${date(b.magasin_du).getDate()}</span><span class="m">${date(b.magasin_du).toLocaleDateString("fr-FR", { month: "short" })}</span></div>
+      <div class="cal-etat ${ton}">${etat}</div>
+      <div class="cal-corps">
+        <div class="nom">${echapperHTML(b.marque)}</div>
+        <div class="sous">${b.magasin_du === b.magasin_au ? `Arrivée en magasin vers le ${fmt(b.magasin_du)}` : `Arrivée en magasin du ${fmt(b.magasin_du)} au ${fmt(b.magasin_au)}`}
+          · ${b.nb_references} référence${b.nb_references > 1 ? "s" : ""}</div>
+        <div class="chiffres" style="margin-top:12px"><span>${b.recu_central ? "reçu au central" : `attendu au central ${b.du === b.au ? "le " + fmt(b.du) : "du " + fmt(b.du) + " au " + fmt(b.au)}`}</span>
+          <span>${REC_OUVERT === cle(b) ? "fermer ▴" : "voir les produits ▾"}</span></div>
+      </div>
+    </div>`;
+  };
   const carte = p => `<div class="dash-carte">
       <span class="media" title="Ouvrir la fiche produit" onclick="location.hash='#/produit/' + encodeURIComponent('${echapperHTML(p.reference)}')">
         ${p.photo_url ? `<img class="photo" loading="lazy" src="${echapperHTML(p.photo_url)}" alt="">` : `<span class="photo"></span>`}
@@ -2187,21 +2214,22 @@ async function rendreReceptions() {
         <span class="nom">${echapperHTML(p.designation || p.reference)}</span>
         <span class="ref">${echapperHTML(p.reference)}</span>
       </div></div>`;
-  zone.innerHTML = [...semaines.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, lb]) => `
-    <h2 class="rec-semaine ${k === semaineCourante ? "courante" : ""}">Semaine du ${fmt(k)}${k === semaineCourante ? " · cette semaine" : k < semaineCourante ? " · passée" : ""}</h2>
-    ${lb.map(b => `<div class="rec-bloc">
-      <div class="rec-tete">
-        <b>${echapperHTML(b.marque)}</b>
-        <span>${b.magasin_du === b.magasin_au
-          ? `arrivée en magasin vers le ${fmt(b.magasin_du)}`
-          : `arrivée en magasin entre le ${fmt(b.magasin_du)} et le ${fmt(b.magasin_au)}`}</span>
-        <span class="rec-etat ${b.recu_central ? "ok" : ""}">${b.recu_central
-          ? "reçu au central"
-          : `attendu au central ${b.du === b.au ? "le " + fmt(b.du) : "du " + fmt(b.du) + " au " + fmt(b.au)}`}</span>
-        <span>${b.nb_references} référence${b.nb_references > 1 ? "s" : ""}</span>
-      </div>
+  const detail = b => `<div class="rec-detail">
+      <div class="rec-detail-tete"><b>${echapperHTML(b.marque)}</b><span>${b.nb_references} référence${b.nb_references > 1 ? "s" : ""}, dans l'ordre des quantités attendues</span></div>
       <div class="dash-grille">${(b.produits || []).map(carte).join("")}</div>
-    </div>`).join("")}`).join("");
+    </div>`;
+  const aVenir = REC_BLOCS.filter(b => jours(b.magasin_au) >= 0).sort((a, b) => a.magasin_du.localeCompare(b.magasin_du));
+  const passes = REC_BLOCS.filter(b => jours(b.magasin_au) < 0).sort((a, b) => b.magasin_du.localeCompare(a.magasin_du));
+  const grille = liste => `<div class="cal-grille">${liste.map(b => tuile(b) + (REC_OUVERT === cle(b) ? detail(b) : "")).join("")}</div>`;
+  zone.innerHTML = `
+    ${aVenir.length ? grille(aVenir) : `<div class="compte-produits">Aucun arrivage à venir.</div>`}
+    ${passes.length ? `<h2 class="rec-semaine" style="margin-top:34px">Déjà arrivés</h2>${grille(passes)}` : ""}`;
+}
+
+function basculerReception(k) {
+  REC_OUVERT = REC_OUVERT === k ? null : k;
+  dessinerReceptions();
+  if (REC_OUVERT) document.querySelector(".rec-detail")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function router() {
