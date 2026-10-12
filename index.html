@@ -1113,6 +1113,17 @@
   .rec-tete .rec-etat.ok { background: #e6f4ea; color: #1e6b34; border-color: #bfe3c8; }
   .rec-bloc .dash-grille { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
   .cal-tuile.rec-ouverte { outline: 3px solid #f2751f; outline-offset: -3px; }
+  /* tuile d'arrivage : la photo sur un panneau clair, le texte sur fond sombre (pas de produit noir sur noir) */
+  .cal-tuile.rec-tuile { background: #111; justify-content: flex-start; }
+  .cal-tuile.rec-tuile::after { display: none; }
+  .rec-visuel { height: 210px; background: #f6f6f4; display: flex; align-items: center; justify-content: center; }
+  .rec-visuel img { width: 100%; height: 100%; object-fit: contain; padding: 30px 22px 14px; }
+  .rec-visuel.vide { background: #1b1b1b; }
+  .rec-visuel.vide span { font-size: 34px; font-weight: 800; letter-spacing: .06em; color: #3d3d3d; text-transform: uppercase;
+    text-align: center; padding: 30px 20px 0; line-height: 1.05; }
+  .rec-tuile .cal-etat { background: rgba(10,10,10,.85); border-color: transparent; }
+  .rec-tuile .cal-etat.chaud { background: rgba(242,117,31,.95); }
+  .rec-tuile .cal-corps { margin-top: auto; }
   .rec-detail { grid-column: 1 / -1; background: #fff; border: 1px solid var(--hairline); border-radius: 14px; padding: 14px 16px 16px; }
   .rec-detail-tete { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
   .rec-detail-tete b { font-size: 16px; letter-spacing: .06em; }
@@ -1790,8 +1801,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1791792377"></script>
-<script src="imports.js?v=1791792377"></script>
+<script src="config.js?v=1791792521"></script>
+<script src="imports.js?v=1791792521"></script>
 <script src="merch-shopify.js?v=1790343907"></script>
 <script src="moteur-merch.js?v=1790343907"></script>
 <script>
@@ -2193,10 +2204,11 @@ function dessinerReceptions() {
     const n = jours(b.magasin_du), fin = jours(b.magasin_au);
     const [etat, ton] = fin < 0 ? ["arrivé", ""] : n <= 0 ? ["cette semaine", "chaud"] : n <= 3 ? [`J – ${n}`, "chaud"] : [`J – ${n}`, ""];
     const v = visuel(b);
-    const fond = v ? `background-image:url('${echapperHTML(v.photo_url)}'); background-color:#1b1b1b;` : "background:#1b1b1b;";
-    return `<div class="cal-tuile ${REC_OUVERT === cle(b) ? "rec-ouverte" : ""}" style="${fond}" onclick="basculerReception(${JSON.stringify(cle(b)).replaceAll('"', "&quot;")})">
+    return `<div class="cal-tuile rec-tuile ${REC_OUVERT === cle(b) ? "rec-ouverte" : ""}" onclick="basculerReception(${JSON.stringify(cle(b)).replaceAll('"', "&quot;")})">
       <div class="cal-date"><span class="j">${date(b.magasin_du).getDate()}</span><span class="m">${date(b.magasin_du).toLocaleDateString("fr-FR", { month: "short" })}</span></div>
       <div class="cal-etat ${ton}">${etat}</div>
+      ${v ? `<div class="rec-visuel"><img loading="lazy" src="${echapperHTML(v.photo_url)}" alt=""></div>`
+          : `<div class="rec-visuel vide"><span>${echapperHTML(b.marque)}</span></div>`}
       <div class="cal-corps">
         <div class="nom">${echapperHTML(b.marque)}</div>
         <div class="sous">${b.magasin_du === b.magasin_au ? `Arrivée en magasin vers le ${fmt(b.magasin_du)}` : `Arrivée en magasin du ${fmt(b.magasin_du)} au ${fmt(b.magasin_au)}`}
