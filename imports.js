@@ -21,7 +21,10 @@ const MODELES_IMPORT = {
        le magasin n'a pas encore réceptionnés. C'est le stock en transit du Dashboard magasins. */
     libelle: "Stock en transit — BL expédiés non réceptionnés",
     sep: ";", encodage: "windows-1252",
-    signature: ["CodeMag", "Origine", "BarCode", "Taille", "Qte", "Recu", "Expedie"],
+    // deux écrans Fastmag : l'ancien (avec Recu/Expedie) et, depuis octobre 2026, la liste
+    // des BL non reçus (Fournisseur/CodeMag/Marque, sans colonne Recu : tout est en transit)
+    signatures: [["CodeMag", "Origine", "BarCode", "Taille", "Qte", "Recu", "Expedie"],
+                 ["Fournisseur", "Origine", "BarCode", "Taille", "Qte", "CodeMag", "Marque"]],
     remplacement_complet: true,
     remplacement_libelle: "remplace la photo du stock en transit — aucun autre stock n'est touché",
   },
@@ -185,6 +188,8 @@ function trouverColonne(entete, candidats) {
   return null;
 }
 
+const MARQUEURS_EXPORT = ["origine", "fournisseur", "codemag", "prixachat", "code_origine", "reference_article", "produit",
+  "tarif", "tarifvente", "stock a date", "date stock", "quantite disponible", "qte disponible", "numero de reception", "variant id"];
 function detecterStockB2B(tampon) {
   for (const encodage of ["utf-8", "windows-1252"]) {
     let texte;
@@ -193,6 +198,9 @@ function detecterStockB2B(tampon) {
     for (const sep of [";", ",", "\t"]) {
       const entete = decouperLigne(premiere, sep).map(c => c.trim());
       if (entete.length < 2) continue;
+      // Un export Fastmag ou WMS incomplet (sans la colonne attendue par son modèle) ne doit
+      // jamais passer pour un stock B2B : il remplacerait tout le stock vendable (incident du 23/09).
+      if (MARQUEURS_EXPORT.some(m => entete.map(sansAccent).includes(m))) continue;
       const ref = trouverColonne(entete, COLONNES_B2B.reference);
       const qte = trouverColonne(entete, COLONNES_B2B.quantite);
       const preco = trouverColonne(entete, COLONNES_B2B.precommande);
