@@ -95,6 +95,15 @@ const MODELES_IMPORT = {
     remplacement_complet: true,
     remplacement_libelle: "remplace le stock WEB connu — le stock central et le stock B2B ne sont pas touchés",
   },
+  receptions_wms: {
+    /* Réceptions fournisseur attendues au central (export WMS « FTK_ReceptionsDetail ») :
+       une ligne par commande d'achat et par taille. Alimente l'onglet « Arrivages ». */
+    libelle: "Réceptions attendues au central — export WMS (ReceptionsDetail)",
+    sep: ";", encodage: "utf-8",
+    signature: ["Numéro de réception", "Nom tiers", "Date prévue", "Article commandé", "Qté commandée", "CA2"],
+    remplacement_complet: true,
+    remplacement_libelle: "remplace la liste des réceptions attendues — aucun stock n'est touché",
+  },
   objectifs: {
     /* Export OBJECTIF de Fastmag : objectif de CA du jour, pièces et tickets par magasin.
        Sert au Dashboard magasins (réalisé / objectif, fréquentation, panier moyen). */
@@ -443,6 +452,8 @@ function mapperVersTables(analyse) {
     }
     case "stock_transit":
       return [{ table: "stock_transit", rows: lignesTransit(L) }];
+    case "receptions_wms":
+      return [{ table: "receptions_attendues", rows: lignesReceptions(L) }];
     case "stock_preparation":
       // simulation : tous les BL de réservation ; le rattachement client → magasin se fait à l'exécution
       return [{ table: "stock_transit", rows: lignesPreparation(L, null) }];
@@ -727,6 +738,7 @@ async function executerImport(analyse, surProgres) {
   if (analyse.modele === "stock_fastmag") return executerStockFastmag(analyse, surProgres);
   if (analyse.modele === "stock_magasins") return executerStockMagasins(analyse, surProgres);
   if (analyse.modele === "stock_transit") return executerStockTransit(analyse, surProgres);
+  if (analyse.modele === "receptions_wms") return executerReceptionsWms(analyse, surProgres);
   if (analyse.modele === "stock_preparation") return executerStockPreparation(analyse, surProgres);
   if (analyse.modele === "objectifs") return executerObjectifs(analyse, surProgres);
   if (analyse.modele === "stock_web_egonet") return executerStockWebEgonet(analyse, surProgres);
@@ -923,6 +935,49 @@ async function executerStockTransit(analyse, surProgres) {
     lignes_lues: analyse.lues, crees: total, maj: 0, inchanges: 0,
     quarantaine: analyse.quarantaine.length, statut: "OK" } });
   return total;
+}
+
+/* Export WMS des réceptions : une ligne par commande d'achat, article et taille.
+   « Article commandé » est l'EAN, CA2 la référence Fastmag, CA3 la marque, CA1 « couleur taille ». */
+function lignesReceptions(L) {
+  const nombre = v => parseInt(parseFloat(String(v ?? "0").replace(/\s/g, "").replace(",", ".")), 10) || 0;
+  const jour = v => { const m = String(v || "").match(/^(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
+  const parCle = new Map();
+  for (const l of L) {
+    const numero = (l["Numéro de réception"] || "").trim();
+    const reference = (l.CA2 || "").trim();
+    if (!numero || !reference) continue;
+    const ca1 = (l.CA1 || "").trim();
+    const taille = ca1.includes(" ") ? ca1.slice(ca1.lastIndexOf(" ") + 1) : "";
+    const cle = `${numero}|${reference}|${taille}`;
+    const e = parCle.get(cle) || { numero, reference, taille, fournisseur: (l["Nom tiers"] || "").trim(),
+      marque: (l.CA3 || l["Nom tiers"] || "").trim().toUpperCase(), ean: (l["Article commandé"] || "").trim(),
+      libelle: (l["Description article"] || "").trim(), quantite_commandee: 0, quantite_recue: 0,
+      date_prevue: jour(l["Date prévue"]), cree_le: jour(l["Date de création"]), recu_le: null,
+      soldee: String(l["Soldé"] || "").trim().toUpperCase() === "O" };
+    e.quantite_commandee += nombre(l["Qté commandée"]);
+    e.quantite_recue += nombre(l["Qté réceptionnée"]);
+    e.recu_le = e.recu_le || jour(l["Date de réception"]);
+    parCle.set(cle, e);
+  }
+  return [...parCle.values()];
+}
+
+async function executerReceptionsWms(analyse, surProgres) {
+  const rows = lignesReceptions(analyse.lignes);
+  if (!rows.length) throw new Error("aucune réception exploitable dans ce fichier (référence CA2 et numéro de réception attendus)");
+  let total = 0, bilan = null;
+  for (let i = 0; i < rows.length; i += 2000) {
+    const lot = rows.slice(i, i + 2000);
+    bilan = await api("/rest/v1/rpc/receptions_wms_lot", { corps: { p_rows: lot, p_premier: i === 0 } });
+    total += lot.length;
+    surProgres(`réceptions attendues : ${total}/${rows.length} lignes…`);
+  }
+  await apiFonction("journal", { entree: {
+    fichier: analyse.fichier, modele: "receptions_wms", empreinte: analyse.empreinte,
+    lignes_lues: analyse.lues, crees: Number(bilan?.total) || total, maj: 0, inchanges: 0,
+    quarantaine: analyse.quarantaine.length, statut: "OK" } });
+  return Number(bilan?.total) || total;
 }
 
 async function executerStockMagasins(analyse, surProgres) {

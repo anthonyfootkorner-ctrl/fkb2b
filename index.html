@@ -1102,6 +1102,16 @@
   .dash-section { margin: 26px 22px 0; }
   .dash-section > h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
   .dash-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 12px; margin-top: 12px; }
+  /* Arrivages : un bloc par marque et par vague de réception */
+  .rec-semaine { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--encre2); margin: 26px 0 8px; }
+  .rec-semaine.courante { color: #111; }
+  .rec-bloc { background: #fff; border: 1px solid var(--hairline); border-radius: 14px; padding: 14px 16px 16px; margin-bottom: 14px; }
+  .rec-tete { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .rec-tete b { font-size: 18px; letter-spacing: .06em; }
+  .rec-tete span { font-size: 12.5px; color: var(--encre2); }
+  .rec-tete .rec-etat { border-radius: 999px; padding: 2px 9px; border: 1px solid var(--hairline); font-size: 11px; }
+  .rec-tete .rec-etat.ok { background: #e6f4ea; color: #1e6b34; border-color: #bfe3c8; }
+  .rec-bloc .dash-grille { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
   .dash-carte { position: relative; background: #fff; border: 1px solid var(--hairline); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
   .dash-carte .photo { aspect-ratio: 1 / 1; background: #f4f4f2; display: block; width: 100%; object-fit: contain; }
   .dash-carte .corps { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
@@ -1248,6 +1258,7 @@
         <a href="#/hebdo" id="lien-hebdo" style="display:none">Reporting hebdo (direction)</a>
       </div>
     </div>
+    <a href="#/receptions" id="lien-receptions">ARRIVAGES</a>
     <a href="#/compte">MON COMPTE</a>
     <div class="menu-deroulant" id="lien-backoffice" style="display:none">
       <a style="color:#d9a441">BACK OFFICE ▾</a>
@@ -1534,6 +1545,16 @@
     <div class="bo" id="bo-contenu"></div>
   </section>
 
+  <!-- ARRIVAGES : les réceptions fournisseur attendues au central, et leur arrivée estimée en magasin -->
+  <section class="vue page-claire" id="vue-receptions">
+    <div class="col-tete">
+      <span class="fil" onclick="location.hash='#/'">&larr; ACCUEIL</span>
+      <h1>ARRIVAGES</h1>
+      <div class="compte-produits">Ce que le central attend des marques, et la semaine où ça arrive en magasin, environ sept jours après la réception au central.</div>
+    </div>
+    <div id="rec-corps" style="margin: 0 22px 60px"></div>
+  </section>
+
   <!-- COMMANDES (interne) : approbation, intégration, et la copie de secours quand l'e-mail ne part pas -->
   <section class="vue page-claire" id="vue-commandes">
     <div class="col-tete">
@@ -1763,8 +1784,8 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1791454612"></script>
-<script src="imports.js?v=1791454612"></script>
+<script src="config.js?v=1791787248"></script>
+<script src="imports.js?v=1791787248"></script>
 <script src="merch-shopify.js?v=1790343907"></script>
 <script src="moteur-merch.js?v=1790343907"></script>
 <script>
@@ -2135,6 +2156,52 @@ function signalerMagasin(texte) {
 }
 
 /* ---------------- routeur ---------------- */
+/* Arrivages : les réceptions attendues au central, regroupées par marque (dates à 2 jours près)
+   et classées par semaine d'arrivée en magasin. Les produits sont dans l'ordre des quantités
+   attendues, mais aucune quantité n'est affichée. */
+async function rendreReceptions() {
+  const zone = document.getElementById("rec-corps");
+  zone.innerHTML = `<div class="compte-produits">Chargement…</div>`;
+  let blocs;
+  try { blocs = await api("/rest/v1/rpc/calendrier_receptions", { corps: {} }); }
+  catch (e) { zone.innerHTML = `<div class="compte-produits">Impossible de charger les arrivages : ${echapperHTML(e.donnees?.message || e.message)}</div>`; return; }
+  if (!(blocs || []).length) { zone.innerHTML = `<div class="compte-produits">Aucune réception attendue pour le moment.</div>`; return; }
+  const date = d => new Date(d + "T00:00:00");
+  const lundi = d => { const x = date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x.toISOString().slice(0, 10); };
+  const fmt = d => date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+  const semaineCourante = lundi(new Date().toISOString().slice(0, 10));
+  const semaines = new Map();
+  for (const b of blocs) {
+    const k = lundi(b.magasin_du);
+    if (!semaines.has(k)) semaines.set(k, []);
+    semaines.get(k).push(b);
+  }
+  const carte = p => `<div class="dash-carte">
+      <span class="media" title="Ouvrir la fiche produit" onclick="location.hash='#/produit/' + encodeURIComponent('${echapperHTML(p.reference)}')">
+        ${p.photo_url ? `<img class="photo" loading="lazy" src="${echapperHTML(p.photo_url)}" alt="">` : `<span class="photo"></span>`}
+      </span>
+      <div class="corps">
+        <span class="marque">${echapperHTML(p.famille || "")}</span>
+        <span class="nom">${echapperHTML(p.designation || p.reference)}</span>
+        <span class="ref">${echapperHTML(p.reference)}</span>
+      </div></div>`;
+  zone.innerHTML = [...semaines.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, lb]) => `
+    <h2 class="rec-semaine ${k === semaineCourante ? "courante" : ""}">Semaine du ${fmt(k)}${k === semaineCourante ? " · cette semaine" : k < semaineCourante ? " · passée" : ""}</h2>
+    ${lb.map(b => `<div class="rec-bloc">
+      <div class="rec-tete">
+        <b>${echapperHTML(b.marque)}</b>
+        <span>${b.magasin_du === b.magasin_au
+          ? `arrivée en magasin vers le ${fmt(b.magasin_du)}`
+          : `arrivée en magasin entre le ${fmt(b.magasin_du)} et le ${fmt(b.magasin_au)}`}</span>
+        <span class="rec-etat ${b.recu_central ? "ok" : ""}">${b.recu_central
+          ? "reçu au central"
+          : `attendu au central ${b.du === b.au ? "le " + fmt(b.du) : "du " + fmt(b.du) + " au " + fmt(b.au)}`}</span>
+        <span>${b.nb_references} référence${b.nb_references > 1 ? "s" : ""}</span>
+      </div>
+      <div class="dash-grille">${(b.produits || []).map(carte).join("")}</div>
+    </div>`).join("")}`).join("");
+}
+
 function router() {
   const h = location.hash || "#/";
   const [, route, ...args] = h.split("/");
@@ -2182,6 +2249,9 @@ function router() {
   } else if (route === "hebdo") {
     document.getElementById("vue-hebdo").classList.add("active");
     rendreHebdo();
+  } else if (route === "receptions") {
+    document.getElementById("vue-receptions").classList.add("active");
+    rendreReceptions();
   } else if (route === "import-reporting") {
     document.getElementById("vue-import-reporting").classList.add("active");
     rendreImportReporting();
@@ -3735,6 +3805,7 @@ const SOURCES_IMPORT = [
   ["stock_fastmag", "État de stock Fastmag (central)", "chaque jour", 3],
   ["stock_web_egonet", "Stock web (WMS)", "chaque jour", 3],
   ["stock_transit", "Stock en transit (BL expédiés)", "chaque jour", 3],
+  ["receptions_wms", "Réceptions attendues au central (WMS)", "chaque jour", 3],
   ["stock_preparation", "Stock en préparation (BL de réservation)", "chaque jour", 3],
   ["stock_shopify", "Export Shopify (photos, prix web, promo)", "chaque semaine", 10],
   ["stock_b2b", "Stock B2B vendable", "à chaque dépôt Footkorner", 35],
@@ -3815,7 +3886,7 @@ function telechargerPrixZero() {
 /* Ces modèles remplacent ce qu'ils touchent (le jour pour les ventes, le magasin pour
    un stock) : les redéposer ne double rien et permet de corriger un import raté. Les
    autres restent bloqués par l'anti-rejeu. */
-const MODELES_REJOUABLES = ["stock_b2b", "ventes", "objectifs", "stock_magasins", "stock_transit", "stock_preparation", "stock_web_egonet", "stock_fastmag"];
+const MODELES_REJOUABLES = ["stock_b2b", "ventes", "objectifs", "stock_magasins", "stock_transit", "stock_preparation", "stock_web_egonet", "stock_fastmag", "receptions_wms"];
 
 async function traiterFichier(fichier) {
   const zone = document.getElementById("rapport-import");
