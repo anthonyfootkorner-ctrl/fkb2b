@@ -1801,10 +1801,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1791793667"></script>
-<script src="imports.js?v=1791793667"></script>
-<script src="merch-shopify.js?v=1790343907"></script>
-<script src="moteur-merch.js?v=1790343907"></script>
+<script src="config.js?v=1792058312"></script>
+<script src="imports.js?v=1792058312"></script>
+<script src="merch-shopify.js?v=1792058312"></script>
+<script src="moteur-merch.js?v=1792058312"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2376,7 +2376,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1790160593";
+    v.src = "hero.mp4?v=1792058312";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -10534,7 +10534,10 @@ function basculerReassort(ref, bouton) {
     Object.keys(REA.saisie).filter(c => c.startsWith(ref + "|")).forEach(c => delete REA.saisie[c]);
   } else {
     REA.selection = REA.selection.concat(ref);
-    if (!REA.magasin) REA.magasin = DASH.choisis.length === 1 ? DASH.choisis[0] : (reaSucc()[0]?.code || null);
+    // un nouveau réassort part du magasin affiché sur le dashboard, pas de celui du réassort précédent
+    // (le 14/10, une commande pour La Défense est partie au code client de Lyon, resté en mémoire)
+    const affiche = DASH.choisis.length === 1 && reaSucc().some(m => m.code === DASH.choisis[0]) ? DASH.choisis[0] : null;
+    if (REA.selection.length === 1 || !REA.magasin) REA.magasin = affiche || REA.magasin || null;
   }
   memoriserRea();
   // la carte n'est pas redessinée, mais on relève la vignette avant de toucher à la barre
@@ -10591,7 +10594,8 @@ async function rendreReassort() {
       <div class="compte-produits">Le réassort est réservé aux succursales.</div></div>`;
     return;
   }
-  if (!succ.some(m => m.code === REA.magasin)) REA.magasin = succ[0].code;
+  // jamais de magasin choisi d'office parmi plusieurs : c'est lui qui fixe le code client Fastmag
+  if (!succ.some(m => m.code === REA.magasin)) REA.magasin = succ.length === 1 ? succ[0].code : null;
   const tete = `<div class="col-tete">
       <span class="fil" onclick="location.hash='#/dashboard'">&larr; Dashboard magasins</span>
       <h1>RÉASSORT</h1>
@@ -10609,6 +10613,11 @@ async function rendreReassort() {
     vue.innerHTML = tete + `<div class="dash-section"><div class="dash-vide">
       Aucun produit retenu. Depuis le dashboard, cliquez « Réassort » sur les produits à recharger.</div>
       ${historiqueReassort()}</div>`;
+    return;
+  }
+  if (!REA.magasin) {
+    vue.innerHTML = tete + `<div class="dash-section"><div class="dash-vide">
+      Choisissez d'abord le <b>magasin livré</b> ci-dessus : c'est lui qui reçoit et paie la commande dans Fastmag.</div></div>`;
     return;
   }
   vue.innerHTML = tete + `<div class="dash-section" id="rea-grille"><div class="compte-produits">Chargement…</div></div>`;
@@ -10712,12 +10721,18 @@ async function validerReassort(btn) {
   }).filter(l => l.quantite > 0);
   if (!lignes.length) return signalerMagasin("Saisissez au moins une quantité.");
   if (!REA.magasin) return signalerMagasin("Choisissez le magasin à livrer.");
+  // le magasin livré décide du code client Fastmag : on le fait relire avant d'émettre le fichier
+  const livre = DASH.magasins.find(m => m.code === REA.magasin);
+  const pieces = lignes.reduce((t, l) => t + l.quantite, 0);
+  if (!confirm(`Réassort pour le magasin : ${(livre?.nom || REA.magasin).toUpperCase()}\n\n`
+      + `${pieces} pièce${pieces > 1 ? "s" : ""}, facturées et livrées à ce magasin.\n`
+      + `Si ce n'est pas le bon, annulez et changez « Magasin livré » en haut de la grille.`)) return;
   const libelle = btn.textContent;
   btn.disabled = true; btn.textContent = "…";
   try {
     const res = await api("/rest/v1/rpc/reassort_creer", { corps: { p_magasin: REA.magasin, p_lignes: lignes } });
     fichierReassort(res);
-    REA.selection = []; REA.saisie = {}; memoriserRea();
+    REA.selection = []; REA.saisie = {}; REA.magasin = null; memoriserRea();
     await chargerHistoriqueRea();
     rendreReassort();
     signalerMagasin(`Réassort ${res.numero} enregistré : ${res.nb_pieces} pièces, fichier téléchargé.`);
