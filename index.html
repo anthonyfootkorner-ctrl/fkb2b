@@ -784,6 +784,36 @@
   .barre-collante { position: sticky; top: 0; z-index: 40; background: var(--papier);
     padding: 12px 22px; margin: 0 0 14px; border-bottom: 1px solid var(--hairline);
     box-shadow: 0 10px 16px -14px rgba(0,0,0,.55); }
+  /* panneau de suivi repliable : tableau des collections + tuiles de synthèse */
+  .suivi-entete { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+  .suivi-fleche { font-size: 11px; color: var(--encre2); transition: transform 150ms ease; }
+  .suivi-entete.ferme .suivi-fleche { transform: rotate(-90deg); }
+  #suivi-corps { margin-top: 12px; }
+  #suivi-corps.ferme { display: none; }
+  .suivi-tuiles { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .suivi-tuile { border: 1px solid var(--hairline); border-radius: 12px; padding: 8px 14px; min-width: 104px; background: #fff; }
+  .suivi-tuile .nb { font-size: 21px; font-weight: 700; line-height: 1.1; }
+  .suivi-tuile .lib { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--encre2); }
+  .suivi-tuile.urgent .nb { color: #c0504d; }
+  .suivi-tuile.afaire .nb { color: #b8860b; }
+  .suivi-tuile.ajour .nb { color: #3f8f55; }
+  .suivi-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .suivi-table th { text-align: left; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--encre2); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--hairline); position: sticky; top: 0; background: #fafaf8; }
+  .suivi-table td { padding: 7px 10px; border-bottom: 1px solid #f0f0ee; vertical-align: middle; }
+  .suivi-table tr:hover td { background: #fbfbf9; }
+  .suivi-table .collection { font-weight: 600; cursor: pointer; }
+  .suivi-table .collection:hover { text-decoration: underline; }
+  .suivi-defile { max-height: 420px; overflow: auto; border: 1px solid var(--hairline); border-radius: 12px; }
+  .badge-statut { display: inline-block; min-width: 92px; text-align: center; color: #fff; font-size: 11.5px;
+    font-weight: 600; border-radius: 6px; padding: 4px 10px; }
+  .badge-statut.urgent { background: #c0504d; }
+  .badge-statut.afaire { background: #e8a33d; }
+  .badge-statut.ajour { background: #5aa469; }
+  .badge-statut.jamais { background: #8d8d86; }
+  .badge-statut.encours { background: #2ea3f2; }
+  .alerte-encours { background: #e8f4fd; border: 1px solid #b6ddf7; color: #1a6ea8; border-radius: 8px;
+    padding: 6px 12px; font-size: 12.5px; }
   .valider-suivi { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px;
     border-radius: 50%; border: 1px solid #cfcfcb; color: #6b6b66; font-size: 11px; font-weight: 700;
     background: #fff; margin-left: 2px; }
@@ -1447,9 +1477,17 @@
         <span class="compte-produits" id="etat-shopify"></span>
       </div>
       <div id="jauges-shopify" class="panneau-jauges" style="display:none"></div>
-    <div class="bloc-clair" style="margin: 0 22px 26px; padding: 10px 16px"
-      title="Une collection en tri manuel n'évolue plus seule : repassez dessus régulièrement (les nouveautés arrivent sans position).">
-      <div id="suivi-shopify"></div>
+    <div id="alerte-encours" style="margin: 0 22px 12px"></div>
+    <div class="bloc-clair" style="margin: 0 22px 26px; padding: 12px 16px" id="panneau-suivi">
+      <div class="suivi-entete" id="suivi-entete" title="Ouvrir ou fermer le suivi">
+        <span class="suivi-fleche" id="suivi-fleche">▾</span>
+        <span class="titre-bloc" style="margin:0">Suivi du merch</span>
+        <span class="compte-produits" id="suivi-resume" style="margin:0"></span>
+      </div>
+      <div id="suivi-corps">
+        <div id="suivi-tuiles"></div>
+        <div id="suivi-shopify"></div>
+      </div>
     </div>
     <div class="grille-col" id="grille-shopify"></div>
   </section>
@@ -1828,10 +1866,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792071588"></script>
-<script src="imports.js?v=1792071588"></script>
-<script src="merch-shopify.js?v=1792071588"></script>
-<script src="moteur-merch.js?v=1792071588"></script>
+<script src="config.js?v=1792072197"></script>
+<script src="imports.js?v=1792072197"></script>
+<script src="merch-shopify.js?v=1792072197"></script>
+<script src="moteur-merch.js?v=1792072197"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -4189,6 +4227,22 @@ async function rendreMerchShopify() {
   document.getElementById("btn-auto-shopify").onclick = classementAutoShopify;
   document.getElementById("btn-rapport-shopify").onclick = telechargerRapport;
   document.getElementById("btn-shopify-export").onclick = exporterShopify;
+
+  // panneau de suivi : ouvert ou fermé, le choix est retenu d'une fois sur l'autre
+  const entete = document.getElementById("suivi-entete"), corps = document.getElementById("suivi-corps");
+  const appliquerSuivi = ouvert => {
+    entete.classList.toggle("ferme", !ouvert);
+    corps.classList.toggle("ferme", !ouvert);
+    localStorage.setItem("fkb2b-suivi-ouvert", ouvert ? "1" : "0");
+  };
+  appliquerSuivi(localStorage.getItem("fkb2b-suivi-ouvert") !== "0");
+  entete.onclick = () => appliquerSuivi(corps.classList.contains("ferme"));
+
+  // on libère la collection quand on quitte l'écran ou qu'on ferme l'onglet
+  window.addEventListener("hashchange", () => {
+    if (!location.hash.startsWith("#/merch-shopify") && collectionOccupee) libererPresence(collectionOccupee);
+  });
+  window.addEventListener("beforeunload", () => { if (collectionOccupee) libererPresence(collectionOccupee); });
   document.getElementById("btn-merch-fait").onclick = async () => {
     const collection = document.getElementById("sel-collection").value;
     if (!collection) return;
@@ -4353,6 +4407,8 @@ async function rendreCollectionShopify() {
     </div>`;
   }).join("");
   afficherDernierMerch(collection);
+  signalerPresence(collection);
+  verifierCollectionOccupee(collection);
   const sansStatut = affiches.filter(x => vignettes[x.handle] && !vignettes[x.handle].statut).length;
   document.getElementById("etat-shopify").textContent =
     `${affiches.length} produits affichés`
@@ -4443,6 +4499,60 @@ async function chargerPriorites() {
   return PRIORITES;
 }
 
+/* Présence : une ligne par collection ouverte, rafraîchie chaque minute. Deux personnes
+   qui rangent la même collection en même temps s'écrasent l'une l'autre à l'export —
+   mieux vaut le voir avant de commencer. Une présence sans signe de vie depuis 3 minutes
+   est considérée terminée (onglet fermé, ordinateur en veille…). */
+const PRESENCE_VALIDE_MS = 3 * 60 * 1000;
+let collectionOccupee = null, minuteurPresence = null;
+
+async function chargerPresences() {
+  const rows = await api("/rest/v1/merch_shopify_encours?select=*").catch(() => []);
+  const limite = Date.now() - PRESENCE_VALIDE_MS;
+  return (rows || []).filter(r => new Date(r.vu_le).getTime() > limite);
+}
+
+async function signalerPresence(collection) {
+  if (collectionOccupee && collectionOccupee !== collection) await libererPresence(collectionOccupee);
+  collectionOccupee = collection || null;
+  if (!collection) return;
+  const ecrire = async () => {
+    try {
+      await api(`/rest/v1/merch_shopify_encours?collection=eq.${encodeURIComponent(collection)}&auteur=eq.${encodeURIComponent(MON_NOM || "")}`,
+        { methode: "DELETE" });
+      await api("/rest/v1/merch_shopify_encours", { corps: {
+        collection, auteur: MON_NOM || "quelqu'un", debut_le: new Date().toISOString(), vu_le: new Date().toISOString() } });
+    } catch (e) { /* la présence est un confort, jamais un blocage */ }
+  };
+  await ecrire();
+  clearInterval(minuteurPresence);
+  minuteurPresence = setInterval(() => {
+    if (collectionOccupee !== collection) return clearInterval(minuteurPresence);
+    api(`/rest/v1/merch_shopify_encours?collection=eq.${encodeURIComponent(collection)}`,
+      { methode: "PATCH", corps: { vu_le: new Date().toISOString(), auteur: MON_NOM || "quelqu'un" } }).catch(() => {});
+  }, 60000);
+}
+
+async function libererPresence(collection) {
+  clearInterval(minuteurPresence);
+  if (!collection) return;
+  await api(`/rest/v1/merch_shopify_encours?collection=eq.${encodeURIComponent(collection)}&auteur=eq.${encodeURIComponent(MON_NOM || "")}`,
+    { methode: "DELETE" }).catch(() => {});
+}
+
+// Bandeau d'alerte quand quelqu'un d'autre est déjà sur la collection qu'on ouvre
+async function verifierCollectionOccupee(collection) {
+  const zone = document.getElementById("alerte-encours");
+  if (!zone) return;
+  zone.innerHTML = "";
+  const presences = await chargerPresences();
+  const autre = presences.find(p => p.collection === collection && p.auteur !== (MON_NOM || "quelqu'un"));
+  if (!autre) return;
+  const depuis = Math.max(1, Math.round((Date.now() - new Date(autre.debut_le)) / 60000));
+  zone.innerHTML = `<div class="alerte-encours">⚠ <b>${autre.auteur}</b> travaille sur cette collection
+    depuis ${depuis} min — mettez-vous d'accord avant d'exporter, le dernier CSV importé écrase l'autre.</div>`;
+}
+
 /* Suivi du merch, collection par collection. Deux façons de dater un passage :
    « export » quand le CSV est généré ici, « manuel » quand la collection a été rangée
    directement dans Shopify — sans ça, une collection bien tenue à la main apparaissait
@@ -4455,8 +4565,12 @@ async function enregistrerSuiviMerch(collection, nbProduits, source) {
   }
   try {
     await api(`/rest/v1/merch_shopify_suivi?collection=eq.${encodeURIComponent(collection)}`, { methode: "DELETE" });
+    const fait_le = new Date().toISOString();
     await api("/rest/v1/merch_shopify_suivi", { corps: {
-      collection, fait_le: new Date().toISOString(), nb_produits: nbProduits, source, auteur } });
+      collection, fait_le, nb_produits: nbProduits, source, auteur } });
+    // historique : c'est lui qui permet de compter le travail fait par personne
+    await api("/rest/v1/merch_shopify_journal", { corps: {
+      collection, fait_le, nb_produits: nbProduits, source, auteur } }).catch(() => {});
     await rendreSuiviShopify();
     if (document.getElementById("sel-collection")?.value === collection) await afficherDernierMerch(collection);
   } catch (e) {
@@ -4495,57 +4609,71 @@ function rappelPriorite(p) {
 }
 
 async function rendreSuiviShopify() {
-  // une seule ligne compacte : pastilles cliquables pour les collections à revoir,
-  // les collections à jour résumées en un compteur — la grille garde toute la place
-  const [rows, prio] = await Promise.all([
-    api("/rest/v1/merch_shopify_suivi?select=*&order=fait_le.asc").catch(() => []),
+  const depuis30j = new Date(Date.now() - 30 * 86400000).toISOString();
+  const [rows, prio, journal, presences] = await Promise.all([
+    api("/rest/v1/merch_shopify_suivi?select=*").catch(() => []),
     chargerPriorites(),
+    api(`/rest/v1/merch_shopify_journal?select=auteur,fait_le&fait_le=gte.${depuis30j}`).catch(() => []),
+    chargerPresences(),
   ]);
-  const etats = rows.map(s => {
-    const jours = Math.floor((Date.now() - new Date(s.fait_le)) / 86400000);
-    const cadence = prio[s.collection]?.cadence_jours ?? 14;
-    return { ...s, jours, cadence, cls: jours >= cadence * 2 ? "rouge" : jours >= cadence ? "orange" : "vert" };
-  });
-  const parCollection = new Map(etats.map(x => [x.collection, x]));
+  const dernier = new Map((rows || []).map(r => [r.collection, r]));
+  const occupees = new Map(presences.map(p => [p.collection, p]));
 
-  /* Les collections les plus visitées passent devant : une collection du top 10 non
-     revue depuis 4 jours est plus urgente qu'une collection de fond oubliée depuis un
-     mois. « Jamais merchandisée » compte comme le retard maximal. */
-  const urgentes = Object.values(prio).map(p => {
-    const e = parCollection.get(p.collection);
-    return { ...p, etat: e, jours: e ? e.jours : null,
-             retard: e ? e.jours - p.cadence_jours : 9999 };
-  }).filter(x => x.retard >= 0)
-    .sort((a, b) => a.rang - b.rang)
-    .slice(0, 10);
-  const puceTop = x => `<span onclick="ouvrirCollectionSuivi('${x.collection.replaceAll("'", "")}')"
-      title="${x.sessions_30j.toLocaleString("fr-FR")} visites sur 30 j · à refaire tous les ${x.cadence_jours} j${x.etat ? " · dernier merch le " + new Date(x.etat.fait_le).toLocaleDateString("fr-FR") + (x.etat.auteur ? " par " + x.etat.auteur : "") : " · jamais merchandisée"} — cliquer pour ouvrir"
-      style="display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border:1px solid #e3c7c7;
-      border-radius:999px; font-size:12px; cursor:pointer; background:#fff7f7; white-space:nowrap">
-      <span class="pastille ${x.jours === null || x.jours >= x.cadence_jours * 2 ? "rouge" : "orange"}"></span>
-      <b>TOP ${x.rang}</b> ${x.collection} · ${x.jours === null ? "jamais" : x.jours + " j"}${x.etat?.source === "manuel" ? " ✋" : ""}
-      ${cocheValider(x.collection)}</span>`;
+  /* On montre les collections qui comptent : celles du top audience (même jamais
+     merchandisées) et celles déjà passées au moins une fois. Chacune a sa cadence. */
+  const noms = new Set([...Object.keys(prio), ...dernier.keys()]);
+  const lignes = [...noms].map(c => {
+    const p = prio[c], s = dernier.get(c);
+    const cadence = p?.cadence_jours ?? 14;
+    const jours = s ? Math.floor((Date.now() - new Date(s.fait_le)) / 86400000) : null;
+    const occupee = occupees.get(c);
+    let statut = "ajour", libelle = "À jour";
+    if (jours === null) { statut = "jamais"; libelle = "Jamais fait"; }
+    else if (jours >= cadence * 2) { statut = "urgent"; libelle = "Urgent"; }
+    else if (jours >= cadence) { statut = "afaire"; libelle = "À refaire"; }
+    const ordre = occupee ? 0 : statut === "jamais" ? 1 : statut === "urgent" ? 2 : statut === "afaire" ? 3 : 4;
+    return { collection: c, p, s, jours, cadence, statut, libelle, occupee, ordre };
+  }).sort((a, b) => a.ordre - b.ordre
+      || (a.p?.rang ?? 9999) - (b.p?.rang ?? 9999)
+      || (b.jours ?? 0) - (a.jours ?? 0));
 
-  const attention = etats.filter(x => x.cls !== "vert" && !prio[x.collection]).sort((a, b) => b.jours - a.jours);
-  const aJour = etats.length - etats.filter(x => x.cls !== "vert").length;
-  const puce = x => `<span onclick="ouvrirCollectionSuivi('${x.collection.replaceAll("'", "")}')"
-      title="${x.nb_produits ?? "?"} produits · fait le ${new Date(x.fait_le).toLocaleDateString("fr-FR")}${x.source === "manuel" ? " (validé à la main" + (x.auteur ? " par " + x.auteur : "") + ")" : ""} — cliquer pour ouvrir"
-      style="display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border:1px solid #ddd;
-      border-radius:999px; font-size:12px; cursor:pointer; background:#fff; white-space:nowrap">
-      <span class="pastille ${x.cls}"></span>${x.collection} · ${x.jours} j${x.source === "manuel" ? " ✋" : ""}
-      ${cocheValider(x.collection)}</span>`;
-  const resume = !etats.length ? "aucune collection merchandisée pour le moment"
-    : `${aJour} collection${aJour > 1 ? "s" : ""} à jour ✓`;
-  const titre = t => `<span style="font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--encre2); margin-right:4px">${t}</span>`;
-  document.getElementById("suivi-shopify").innerHTML =
-    (urgentes.length ? `<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px">
-      ${titre("À faire en priorité")}${urgentes.map(puceTop).join("")}
-      <span class="compte-produits">les plus visitées du site, en retard sur leur cadence</span>
-    </div>` : "")
-    + `<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
-      ${titre("Suivi")}${attention.map(puce).join("")}
-      <span class="compte-produits">${resume}</span>
-    </div>`;
+  // --- tuiles de synthèse, dont le travail fait par personne sur 30 jours ---
+  const nb = st => lignes.filter(l => l.statut === st).length;
+  const parPersonne = {};
+  for (const j of journal || []) parPersonne[j.auteur || "sans nom"] = (parPersonne[j.auteur || "sans nom"] || 0) + 1;
+  const classement = Object.entries(parPersonne).sort((a, b) => b[1] - a[1]);
+  const tuile = (cls, n, lib) => `<div class="suivi-tuile ${cls}"><div class="nb">${n}</div><div class="lib">${lib}</div></div>`;
+  document.getElementById("suivi-tuiles").innerHTML = `<div class="suivi-tuiles">
+    ${tuile("urgent", nb("urgent") + nb("jamais"), "urgents")}
+    ${tuile("afaire", nb("afaire"), "à refaire")}
+    ${tuile("ajour", nb("ajour"), "à jour")}
+    ${tuile("", (journal || []).length, "faits sur 30 j")}
+    ${classement.length ? `<div class="suivi-tuile" style="min-width:auto">
+        <div class="lib" style="margin-bottom:4px">sur 30 jours</div>
+        <div style="font-size:12.5px; line-height:1.6">${classement.map(([qui, n]) =>
+          `<b>${qui}</b> ${n}`).join(" · ")}</div></div>` : ""}
+  </div>`;
+
+  // --- tableau ---
+  const jamais = `<span style="color:#a33">jamais</span>`;
+  const ligneHTML = l => `<tr>
+    <td class="collection" onclick="ouvrirCollectionSuivi('${l.collection.replaceAll("'", "")}')">${l.collection}</td>
+    <td>${l.p ? `<span class="etiquette-top">TOP ${l.p.rang}</span> ${l.p.sessions_30j.toLocaleString("fr-FR")} visites` : `<span style="color:var(--encre2)">hors top 100</span>`}</td>
+    <td>tous les ${l.cadence} j</td>
+    <td>${l.s ? `${new Date(l.s.fait_le).toLocaleDateString("fr-FR")} <span style="color:var(--encre2)">(${l.jours} j)</span>` : jamais}</td>
+    <td>${l.s?.auteur ? l.s.auteur + (l.s.source === "manuel" ? " ✋" : "") : "—"}</td>
+    <td>${l.occupee ? `<span class="badge-statut encours" title="ouverte depuis ${Math.max(1, Math.round((Date.now() - new Date(l.occupee.debut_le)) / 60000))} min">En cours · ${l.occupee.auteur}</span>`
+        : `<span class="badge-statut ${l.statut}">${l.libelle}</span>`}</td>
+    <td style="text-align:right">${cocheValider(l.collection)}</td>
+  </tr>`;
+  document.getElementById("suivi-shopify").innerHTML = `<div class="suivi-defile"><table class="suivi-table">
+    <thead><tr><th>Collection</th><th>Audience du site</th><th>Cadence</th><th>Dernier merch</th><th>Par</th><th>Statut</th><th></th></tr></thead>
+    <tbody>${lignes.map(ligneHTML).join("")}</tbody></table></div>`;
+
+  const enCours = lignes.filter(l => l.occupee).length;
+  document.getElementById("suivi-resume").textContent =
+    `${nb("urgent") + nb("jamais")} urgents · ${nb("afaire")} à refaire · ${nb("ajour")} à jour`
+    + (enCours ? ` · ${enCours} en cours` : "");
 }
 
 /* Merch fait ailleurs (directement dans Shopify, ou par quelqu'un d'autre) : on date le
