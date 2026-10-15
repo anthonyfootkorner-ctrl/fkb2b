@@ -14,7 +14,9 @@ const MODELES_IMPORT = {
     sep: "\t", encodage: "windows-1252",
     signature: ["nature", "CLIENT", "barcode", "taille", "quantite", "Piece", "TypeBL"],
     remplacement_complet: true,
-    remplacement_libelle: "remplace la photo des pièces en préparation — le transit et les stocks ne sont pas touchés",
+    // Fastmag sort un fichier par type de BL (« Réservation », « Reservation non facturable »…) :
+    // chaque dépôt ne remplace que les lignes de SES types, les autres fichiers restent en place
+    remplacement_libelle: "remplace les pièces en préparation du même type de BL — les autres types, le transit et les stocks ne sont pas touchés",
   },
   stock_transit: {
     /* Réceptions en attente (export Fastmag « fastmag (n).csv ») : les BL partis du central que
@@ -896,6 +898,7 @@ function lignesPreparation(L, codeParClient) {
     const taille = (l.taille || "").trim(), bl = (l.Piece || "").trim(), j = (l.Date || "").trim();
     const cle = `${magasin}|${reference}|${taille}|${bl}`;
     const e = parCle.get(cle) || { statut: "preparation", magasin, reference, taille, bl, quantite: 0,
+      type_bl: (l.TypeBL || "").trim(),
       expedie_le: j.length === 10 ? `${j.slice(6, 10)}-${j.slice(3, 5)}-${j.slice(0, 2)}` : null };
     e.quantite += q;
     parCle.set(cle, e);
@@ -910,8 +913,12 @@ async function executerStockPreparation(analyse, surProgres) {
   const rows = lignesPreparation(analyse.lignes, codeParClient);
   if (!toutes.length) throw new Error("aucun BL de réservation dans ce fichier");
   const pieces = l => l.reduce((s, r) => s + r.quantite, 0);
-  surProgres(`remplacement de la photo précédente… (${pieces(toutes) - pieces(rows)} pièces pour des clients hors dashboard ignorées)`);
-  await api("/rest/v1/stock_transit?statut=eq.preparation", { methode: "DELETE" });
+  // seuls les types de BL présents dans CE fichier sont remplacés (le 15/10, l'export « non facturable »
+  // déposé juste après l'export « Réservation » l'avait effacé) ; les lignes d'avant ce découpage (type vide) aussi
+  const types = [...new Set(toutes.map(r => r.type_bl))];
+  const liste = types.map(t => `"${t.replace(/"/g, '\\"')}"`).join(",");
+  surProgres(`remplacement des BL « ${types.join(" », « ")} »… (${pieces(toutes) - pieces(rows)} pièces pour des clients hors dashboard ignorées)`);
+  await api(`/rest/v1/stock_transit?statut=eq.preparation&or=${encodeURIComponent(`(type_bl.is.null,type_bl.in.(${liste}))`)}`, { methode: "DELETE" });
   let total = 0;
   for (let i = 0; i < rows.length; i += 2000) {
     const lot = rows.slice(i, i + 2000);
