@@ -784,6 +784,8 @@
   .barre-collante { position: sticky; top: 0; z-index: 40; background: var(--papier);
     padding: 12px 22px; margin: 0 0 14px; border-bottom: 1px solid var(--hairline);
     box-shadow: 0 10px 16px -14px rgba(0,0,0,.55); }
+  .etiquette-top { display: inline-block; background: #111; color: #fff; font-size: 10px; font-weight: 800;
+    letter-spacing: .06em; border-radius: 999px; padding: 2px 8px; margin-right: 6px; }
   .pastille-brouillon { position: absolute; top: 34px; left: 10px; z-index: 2; background: #6b6b66;
     color: #fff; font-size: 10.5px; font-weight: 800; border-radius: 999px; padding: 3px 8px; letter-spacing: .03em; }
   .carte.brouillon .visuel img { opacity: .62; }
@@ -1822,10 +1824,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792070721"></script>
-<script src="imports.js?v=1792070721"></script>
-<script src="merch-shopify.js?v=1792070721"></script>
-<script src="moteur-merch.js?v=1792070721"></script>
+<script src="config.js?v=1792071266"></script>
+<script src="imports.js?v=1792071266"></script>
+<script src="merch-shopify.js?v=1792071266"></script>
+<script src="moteur-merch.js?v=1792071266"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1849,7 +1851,7 @@ const produitConnu = ref => CONNUS.get(ref) || DATA.produits.find(x => x.referen
 let MES_SOCIETES = [], estAdmin = false;
 // Trois rôles internes se partagent le back-office : l'admin voit tout, le commercial
 // approuve les commandes, l'ADV les marque intégrées dans Fastmag.
-let MON_ROLE = null, estStaff = false, peutApprouver = false, peutIntegrer = false;
+let MON_ROLE = null, MON_NOM = null, estStaff = false, peutApprouver = false, peutIntegrer = false;
 let travailNonEnregistre = false;
 window.addEventListener("beforeunload", e => {
   if (travailNonEnregistre) { e.preventDefault(); e.returnValue = ""; }
@@ -1925,13 +1927,14 @@ async function init() {
   try {
     [MES_SOCIETES, profil] = await Promise.all([
       api("/rest/v1/societes?select=id,compte,id_fastmag,nom,ville,famille_tarifaire,remise,reseau&actif=eq.true&order=compte"),
-      api("/rest/v1/profils?select=role&limit=1").then(r => r[0]).catch(() => null),
+      api("/rest/v1/profils?select=role,nom&limit=1").then(r => r[0]).catch(() => null),
     ]);
   } catch (err) {
     if (err.statut === 401) { deconnexion(); return; }
     throw err;
   }
   MON_ROLE = profil?.role || null;
+  MON_NOM = profil?.nom || null;
   estAdmin = MON_ROLE === "admin";
   estStaff = ["admin", "admin_commercial", "admin_adv"].includes(MON_ROLE);
   peutApprouver = ["admin", "admin_commercial"].includes(MON_ROLE);
@@ -4425,14 +4428,27 @@ async function exporterShopify() {
   await enregistrerSuiviMerch(collection, ordreShopify.length, "export");
 }
 
+/* Les collections les plus visitées du site méritent un passage plus fréquent : la table
+   merch_collections_priorite porte leur rang d'audience (sessions sur 30 jours, analytique
+   Shopify) et la cadence visée — 3 jours pour le top 10, 7 jours jusqu'au 30e, 14 ensuite. */
+let PRIORITES = null;
+async function chargerPriorites() {
+  if (PRIORITES) return PRIORITES;
+  const rows = await api("/rest/v1/merch_collections_priorite?select=*&order=rang").catch(() => []);
+  PRIORITES = Object.fromEntries((rows || []).map(r => [r.collection, r]));
+  return PRIORITES;
+}
+
 /* Suivi du merch, collection par collection. Deux façons de dater un passage :
    « export » quand le CSV est généré ici, « manuel » quand la collection a été rangée
    directement dans Shopify — sans ça, une collection bien tenue à la main apparaissait
    en retard dans le suivi. */
 async function enregistrerSuiviMerch(collection, nbProduits, source) {
   if (!collection) return;
-  let auteur = null;
-  try { auteur = JSON.parse(localStorage.getItem("fkb2b-session") || "{}").email || null; } catch (e) { /* sans auteur */ }
+  let auteur = MON_NOM || null;
+  if (!auteur) {
+    try { auteur = JSON.parse(localStorage.getItem("fkb2b-session") || "{}").email || null; } catch (e) { /* sans auteur */ }
+  }
   try {
     await api(`/rest/v1/merch_shopify_suivi?collection=eq.${encodeURIComponent(collection)}`, { methode: "DELETE" });
     await api("/rest/v1/merch_shopify_suivi", { corps: {
@@ -4450,37 +4466,78 @@ async function afficherDernierMerch(collection) {
   if (!zone) return;
   zone.textContent = "";
   if (!collection) return;
-  const rows = await api(`/rest/v1/merch_shopify_suivi?collection=eq.${encodeURIComponent(collection)}&select=*`).catch(() => []);
+  const [rows, prio] = await Promise.all([
+    api(`/rest/v1/merch_shopify_suivi?collection=eq.${encodeURIComponent(collection)}&select=*`).catch(() => []),
+    chargerPriorites(),
+  ]);
+  const p = prio[collection];
   const s = rows?.[0];
-  if (!s) { zone.innerHTML = `<span style="color:#a33">jamais merchandisée</span>`; return; }
+  if (!s) { zone.innerHTML = rappelPriorite(p) + `<span style="color:#a33">jamais merchandisée</span>`; return; }
   const jours = Math.floor((Date.now() - new Date(s.fait_le)) / 86400000);
-  const couleur = jours >= 30 ? "#a33" : jours >= 14 ? "#a68a3d" : "var(--encre2)";
+  const cadence = p?.cadence_jours ?? 14;
+  const couleur = jours >= cadence * 2 ? "#a33" : jours >= cadence ? "#a68a3d" : "var(--encre2)";
   const quand = jours === 0 ? "aujourd'hui" : jours === 1 ? "hier" : `il y a ${jours} j`;
-  zone.innerHTML = `<span style="color:${couleur}">dernier merch : ${new Date(s.fait_le).toLocaleDateString("fr-FR")}`
-    + ` (${quand})${s.source === "manuel" ? " · validé à la main" : ""}</span>`;
+  zone.innerHTML = rappelPriorite(p)
+    + `<span style="color:${couleur}">dernier merch : ${new Date(s.fait_le).toLocaleDateString("fr-FR")}`
+    + ` (${quand})${s.auteur ? " · par " + s.auteur : ""}${s.source === "manuel" ? " · à la main" : ""}`
+    + `${jours >= cadence ? " · <b>à refaire</b>" : ""}</span>`;
+}
+
+// étiquette « TOP n » : pourquoi cette collection passe avant les autres
+function rappelPriorite(p) {
+  if (!p) return "";
+  return `<span class="etiquette-top" title="${p.sessions_30j.toLocaleString("fr-FR")} visites sur 30 jours (entrées sur le site)">`
+    + `TOP ${p.rang} · tous les ${p.cadence_jours} j</span> `;
 }
 
 async function rendreSuiviShopify() {
   // une seule ligne compacte : pastilles cliquables pour les collections à revoir,
   // les collections à jour résumées en un compteur — la grille garde toute la place
-  const rows = await api("/rest/v1/merch_shopify_suivi?select=*&order=fait_le.asc").catch(() => []);
+  const [rows, prio] = await Promise.all([
+    api("/rest/v1/merch_shopify_suivi?select=*&order=fait_le.asc").catch(() => []),
+    chargerPriorites(),
+  ]);
   const etats = rows.map(s => {
     const jours = Math.floor((Date.now() - new Date(s.fait_le)) / 86400000);
-    return { ...s, jours, cls: jours >= 30 ? "rouge" : jours >= 14 ? "orange" : "vert" };
+    const cadence = prio[s.collection]?.cadence_jours ?? 14;
+    return { ...s, jours, cadence, cls: jours >= cadence * 2 ? "rouge" : jours >= cadence ? "orange" : "vert" };
   });
-  const attention = etats.filter(x => x.cls !== "vert").sort((a, b) => b.jours - a.jours);
-  const aJour = etats.length - attention.length;
+  const parCollection = new Map(etats.map(x => [x.collection, x]));
+
+  /* Les collections les plus visitées passent devant : une collection du top 10 non
+     revue depuis 4 jours est plus urgente qu'une collection de fond oubliée depuis un
+     mois. « Jamais merchandisée » compte comme le retard maximal. */
+  const urgentes = Object.values(prio).map(p => {
+    const e = parCollection.get(p.collection);
+    return { ...p, etat: e, jours: e ? e.jours : null,
+             retard: e ? e.jours - p.cadence_jours : 9999 };
+  }).filter(x => x.retard >= 0)
+    .sort((a, b) => a.rang - b.rang)
+    .slice(0, 10);
+  const puceTop = x => `<span onclick="ouvrirCollectionSuivi('${x.collection.replaceAll("'", "")}')"
+      title="${x.sessions_30j.toLocaleString("fr-FR")} visites sur 30 j · à refaire tous les ${x.cadence_jours} j${x.etat ? " · dernier merch le " + new Date(x.etat.fait_le).toLocaleDateString("fr-FR") + (x.etat.auteur ? " par " + x.etat.auteur : "") : " · jamais merchandisée"} — cliquer pour ouvrir"
+      style="display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border:1px solid #e3c7c7;
+      border-radius:999px; font-size:12px; cursor:pointer; background:#fff7f7; white-space:nowrap">
+      <span class="pastille ${x.jours === null || x.jours >= x.cadence_jours * 2 ? "rouge" : "orange"}"></span>
+      <b>TOP ${x.rang}</b> ${x.collection} · ${x.jours === null ? "jamais" : x.jours + " j"}${x.etat?.source === "manuel" ? " ✋" : ""}</span>`;
+
+  const attention = etats.filter(x => x.cls !== "vert" && !prio[x.collection]).sort((a, b) => b.jours - a.jours);
+  const aJour = etats.length - etats.filter(x => x.cls !== "vert").length;
   const puce = x => `<span onclick="ouvrirCollectionSuivi('${x.collection.replaceAll("'", "")}')"
       title="${x.nb_produits ?? "?"} produits · fait le ${new Date(x.fait_le).toLocaleDateString("fr-FR")}${x.source === "manuel" ? " (validé à la main" + (x.auteur ? " par " + x.auteur : "") + ")" : ""} — cliquer pour ouvrir"
       style="display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border:1px solid #ddd;
       border-radius:999px; font-size:12px; cursor:pointer; background:#fff; white-space:nowrap">
       <span class="pastille ${x.cls}"></span>${x.collection} · ${x.jours} j${x.source === "manuel" ? " ✋" : ""}</span>`;
   const resume = !etats.length ? "aucune collection merchandisée pour le moment"
-    : attention.length ? `+ ${aJour} à jour` : `${aJour} collection${aJour > 1 ? "s" : ""} à jour ✓`;
+    : `${aJour} collection${aJour > 1 ? "s" : ""} à jour ✓`;
+  const titre = t => `<span style="font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--encre2); margin-right:4px">${t}</span>`;
   document.getElementById("suivi-shopify").innerHTML =
-    `<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
-      <span style="font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--encre2); margin-right:4px">Suivi</span>
-      ${attention.map(puce).join("")}
+    (urgentes.length ? `<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px">
+      ${titre("À faire en priorité")}${urgentes.map(puceTop).join("")}
+      <span class="compte-produits">les plus visitées du site, en retard sur leur cadence</span>
+    </div>` : "")
+    + `<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
+      ${titre("Suivi")}${attention.map(puce).join("")}
       <span class="compte-produits">${resume}</span>
     </div>`;
 }
