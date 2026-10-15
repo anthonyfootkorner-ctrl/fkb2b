@@ -1237,6 +1237,8 @@
                           color: var(--encre2); font-weight: 500; }
   .dash-modale tfoot td { font-weight: 600; border-bottom: 0; }
   .dash-modale td.zero { color: var(--gris); }
+  .dash-modale tr.moi td { background: #f4f8ef; }
+  .dash-modale tr.autres td { color: var(--encre2); font-style: italic; }
   .dash-modale h5 { margin: 18px 0 0; font-size: 10.5px; letter-spacing: .14em;
                     text-transform: uppercase; color: var(--encre2); }
   /* Le détail des tailles au survol : une bulle posée à côté du chiffre, sans clic. */
@@ -1866,10 +1868,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792072197"></script>
-<script src="imports.js?v=1792072197"></script>
-<script src="merch-shopify.js?v=1792072197"></script>
-<script src="moteur-merch.js?v=1792072197"></script>
+<script src="config.js?v=1792076585"></script>
+<script src="imports.js?v=1792076585"></script>
+<script src="merch-shopify.js?v=1792076585"></script>
+<script src="moteur-merch.js?v=1792076585"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2443,7 +2445,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792059703";
+    v.src = "hero.mp4?v=1792076585";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -10776,6 +10778,40 @@ function ouvrirModaleDash(contenu) {
   return fond;
 }
 
+/* « Magasins vendeurs » : au clic, la liste des magasins qui ont vendu la référence sur la période.
+   Le personnel voit tous les noms ; un compte magasin ne voit que les siens, le reste est regroupé. */
+async function vendeursDash(ref) {
+  const produit = (DASH.donnees?.tops || []).concat(DASH.donnees?.retard || [], DASH.donnees?.central || [], DASH.donnees?.arrivages || [])
+    .find(p => p.reference === ref) || { reference: ref };
+  const { du, au } = dashDates(DASH.periode);
+  const entete = `<div class="entete">
+      <div><h4>${echapperHTML(produit.designation || ref)}</h4>
+        <div class="ref">${echapperHTML(produit.marque || "")}${produit.marque ? " · " : ""}${echapperHTML(ref)}</div></div>
+      <button class="puce-claire" onclick="fermerModaleDash()">Fermer</button>
+    </div>`;
+  const fond = ouvrirModaleDash(entete + `<div class="compte-produits" style="margin-top:14px">Chargement…</div>`);
+  const lignes = await api("/rest/v1/rpc/dash_vendeurs", { corps: { p_reference: ref, p_du: du, p_au: au } }).catch(() => null);
+  if (!fond.isConnected) return;
+  const boite = fond.querySelector(".boite");
+  const periode = `du ${new Date(du).toLocaleDateString("fr-FR")} au ${new Date(au).toLocaleDateString("fr-FR")}`;
+  if (!lignes?.length) {
+    boite.innerHTML = entete + `<div class="dash-vide">Aucun magasin n'a vendu cette référence ${periode}.</div>`;
+    return;
+  }
+  const nb = lignes.reduce((t, l) => t + Number(l.nb_magasins || 1), 0);
+  const total = lignes.reduce((t, l) => t + Number(l.ventes || 0), 0);
+  boite.innerHTML = entete + `
+    <div class="compte-produits" style="margin-top:10px">${dashNb(nb)} magasin${nb > 1 ? "s" : ""} vendeur${nb > 1 ? "s" : ""} ${periode} (web et central exclus).</div>
+    <table>
+      <thead><tr><th>Magasin</th><th>Ventes</th><th>ROS/sem</th><th>Stock</th></tr></thead>
+      <tbody>${lignes.map(l => l.magasin
+        ? `<tr class="${l.a_moi ? "moi" : ""}"><td>${echapperHTML(l.nom || l.magasin)}</td><td>${dashNb(l.ventes)}</td><td>${dashRos(l.ros)}</td><td class="${Number(l.stock) ? "" : "zero"}">${dashNb(l.stock)}</td></tr>`
+        : `<tr class="autres"><td>${echapperHTML(l.nom)} · ${dashNb(l.nb_magasins)}</td><td>${dashNb(l.ventes)}</td><td>${dashRos(l.ros)}</td><td>—</td></tr>`).join("")}</tbody>
+      <tfoot><tr><td>Total</td><td>${dashNb(total)}</td><td></td><td></td></tr></tfoot>
+    </table>
+    ${lignes.some(l => l.a_moi) ? `<div class="compte-produits" style="margin-top:8px">Vos magasins sont surlignés en vert. Le ROS est en pièces par semaine.</div>` : ""}`;
+}
+
 async function detailTaillesDash(ref) {
   const produit = (DASH.donnees?.tops || []).concat(DASH.donnees?.retard || [], DASH.donnees?.central || [])
     .find(p => p.reference === ref) || { reference: ref };
@@ -11131,7 +11167,7 @@ function carteDash(p, options = {}) {
         ${p.ventes != null ? `<span><i>Ventes</i><br>${dashNb(p.ventes)}</span>` : ""}
         ${couverture ? `<span title="${echapperHTML(couverture.titre)}"><i>Couverture</i><br><span class="dash-badge ${couverture.classe}">${couverture.texte}</span></span>` : ""}
         ${p.indice != null ? `<span><i>Indice</i><br><span class="dash-badge rouge">${dashRos(p.indice)}</span></span>` : ""}
-        ${p.nb_mag_vendeurs != null ? `<span><i>Magasins vendeurs</i><br>${dashNb(p.nb_mag_vendeurs)}</span>` : ""}
+        ${p.nb_mag_vendeurs != null ? `<span title="magasins qui ont vendu la référence sur la période — web et central exclus"><i>Magasins vendeurs</i><br><button class="dash-lien" title="Voir lesquels" onclick="vendeursDash('${echapperHTML(p.reference)}')">${dashNb(p.nb_mag_vendeurs)}</button></span>` : ""}
         ${p.tendance != null ? `<span><i>Tendance</i><br>${Number(p.tendance) >= 0 ? "↑ +" : "↓ "}${dashNb(p.tendance)} %</span>` : ""}
       </div>
     </div>
