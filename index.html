@@ -1810,10 +1810,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792064298"></script>
-<script src="imports.js?v=1792064298"></script>
-<script src="merch-shopify.js?v=1792064298"></script>
-<script src="moteur-merch.js?v=1792064298"></script>
+<script src="config.js?v=1792067149"></script>
+<script src="imports.js?v=1792067149"></script>
+<script src="merch-shopify.js?v=1792067149"></script>
+<script src="moteur-merch.js?v=1792067149"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -3939,7 +3939,12 @@ function telechargerPrixZero() {
 /* Ces modèles remplacent ce qu'ils touchent (le jour pour les ventes, le magasin pour
    un stock) : les redéposer ne double rien et permet de corriger un import raté. Les
    autres restent bloqués par l'anti-rejeu. */
-const MODELES_REJOUABLES = ["stock_b2b", "ventes", "objectifs", "stock_magasins", "stock_transit", "stock_preparation", "stock_web_egonet", "stock_fastmag", "receptions_wms"];
+// Modèles qu'on peut redéposer tels quels : leur import est idempotent (remplacement ou
+// correction ligne à ligne). L'export Products en fait partie — il vide puis réécrit le
+// stock Duhamel et met à jour les fiches photos : le rejouer ne double rien, et c'est le
+// seul moyen de rattraper une colonne ajoutée depuis (ex. le statut Shopify, 15/10/2026).
+const MODELES_REJOUABLES = ["stock_b2b", "ventes", "ventes_web_fastmag", "objectifs", "stock_magasins",
+  "stock_transit", "stock_preparation", "stock_web_egonet", "stock_fastmag", "stock_shopify", "receptions_wms"];
 
 async function traiterFichier(fichier) {
   const zone = document.getElementById("rapport-import");
