@@ -777,6 +777,9 @@
     font-size: 10.5px; font-weight: 800; border-radius: 999px; padding: 3px 8px; letter-spacing: .03em; }
   .ligne-info b { color: #8a7020; font-weight: 700; }
   /* produit non publié sur le site : visible seulement si on demande les brouillons */
+  /* barre d'outils du merch : elle reste sous la main quand on descend dans la grille */
+  .barre-collante { position: sticky; top: 0; z-index: 40; background: var(--noir);
+    padding: 10px 0 12px; margin-top: 4px; box-shadow: 0 10px 18px -12px rgba(0,0,0,.9); }
   .pastille-brouillon { position: absolute; top: 34px; left: 10px; z-index: 2; background: #6b6b66;
     color: #fff; font-size: 10.5px; font-weight: 800; border-radius: 999px; padding: 3px 8px; letter-spacing: .03em; }
   .carte.brouillon .visuel img { opacity: .62; }
@@ -1365,7 +1368,7 @@
       <span class="fil" onclick="location.hash='#/'">← ACCUEIL</span>
       <h1>MERCHANDISING</h1>
       <div class="compte-produits">Choisissez un périmètre, partez d'un tri automatique si besoin, puis glissez-déposez et enregistrez. Chaque périmètre garde son propre ordre.</div>
-      <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; align-items:center">
+      <div class="barre-collante" style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; align-items:center">
         <select id="merch-contexte" style="background:#fff; color:var(--encre); border:1px solid #d8d8d5; border-radius:8px; padding:9px 12px; font-size:13px"></select>
         <select id="merch-affinage" title="Range la vue telle que le client la voit : FK > ACCESSOIRES a son propre ordre" style="background:#fff; color:var(--encre); border:1px solid #d8d8d5; border-radius:8px; padding:9px 12px; font-size:13px"></select>
         <input class="qte-claire" id="merch-figer" type="number" min="0" placeholder="figer N premiers" style="width:130px; text-align:left" title="Les N premiers produits ne bougent pas lors des tris">
@@ -1373,7 +1376,7 @@
         <button class="puce-claire" id="btn-tri-recent">Tri : du plus récent au plus ancien</button>
         <button class="btn-noir" id="btn-merch-sauver">ENREGISTRER L'ORDRE</button>
         <button class="puce-claire" id="btn-merch-reinit">Effacer l'ordre de ce périmètre</button>
-        <select class="qte-claire" id="merch-profil" style="width:190px; text-align:left"><option value="equilibre">Profil : équilibré</option><option value="nouveautes">Profil : nouveautés d'abord</option><option value="ventes">Profil : meilleures ventes</option><option value="promotions">Profil : promotions</option><option value="antho">Tri antho</option><option value="perso">Tri sur mesure (jauges)</option></select>
+        <select class="qte-claire" id="merch-profil" style="width:190px; text-align:left"><option value="equilibre">Profil : équilibré</option><option value="nouveautes">Profil : nouveautés d'abord</option><option value="ventes">Profil : meilleures ventes</option><option value="stock">Profil : stock le plus fort</option><option value="promotions">Profil : promotions</option><option value="antho">Tri antho</option><option value="perso">Tri sur mesure (jauges)</option></select>
         <select class="qte-claire" id="merch-duos" style="width:190px; text-align:left" title="Duos : les produits sont appairés 2 par 2 (haut+bas, coloris du même modèle, associés Shopify). Sans duos : classement au score, un produit après l'autre."><option value="duos">Affichage : en duos</option><option value="simple">Affichage : sans duos</option></select><button class="puce-claire" id="btn-auto-b2b" style="border-color:#111; font-weight:600">⚡ Classement auto</button>
         <button class="puce-claire" id="btn-rapport-b2b" style="display:none">Rapport JSON</button>
         <button class="puce-claire" onclick="location.hash='#/merch-shopify'" style="border-color:#95bf47; color:#5e8e3e">Merch Shopify (collections) →</button>
@@ -1404,10 +1407,11 @@
     <div class="bloc-clair" style="margin: 0 22px 26px">
       <label id="zone-depot-shopify" style="display:block; border:2px dashed #ccc; border-radius:12px; padding:32px;
              text-align:center; cursor:pointer; color:var(--encre2); font-size:13.5px">
-        Glissez l'export CSV Matrixify des collections ici (ou cliquez)
+        Glissez ici l'export Matrixify des <b>collections</b> (pour ranger) ou l'export <b>Products</b>
+        (pour mettre à jour stock web, visuels, prix, promotions et statuts) — ou cliquez
         <input id="fichier-shopify" type="file" accept=".csv,.zip" style="display:none">
       </label>
-      <div class="formu" style="margin-top:14px; display:none" id="barre-shopify">
+      <div class="formu barre-collante" style="margin-top:14px; display:none" id="barre-shopify">
         <input class="qte-claire" id="sel-collection" list="liste-collections" style="width:280px; text-align:left"
                placeholder="chercher une collection… (tapez ou choisissez)">
         <datalist id="liste-collections"></datalist>
@@ -1416,7 +1420,7 @@
         <button class="puce-claire" id="btn-shopify-bas">⭳ Tout en bas</button>
         <input class="qte-claire" id="shopify-position" type="number" min="1" placeholder="n°" style="width:70px">
         <button class="puce-claire" id="btn-shopify-pos">→ À cette position</button>
-        <select class="qte-claire" id="shopify-profil" style="width:190px; text-align:left"><option value="equilibre">Profil : équilibré</option><option value="nouveautes">Profil : nouveautés d'abord</option><option value="ventes">Profil : meilleures ventes</option><option value="promotions">Profil : promotions</option><option value="antho">Tri antho</option><option value="perso">Tri sur mesure (jauges)</option></select>
+        <select class="qte-claire" id="shopify-profil" style="width:190px; text-align:left"><option value="equilibre">Profil : équilibré</option><option value="nouveautes">Profil : nouveautés d'abord</option><option value="ventes">Profil : meilleures ventes</option><option value="stock">Profil : stock le plus fort</option><option value="promotions">Profil : promotions</option><option value="antho">Tri antho</option><option value="perso">Tri sur mesure (jauges)</option></select>
         <select class="qte-claire" id="shopify-statut" style="width:210px; text-align:left" title="Les brouillons et les produits archivés ne sont pas visibles sur footkorner.com : les afficher fausse l'ordre réel de la collection (et la parité des duos).">
           <option value="actifs">Produits : actifs seulement</option>
           <option value="brouillons">Produits : actifs + brouillons</option>
@@ -1810,10 +1814,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792067149"></script>
-<script src="imports.js?v=1792067149"></script>
-<script src="merch-shopify.js?v=1792067149"></script>
-<script src="moteur-merch.js?v=1792067149"></script>
+<script src="config.js?v=1792068475"></script>
+<script src="imports.js?v=1792068475"></script>
+<script src="merch-shopify.js?v=1792068475"></script>
+<script src="moteur-merch.js?v=1792068475"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -4174,12 +4178,13 @@ async function rendreMerchShopify() {
 
 async function traiterFichierShopify(fichier) {
   const etat = document.getElementById("etat-shopify");
-  shopifyDonnees = await analyserFichierShopify(fichier);
-  if (shopifyDonnees.erreur) {
-    document.getElementById("grille-shopify").innerHTML =
-      `<div class="vide" style="grid-column:1/-1; color:#a33">${shopifyDonnees.erreur}</div>`;
-    return;
+  const donnees = await analyserFichierShopify(fichier);
+  if (donnees.erreur) {
+    // pas un export de collections : c'est peut-être l'export Products, que le
+    // merchandiser dépose depuis cet écran sans passer par le Centre d'import
+    return deposerProductsShopify(fichier, donnees.erreur);
   }
+  shopifyDonnees = donnees;
   // mémorise le fichier COMPRESSÉ : toutes les collections (Smart + Custom) restent
   // disponibles à TOUS les comptes merch/admin aux prochaines sessions
   try {
@@ -4199,6 +4204,41 @@ async function traiterFichierShopify(fichier) {
   document.getElementById("barre-shopify").style.display = "flex";
   etat.textContent = `${noms.length} collection${noms.length > 1 ? "s" : ""} dans le fichier`;
   rendreCollectionShopify();
+}
+
+/* Export Products déposé depuis la vue Merch Shopify : c'est le fichier qui remplace le
+   stock web (Duhamel) et rafraîchit les fiches (visuels, prix, promotions, statuts,
+   produits associés). Seul ce modèle est accepté ici — tout le reste reste au Centre
+   d'import, réservé aux administrateurs (le serveur refuse de toute façon une autre
+   table ou un autre magasin pour un compte merchandiser). */
+async function deposerProductsShopify(fichier, erreurCollections) {
+  const etat = document.getElementById("etat-shopify");
+  const grille = document.getElementById("grille-shopify");
+  etat.textContent = `analyse de ${fichier.name}…`;
+  let a = null;
+  try { a = await analyserFichierFastmag(fichier); } catch (e) { a = { erreur: e.message }; }
+  if (!a || a.erreur || a.modele !== "stock_shopify") {
+    grille.innerHTML = `<div class="vide" style="grid-column:1/-1; color:#a33">${erreurCollections}
+      <div style="font-size:12px; margin-top:8px; color:var(--encre2)">Cet écran accepte deux fichiers Matrixify :
+      l'export <b>Collections</b> (pour ranger les produits) et l'export <b>Products</b> (pour mettre à jour les
+      données). Les autres fichiers Fastmag se déposent dans le Centre d'import.</div></div>`;
+    etat.textContent = "";
+    return;
+  }
+  if (!confirm(`Mettre à jour les données Shopify depuis ${fichier.name} ?\n\n`
+      + `${a.lues} lignes lues. Le stock web, les visuels, les prix, les promotions et les statuts `
+      + `seront remplacés par ceux de ce fichier. Les positions de vos collections ne bougent pas.`)) {
+    etat.textContent = "";
+    return;
+  }
+  try {
+    const total = await executerImport(a, m => etat.textContent = m);
+    STOCKS_REFS = {};
+    etat.textContent = `✓ données Shopify à jour : ${total} lignes écrites — rouvrez une collection pour en profiter`;
+    if (document.getElementById("sel-collection").value) rendreCollectionShopify();
+  } catch (e) {
+    etat.textContent = "⚠ import interrompu : " + (e?.message || e);
+  }
 }
 
 let STOCKS_REFS = {}; // reference -> { total, tailles[] } (vue Merch Shopify)

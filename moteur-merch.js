@@ -274,6 +274,8 @@ const PROFILS_TRI = {
   equilibre: (x, y) => (y.bandeCoeur - x.bandeCoeur) || (y.ventesCle - x.ventesCle) || (y.stockTotal - x.stockTotal),
   nouveautes: (x, y) => (x.rangSaison - y.rangSaison) || (y.bandeCoeur - x.bandeCoeur) || (y.ventesCle - x.ventesCle),
   ventes: (x, y) => (y.ventesBrutes - x.ventesBrutes) || (y.bandeCoeur - x.bandeCoeur) || (y.stockTotal - x.stockTotal),
+  // stock : les plus gros stocks d'abord (écouler), puis qualité de grille et ventes
+  stock: (x, y) => (y.stockTotal - x.stockTotal) || (y.bandeCoeur - x.bandeCoeur) || (y.ventesCle - x.ventesCle),
   promotions: (x, y) => (Math.floor(y.promo / 10) - Math.floor(x.promo / 10)) || (y.ventesCle - x.ventesCle) || (y.bandeCoeur - x.bandeCoeur),
   // Tri antho : tailles cœur → date de création (approchée par la saison tant que
   // Created At manque à l'export) → ventes brutes → stock total
