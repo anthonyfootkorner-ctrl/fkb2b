@@ -580,18 +580,24 @@ function mapperVersTables(analyse) {
         const candidat = { reference: ref, url: g[0], urls: g, handle: handleParId[pid] || null,
           prix_shopify: e.prix ?? null, prix_barre: e.compare ?? null, promo_pct: promo,
           associes: associesParId[pid] || [],
+          statut: (statutParId[pid] || "").trim().toLowerCase() || null,
           cree_shopify: creeParId[pid] || null, description: descriptionParId[pid] || null };
         const ex = photosParRef[ref];
+        // une même référence peut porter plusieurs produits Shopify (doublons) : le statut
+        // le plus « vivant » l'emporte, sinon un doublon archivé masquerait un produit en ligne
+        const rangStatut = st => st === "active" ? 3 : st === "draft" ? 2 : st === "archived" ? 1 : 0;
         if (!ex || g.length > ex.urls.length) {
           if (ex && ex.promo_pct > promo) candidat.promo_pct = ex.promo_pct;
           if (ex && !candidat.associes.length) candidat.associes = ex.associes;
           if (ex) { candidat.cree_shopify ??= ex.cree_shopify; candidat.description ??= ex.description; }
+          if (ex && rangStatut(ex.statut) > rangStatut(candidat.statut)) candidat.statut = ex.statut;
           photosParRef[ref] = candidat;
         } else {
           if (promo > ex.promo_pct) ex.promo_pct = promo;
           if (!ex.associes.length && associesParId[pid]?.length) ex.associes = associesParId[pid];
           ex.cree_shopify ??= creeParId[pid] || null;
           ex.description ??= descriptionParId[pid] || null;
+          if (rangStatut(candidat.statut) > rangStatut(ex.statut)) ex.statut = candidat.statut;
         }
       }
       return [

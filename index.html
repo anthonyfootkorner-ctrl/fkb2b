@@ -776,6 +776,10 @@
   .pastille-promo { position: absolute; top: 34px; right: 10px; z-index: 2; background: #c0504d; color: #fff;
     font-size: 10.5px; font-weight: 800; border-radius: 999px; padding: 3px 8px; letter-spacing: .03em; }
   .ligne-info b { color: #8a7020; font-weight: 700; }
+  /* produit non publié sur le site : visible seulement si on demande les brouillons */
+  .pastille-brouillon { position: absolute; top: 34px; left: 10px; z-index: 2; background: #6b6b66;
+    color: #fff; font-size: 10.5px; font-weight: 800; border-radius: 999px; padding: 3px 8px; letter-spacing: .03em; }
+  .carte.brouillon .visuel img { opacity: .62; }
 
   /* gestion des utilisateurs (admin) */
   .bloc-clair { background: #fafaf8; border: 1px solid var(--hairline); border-radius: 14px; padding: 20px; }
@@ -1413,6 +1417,11 @@
         <input class="qte-claire" id="shopify-position" type="number" min="1" placeholder="n°" style="width:70px">
         <button class="puce-claire" id="btn-shopify-pos">→ À cette position</button>
         <select class="qte-claire" id="shopify-profil" style="width:190px; text-align:left"><option value="equilibre">Profil : équilibré</option><option value="nouveautes">Profil : nouveautés d'abord</option><option value="ventes">Profil : meilleures ventes</option><option value="promotions">Profil : promotions</option><option value="antho">Tri antho</option><option value="perso">Tri sur mesure (jauges)</option></select>
+        <select class="qte-claire" id="shopify-statut" style="width:210px; text-align:left" title="Les brouillons et les produits archivés ne sont pas visibles sur footkorner.com : les afficher fausse l'ordre réel de la collection (et la parité des duos).">
+          <option value="actifs">Produits : actifs seulement</option>
+          <option value="brouillons">Produits : actifs + brouillons</option>
+          <option value="tous">Produits : tous (brouillons + archivés)</option>
+        </select>
         <select class="qte-claire" id="shopify-duos" style="width:190px; text-align:left" title="Duos : les produits sont appairés 2 par 2 (haut+bas, coloris du même modèle, associés Shopify). Sans duos : classement au score, un produit après l'autre."><option value="duos">Affichage : en duos</option><option value="simple">Affichage : sans duos</option></select><button class="puce-claire" id="btn-auto-shopify" style="border-color:#111; font-weight:600">⚡ Classement auto</button>
         <button class="puce-claire" id="btn-rapport-shopify" style="display:none">Rapport JSON</button>
         <button class="btn-noir" id="btn-shopify-export">TÉLÉCHARGER LE CSV POUR MATRIXIFY</button>
@@ -1801,10 +1810,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792059703"></script>
-<script src="imports.js?v=1792059703"></script>
-<script src="merch-shopify.js?v=1792059703"></script>
-<script src="moteur-merch.js?v=1792059703"></script>
+<script src="config.js?v=1792064298"></script>
+<script src="imports.js?v=1792064298"></script>
+<script src="merch-shopify.js?v=1792064298"></script>
+<script src="moteur-merch.js?v=1792064298"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1978,7 +1987,8 @@ async function init() {
   // paramétrage de base du merch : dernier profil de tri et N figés retenus
   for (const [id, cle] of [["merch-profil","fkb2b-profil"],["shopify-profil","fkb2b-profil"],
                             ["merch-figer","fkb2b-figer"],["shopify-figer","fkb2b-figer"],
-                            ["merch-duos","fkb2b-duos"],["shopify-duos","fkb2b-duos"]]) {
+                            ["merch-duos","fkb2b-duos"],["shopify-duos","fkb2b-duos"],
+                            ["shopify-statut","fkb2b-statut-shopify"]]) {
     const el = document.getElementById(id);
     if (!el) continue;
     const memo = localStorage.getItem(cle);
@@ -4090,6 +4100,8 @@ function telechargerBilanComptes() {
 /* ---------------- merch Shopify (admin) : réordonner les collections du site public ---------------- */
 let merchShopifyInitialise = false;
 let ordreShopify = [];        // handles produits de la collection affichée, dans l'ordre courant
+let masquesShopify = [];      // handles écartés de l'affichage (brouillons, archivés) : ils restent
+                              // dans le CSV exporté, rangés après les produits visibles
 let selectionShopify = [];    // handles cochés, dans l'ordre des clics
 
 async function rendreMerchShopify() {
@@ -4147,6 +4159,9 @@ async function rendreMerchShopify() {
     const n = parseInt(document.getElementById("shopify-position").value || "0", 10);
     if (n >= 1) deplacerShopify(n - 1);
   };
+  document.getElementById("shopify-statut").addEventListener("change", () => {
+    if (document.getElementById("sel-collection").value) rendreCollectionShopify();
+  });
   document.getElementById("btn-auto-shopify").onclick = classementAutoShopify;
   document.getElementById("btn-rapport-shopify").onclick = telechargerRapport;
   document.getElementById("btn-shopify-export").onclick = exporterShopify;
@@ -4232,29 +4247,48 @@ async function rendreCollectionShopify() {
                  pos: parseInt(lignes[i][iPos] || "0", 10) || 9999 }))
     .filter(x => x.handle)
     .sort((a, b) => a.pos - b.pos);
-  ordreShopify = items.map(x => x.handle);
   selectionShopify = [];
 
   const grille = document.getElementById("grille-shopify");
   grille.innerHTML = `<div class="vide" style="grid-column:1/-1">Chargement des visuels…</div>`;
-  const vignettes = await chargerVignettesShopify(ordreShopify);
-  await chargerStocksRefs([...new Set(Object.values(vignettes).map(v => v.reference))]);
+  const vignettes = await chargerVignettesShopify(items.map(x => x.handle));
 
-  grille.innerHTML = items.map((x, i) => {
+  /* Un brouillon ou un produit archivé n'existe pas pour le client : le laisser dans la
+     grille fausse l'ordre réel de la collection et la parité des duos. On l'écarte donc
+     par défaut — mais jamais du fichier exporté, sinon Matrixify le sortirait de la
+     collection. Statut inconnu (produit jamais vu par l'import Products) = affiché :
+     on ne cache pas ce qu'on ne sait pas. */
+  const mode = document.getElementById("shopify-statut")?.value || "actifs";
+  const visible = st => !st || st === "active"
+    || (st === "draft" && (mode === "brouillons" || mode === "tous"))
+    || (st !== "draft" && mode === "tous");
+  const affiches = items.filter(x => visible(vignettes[x.handle]?.statut));
+  masquesShopify = items.filter(x => !visible(vignettes[x.handle]?.statut)).map(x => x.handle);
+  ordreShopify = affiches.map(x => x.handle);
+  await chargerStocksRefs([...new Set(affiches.map(x => vignettes[x.handle]?.reference).filter(Boolean))]);
+
+  grille.innerHTML = affiches.map((x, i) => {
     const v = vignettes[x.handle];
-    return `<div class="carte" draggable="true" data-handle="${x.handle}">
+    const st = v?.statut;
+    const brouillon = st && st !== "active";
+    return `<div class="carte${brouillon ? " brouillon" : ""}" draggable="true" data-handle="${x.handle}">
       <label class="coche" draggable="false"><input type="checkbox"><span class="ordre-coche"></span></label>
       <div class="rang-merch">${i + 1}</div>
       <div class="visuel">${v ? `<img loading="lazy" src="${v.url}" alt="" draggable="false">`
         : `<span style="font-size:11px; color:#999; padding:20px; text-align:center">${x.titre}</span>`}
+        ${brouillon ? `<span class="pastille-brouillon">${st === "draft" ? "brouillon" : "archivé"}</span>` : ""}
         ${v?.promo_pct ? `<span class="pastille-promo">−${v.promo_pct}%</span>` : ""}</div>
       <div class="infos"><div class="nom">${x.titre}</div>
         <div class="sousnom">${v?.reference || x.handle}</div>
         ${v?.reference ? resumeShopify(v.reference) : ""}</div>
     </div>`;
   }).join("");
+  const sansStatut = affiches.filter(x => vignettes[x.handle] && !vignettes[x.handle].statut).length;
   document.getElementById("etat-shopify").textContent =
-    `${items.length} produits · ${Object.keys(vignettes).length} visuels reconnus`;
+    `${affiches.length} produits affichés`
+    + (masquesShopify.length ? ` · ${masquesShopify.length} masqués (non publiés)` : "")
+    + ` · ${Object.keys(vignettes).length} visuels reconnus`
+    + (sansStatut ? ` · ${sansStatut} au statut inconnu (redéposez l'export Products)` : "");
 
   // drag & drop + cases à cocher (mêmes gestes que le merch FKB2B)
   let saisie = null;
@@ -4313,7 +4347,9 @@ function deplacerShopify(cible) {
 async function exporterShopify() {
   renumShopify();
   const collection = document.getElementById("sel-collection").value;
-  const csv = genererCSVShopify(shopifyDonnees, collection, ordreShopify);
+  // les produits masqués (brouillons, archivés) gardent leur place dans le fichier, à la
+  // suite des produits visibles : l'import Matrixify ne doit pas les sortir de la collection
+  const csv = genererCSVShopify(shopifyDonnees, collection, ordreShopify.concat(masquesShopify));
   const lien = document.createElement("a");
   lien.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   lien.download = "Merch " + collection + " - Smart Collections.csv";
