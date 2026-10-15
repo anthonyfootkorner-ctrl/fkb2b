@@ -778,8 +778,12 @@
   .ligne-info b { color: #8a7020; font-weight: 700; }
   /* produit non publié sur le site : visible seulement si on demande les brouillons */
   /* barre d'outils du merch : elle reste sous la main quand on descend dans la grille */
-  .barre-collante { position: sticky; top: 0; z-index: 40; background: var(--noir);
-    padding: 10px 0 12px; margin-top: 4px; box-shadow: 0 10px 18px -12px rgba(0,0,0,.9); }
+  /* barre d'outils du merch : elle reste sous la main quand on descend dans la grille.
+     Attention : un élément collant ne dépasse pas son parent — cette barre doit donc
+     rester un enfant direct de la vue, jamais enfermée dans un bloc. */
+  .barre-collante { position: sticky; top: 0; z-index: 40; background: var(--papier);
+    padding: 12px 22px; margin: 0 0 14px; border-bottom: 1px solid var(--hairline);
+    box-shadow: 0 10px 16px -14px rgba(0,0,0,.55); }
   .pastille-brouillon { position: absolute; top: 34px; left: 10px; z-index: 2; background: #6b6b66;
     color: #fff; font-size: 10.5px; font-weight: 800; border-radius: 999px; padding: 3px 8px; letter-spacing: .03em; }
   .carte.brouillon .visuel img { opacity: .62; }
@@ -1368,7 +1372,17 @@
       <span class="fil" onclick="location.hash='#/'">← ACCUEIL</span>
       <h1>MERCHANDISING</h1>
       <div class="compte-produits">Choisissez un périmètre, partez d'un tri automatique si besoin, puis glissez-déposez et enregistrez. Chaque périmètre garde son propre ordre.</div>
-      <div class="barre-collante" style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; align-items:center">
+      
+      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; align-items:center">
+        <span class="compte-produits" style="margin:0" id="merch-selection-info">Cochez des produits : déplacements groupés ci-dessous, et les cochés gardent leur position lors des tris ⚡ :</span>
+        <button class="puce-claire" id="btn-sel-haut">⭱ Tout en haut</button>
+        <button class="puce-claire" id="btn-sel-bas">⭳ Tout en bas</button>
+        <input class="qte-claire" id="sel-position" type="number" min="1" placeholder="n°" style="width:70px">
+        <button class="puce-claire" id="btn-sel-position">→ À cette position</button>
+        <button class="puce-claire" id="btn-sel-vider">Tout décocher</button>
+      </div>
+    </div>
+    <div class="barre-collante" style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; align-items:center">
         <select id="merch-contexte" style="background:#fff; color:var(--encre); border:1px solid #d8d8d5; border-radius:8px; padding:9px 12px; font-size:13px"></select>
         <select id="merch-affinage" title="Range la vue telle que le client la voit : FK > ACCESSOIRES a son propre ordre" style="background:#fff; color:var(--encre); border:1px solid #d8d8d5; border-radius:8px; padding:9px 12px; font-size:13px"></select>
         <input class="qte-claire" id="merch-figer" type="number" min="0" placeholder="figer N premiers" style="width:130px; text-align:left" title="Les N premiers produits ne bougent pas lors des tris">
@@ -1383,15 +1397,6 @@
         <span class="compte-produits" id="merch-etat" style="margin:0"></span>
       </div>
       <div id="jauges-merch" class="panneau-jauges" style="display:none"></div>
-      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; align-items:center">
-        <span class="compte-produits" style="margin:0" id="merch-selection-info">Cochez des produits : déplacements groupés ci-dessous, et les cochés gardent leur position lors des tris ⚡ :</span>
-        <button class="puce-claire" id="btn-sel-haut">⭱ Tout en haut</button>
-        <button class="puce-claire" id="btn-sel-bas">⭳ Tout en bas</button>
-        <input class="qte-claire" id="sel-position" type="number" min="1" placeholder="n°" style="width:70px">
-        <button class="puce-claire" id="btn-sel-position">→ À cette position</button>
-        <button class="puce-claire" id="btn-sel-vider">Tout décocher</button>
-      </div>
-    </div>
     <div id="merch-blocs" hidden></div>
     <div class="grille-col" id="grille-merch"></div>
   </section>
@@ -1411,7 +1416,8 @@
         (pour mettre à jour stock web, visuels, prix, promotions et statuts) — ou cliquez
         <input id="fichier-shopify" type="file" accept=".csv,.zip" style="display:none">
       </label>
-      <div class="formu barre-collante" style="margin-top:14px; display:none" id="barre-shopify">
+          </div>
+    <div class="formu barre-collante" style="margin-top:14px; display:none" id="barre-shopify">
         <input class="qte-claire" id="sel-collection" list="liste-collections" style="width:280px; text-align:left"
                placeholder="chercher une collection… (tapez ou choisissez)">
         <datalist id="liste-collections"></datalist>
@@ -1429,10 +1435,12 @@
         <select class="qte-claire" id="shopify-duos" style="width:190px; text-align:left" title="Duos : les produits sont appairés 2 par 2 (haut+bas, coloris du même modèle, associés Shopify). Sans duos : classement au score, un produit après l'autre."><option value="duos">Affichage : en duos</option><option value="simple">Affichage : sans duos</option></select><button class="puce-claire" id="btn-auto-shopify" style="border-color:#111; font-weight:600">⚡ Classement auto</button>
         <button class="puce-claire" id="btn-rapport-shopify" style="display:none">Rapport JSON</button>
         <button class="btn-noir" id="btn-shopify-export">TÉLÉCHARGER LE CSV POUR MATRIXIFY</button>
+        <button class="puce-claire" id="btn-merch-fait"
+                title="Si vous avez rangé cette collection directement dans Shopify : notez-la comme faite aujourd'hui, sans passer par le CSV.">✓ Merch fait</button>
+        <span class="compte-produits" id="dernier-merch"></span>
         <span class="compte-produits" id="etat-shopify"></span>
       </div>
       <div id="jauges-shopify" class="panneau-jauges" style="display:none"></div>
-    </div>
     <div class="bloc-clair" style="margin: 0 22px 26px; padding: 10px 16px"
       title="Une collection en tri manuel n'évolue plus seule : repassez dessus régulièrement (les nouveautés arrivent sans position).">
       <div id="suivi-shopify"></div>
@@ -1814,10 +1822,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792068475"></script>
-<script src="imports.js?v=1792068475"></script>
-<script src="merch-shopify.js?v=1792068475"></script>
-<script src="moteur-merch.js?v=1792068475"></script>
+<script src="config.js?v=1792070601"></script>
+<script src="imports.js?v=1792070601"></script>
+<script src="merch-shopify.js?v=1792070601"></script>
+<script src="moteur-merch.js?v=1792070601"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -4174,6 +4182,15 @@ async function rendreMerchShopify() {
   document.getElementById("btn-auto-shopify").onclick = classementAutoShopify;
   document.getElementById("btn-rapport-shopify").onclick = telechargerRapport;
   document.getElementById("btn-shopify-export").onclick = exporterShopify;
+  document.getElementById("btn-merch-fait").onclick = async () => {
+    const collection = document.getElementById("sel-collection").value;
+    if (!collection) return;
+    if (!confirm(`Noter « ${collection} » comme merchandisée aujourd'hui ?\n\n`
+        + `À utiliser quand vous avez rangé la collection directement dans Shopify. `
+        + `Aucune position n'est envoyée : seule la date du suivi change.`)) return;
+    await enregistrerSuiviMerch(collection, ordreShopify.length || null, "manuel");
+    document.getElementById("etat-shopify").textContent = `« ${collection} » notée comme merchandisée aujourd'hui`;
+  };
 }
 
 async function traiterFichierShopify(fichier) {
@@ -4328,6 +4345,7 @@ async function rendreCollectionShopify() {
         ${v?.reference ? resumeShopify(v.reference) : ""}</div>
     </div>`;
   }).join("");
+  afficherDernierMerch(collection);
   const sansStatut = affiches.filter(x => vignettes[x.handle] && !vignettes[x.handle].statut).length;
   document.getElementById("etat-shopify").textContent =
     `${affiches.length} produits affichés`
@@ -4404,12 +4422,42 @@ async function exporterShopify() {
   document.getElementById("etat-shopify").textContent =
     `CSV généré pour « ${collection} » — importez-le dans Matrixify (l'ordre de tri de la collection doit être « Manuel » dans Shopify).`;
   // suivi : date du dernier passage sur cette collection
+  await enregistrerSuiviMerch(collection, ordreShopify.length, "export");
+}
+
+/* Suivi du merch, collection par collection. Deux façons de dater un passage :
+   « export » quand le CSV est généré ici, « manuel » quand la collection a été rangée
+   directement dans Shopify — sans ça, une collection bien tenue à la main apparaissait
+   en retard dans le suivi. */
+async function enregistrerSuiviMerch(collection, nbProduits, source) {
+  if (!collection) return;
+  let auteur = null;
+  try { auteur = JSON.parse(localStorage.getItem("fkb2b-session") || "{}").email || null; } catch (e) { /* sans auteur */ }
   try {
     await api(`/rest/v1/merch_shopify_suivi?collection=eq.${encodeURIComponent(collection)}`, { methode: "DELETE" });
-    await api("/rest/v1/merch_shopify_suivi",
-      { corps: { collection, fait_le: new Date().toISOString(), nb_produits: ordreShopify.length } });
-    rendreSuiviShopify();
-  } catch (e) { /* suivi non bloquant */ }
+    await api("/rest/v1/merch_shopify_suivi", { corps: {
+      collection, fait_le: new Date().toISOString(), nb_produits: nbProduits, source, auteur } });
+    await rendreSuiviShopify();
+    await afficherDernierMerch(collection);
+  } catch (e) {
+    document.getElementById("dernier-merch").textContent = "⚠ suivi non enregistré : " + (e?.message || e);
+  }
+}
+
+// Rappel visible dans la barre : quand cette collection a-t-elle été rangée pour la dernière fois ?
+async function afficherDernierMerch(collection) {
+  const zone = document.getElementById("dernier-merch");
+  if (!zone) return;
+  zone.textContent = "";
+  if (!collection) return;
+  const rows = await api(`/rest/v1/merch_shopify_suivi?collection=eq.${encodeURIComponent(collection)}&select=*`).catch(() => []);
+  const s = rows?.[0];
+  if (!s) { zone.innerHTML = `<span style="color:#a33">jamais merchandisée</span>`; return; }
+  const jours = Math.floor((Date.now() - new Date(s.fait_le)) / 86400000);
+  const couleur = jours >= 30 ? "#a33" : jours >= 14 ? "#a68a3d" : "var(--encre2)";
+  const quand = jours === 0 ? "aujourd'hui" : jours === 1 ? "hier" : `il y a ${jours} j`;
+  zone.innerHTML = `<span style="color:${couleur}">dernier merch : ${new Date(s.fait_le).toLocaleDateString("fr-FR")}`
+    + ` (${quand})${s.source === "manuel" ? " · validé à la main" : ""}</span>`;
 }
 
 async function rendreSuiviShopify() {
@@ -4423,10 +4471,10 @@ async function rendreSuiviShopify() {
   const attention = etats.filter(x => x.cls !== "vert").sort((a, b) => b.jours - a.jours);
   const aJour = etats.length - attention.length;
   const puce = x => `<span onclick="ouvrirCollectionSuivi('${x.collection.replaceAll("'", "")}')"
-      title="${x.nb_produits ?? "?"} produits · fait le ${new Date(x.fait_le).toLocaleDateString("fr-FR")} — cliquer pour ouvrir"
+      title="${x.nb_produits ?? "?"} produits · fait le ${new Date(x.fait_le).toLocaleDateString("fr-FR")}${x.source === "manuel" ? " (validé à la main" + (x.auteur ? " par " + x.auteur : "") + ")" : ""} — cliquer pour ouvrir"
       style="display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border:1px solid #ddd;
       border-radius:999px; font-size:12px; cursor:pointer; background:#fff; white-space:nowrap">
-      <span class="pastille ${x.cls}"></span>${x.collection} · ${x.jours} j</span>`;
+      <span class="pastille ${x.cls}"></span>${x.collection} · ${x.jours} j${x.source === "manuel" ? " ✋" : ""}</span>`;
   const resume = !etats.length ? "aucune collection merchandisée pour le moment"
     : attention.length ? `+ ${aJour} à jour` : `${aJour} collection${aJour > 1 ? "s" : ""} à jour ✓`;
   document.getElementById("suivi-shopify").innerHTML =
