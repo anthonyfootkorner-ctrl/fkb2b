@@ -784,6 +784,10 @@
   .barre-collante { position: sticky; top: 0; z-index: 40; background: var(--papier);
     padding: 12px 22px; margin: 0 0 14px; border-bottom: 1px solid var(--hairline);
     box-shadow: 0 10px 16px -14px rgba(0,0,0,.55); }
+  .valider-suivi { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px;
+    border-radius: 50%; border: 1px solid #cfcfcb; color: #6b6b66; font-size: 11px; font-weight: 700;
+    background: #fff; margin-left: 2px; }
+  .valider-suivi:hover { background: #111; color: #fff; border-color: #111; }
   .etiquette-top { display: inline-block; background: #111; color: #fff; font-size: 10px; font-weight: 800;
     letter-spacing: .06em; border-radius: 999px; padding: 2px 8px; margin-right: 6px; }
   .pastille-brouillon { position: absolute; top: 34px; left: 10px; z-index: 2; background: #6b6b66;
@@ -1824,10 +1828,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792071266"></script>
-<script src="imports.js?v=1792071266"></script>
-<script src="merch-shopify.js?v=1792071266"></script>
-<script src="moteur-merch.js?v=1792071266"></script>
+<script src="config.js?v=1792071588"></script>
+<script src="imports.js?v=1792071588"></script>
+<script src="merch-shopify.js?v=1792071588"></script>
+<script src="moteur-merch.js?v=1792071588"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -4454,7 +4458,7 @@ async function enregistrerSuiviMerch(collection, nbProduits, source) {
     await api("/rest/v1/merch_shopify_suivi", { corps: {
       collection, fait_le: new Date().toISOString(), nb_produits: nbProduits, source, auteur } });
     await rendreSuiviShopify();
-    await afficherDernierMerch(collection);
+    if (document.getElementById("sel-collection")?.value === collection) await afficherDernierMerch(collection);
   } catch (e) {
     document.getElementById("dernier-merch").textContent = "⚠ suivi non enregistré : " + (e?.message || e);
   }
@@ -4519,7 +4523,8 @@ async function rendreSuiviShopify() {
       style="display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border:1px solid #e3c7c7;
       border-radius:999px; font-size:12px; cursor:pointer; background:#fff7f7; white-space:nowrap">
       <span class="pastille ${x.jours === null || x.jours >= x.cadence_jours * 2 ? "rouge" : "orange"}"></span>
-      <b>TOP ${x.rang}</b> ${x.collection} · ${x.jours === null ? "jamais" : x.jours + " j"}${x.etat?.source === "manuel" ? " ✋" : ""}</span>`;
+      <b>TOP ${x.rang}</b> ${x.collection} · ${x.jours === null ? "jamais" : x.jours + " j"}${x.etat?.source === "manuel" ? " ✋" : ""}
+      ${cocheValider(x.collection)}</span>`;
 
   const attention = etats.filter(x => x.cls !== "vert" && !prio[x.collection]).sort((a, b) => b.jours - a.jours);
   const aJour = etats.length - etats.filter(x => x.cls !== "vert").length;
@@ -4527,7 +4532,8 @@ async function rendreSuiviShopify() {
       title="${x.nb_produits ?? "?"} produits · fait le ${new Date(x.fait_le).toLocaleDateString("fr-FR")}${x.source === "manuel" ? " (validé à la main" + (x.auteur ? " par " + x.auteur : "") + ")" : ""} — cliquer pour ouvrir"
       style="display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border:1px solid #ddd;
       border-radius:999px; font-size:12px; cursor:pointer; background:#fff; white-space:nowrap">
-      <span class="pastille ${x.cls}"></span>${x.collection} · ${x.jours} j${x.source === "manuel" ? " ✋" : ""}</span>`;
+      <span class="pastille ${x.cls}"></span>${x.collection} · ${x.jours} j${x.source === "manuel" ? " ✋" : ""}
+      ${cocheValider(x.collection)}</span>`;
   const resume = !etats.length ? "aucune collection merchandisée pour le moment"
     : `${aJour} collection${aJour > 1 ? "s" : ""} à jour ✓`;
   const titre = t => `<span style="font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--encre2); margin-right:4px">${t}</span>`;
@@ -4540,6 +4546,18 @@ async function rendreSuiviShopify() {
       ${titre("Suivi")}${attention.map(puce).join("")}
       <span class="compte-produits">${resume}</span>
     </div>`;
+}
+
+/* Merch fait ailleurs (directement dans Shopify, ou par quelqu'un d'autre) : on date le
+   passage sans ouvrir la collection — utile quand elle n'est pas dans le fichier chargé. */
+const cocheValider = handle => `<span class="valider-suivi" title="Noter cette collection comme merchandisée aujourd'hui (merch fait directement dans Shopify)"
+    onclick="event.stopPropagation(); validerMerchDepuisSuivi('${handle.replaceAll("'", "")}')">✓</span>`;
+
+async function validerMerchDepuisSuivi(handle) {
+  if (!confirm(`Noter « ${handle} » comme merchandisée aujourd'hui ?\n\n`
+      + `À utiliser quand le merch a été fait directement dans Shopify. `
+      + `Aucune position n'est envoyée : seule la date du suivi change.`)) return;
+  await enregistrerSuiviMerch(handle, null, "manuel");
 }
 
 function ouvrirCollectionSuivi(handle) {
