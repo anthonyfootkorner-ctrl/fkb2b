@@ -1950,10 +1950,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792171543"></script>
-<script src="imports.js?v=1792171543"></script>
-<script src="merch-shopify.js?v=1792171543"></script>
-<script src="moteur-merch.js?v=1792171543"></script>
+<script src="config.js?v=1792174008"></script>
+<script src="imports.js?v=1792174008"></script>
+<script src="merch-shopify.js?v=1792174008"></script>
+<script src="moteur-merch.js?v=1792174008"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2534,7 +2534,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792171543";
+    v.src = "hero.mp4?v=1792174008";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -10287,6 +10287,7 @@ function dessinerNonLivrable() {
     <div class="dash-section"><h3>BL libérés</h3><div id="nl-bascules"></div></div>
     <div class="dash-section"><h3>Photos déposées</h3>${photosNL()}</div>`;
   dessinerRefsNL(); dessinerBasculesNL(); dessinerBLsNL(); dessinerAlertesNL();
+  if (typeof dessinerEcoulementVS === "function" && document.getElementById("vs-ecoulement")) dessinerEcoulementVS();
 }
 
 /* La liste des BL non livrables, du numéro le plus élevé au plus bas, à cocher pour les libérer. */
@@ -10619,6 +10620,7 @@ async function rendreValeurStock() {
       <aside class="vs-cote"><div class="vs-titre">Dépôts</div><div id="vs-dates"></div></aside>
       <div id="vs-corps"><div class="vs-vide">Chargement…</div></div>
     </div>
+    <div class="vs-panneau" id="vs-ecoulement" style="margin-top:16px"></div>
     <div class="vs-panneau" id="vs-nl" style="margin-top:16px">
       <div class="vs-titre">Non livrable — BL libérés</div>
       <div class="vs-sous">Pour garder des références, déposez l'export des BL non facturables filtré sur les lignes à garder :
@@ -10633,6 +10635,82 @@ async function rendreValeurStock() {
     </div></div>`;
   await Promise.all([chargerValeurStock(), chargerNonLivrable()]);
   dessinerBasculesNL();     // la colonne « encore en stock » a besoin du dernier dépôt
+  dessinerEcoulementVS();
+}
+
+/* ---- Écoulement des BL libérés ----
+   Une ligne par libération (BL | code-barres) : libéré, encore en stock au dernier dépôt, écoulé.
+   L'historique vient des dépôts (controles.liberes), le libéré et le prix du registre nl_bascules. */
+function lignesEcoulementVS() {
+  const m = new Map();
+  for (const b of (NL.bascules || [])) if (!b.annulee_le) {
+    const x = m.get(b.cle) || { cle: b.cle, bl: b.bl, client: b.client_nom, reference: b.reference, designation: b.designation,
+      marque: b.marque, taille: b.taille, pa: Number(b.pa), libere: 0, le: b.le };
+    x.libere += Number(b.quantite); if (b.le < x.le) x.le = b.le; m.set(b.cle, x);
+  }
+  const dernier = VS.depots?.[VS.depots.length - 1];
+  const enStock = new Map((dernier?.controles?.liberes || []).map(x => [x.cle, Number(x.en_stock)]));
+  const apres = dernier && new Date(dernier.le);
+  return [...m.values()].map(x => {
+    const connu = apres && new Date(x.le) <= apres && enStock.has(x.cle);
+    const stock = connu ? Math.min(enStock.get(x.cle), x.libere) : null;
+    return { ...x, stock, ecoule: stock == null ? null : x.libere - stock,
+             jours: Math.floor((Date.now() - new Date(x.le)) / 864e5) };
+  });
+}
+
+function dessinerEcoulementVS() {
+  const zone = document.getElementById("vs-ecoulement"); if (!zone) return;
+  const L = lignesEcoulementVS();
+  if (!L.length) {
+    zone.innerHTML = `<div class="vs-titre">Écoulement des BL libérés</div><div class="vs-sous">Aucun BL libéré pour l'instant.</div>`;
+    return;
+  }
+  const connus = L.filter(x => x.stock != null);
+  const s = (f, l = connus) => l.reduce((a, x) => a + f(x), 0);
+  const lib = s(x => x.libere, L), libV = s(x => x.libere * x.pa, L);
+  const st = s(x => x.stock), stV = s(x => x.stock * x.pa), ec = s(x => x.ecoule), ecV = s(x => x.ecoule * x.pa);
+  const base = s(x => x.libere);
+  const tri = VS.triEcoulement || "lent";
+  const T = [...L].sort(tri === "lent" ? (a, b) => (a.stock == null) - (b.stock == null) || (a.ecoule / a.libere) - (b.ecoule / b.libere) || b.libere * b.pa - a.libere * a.pa
+                      : tri === "rapide" ? (a, b) => (a.stock == null) - (b.stock == null) || (b.ecoule / b.libere) - (a.ecoule / a.libere)
+                      : (a, b) => new Date(b.le) - new Date(a.le));
+  // courbe : ce qui reste en stock (valeur), dépôt après dépôt
+  const D = (VS.depots || []).filter(d => d.controles?.liberes?.length).slice(-12);
+  const pa = new Map(L.map(x => [x.cle, x.pa]));
+  const pts = D.map(d => ({ d, v: d.controles.liberes.reduce((a, x) => a + Number(x.en_stock) * (pa.get(x.cle) || 0), 0),
+                                p: d.controles.liberes.reduce((a, x) => a + Number(x.en_stock), 0) }));
+  let courbe = "";
+  if (pts.length >= 2) {
+    const W = 520, H = 120, max = Math.max(...pts.map(x => x.v), 1);
+    const x = i => 24 + i * (W - 48) / (pts.length - 1), y = v => 10 + (H - 32) * (1 - v / max);
+    const pl = pts.map((p, i) => `${x(i)},${y(p.v)}`).join(" ");
+    courbe = `<svg viewBox="0 0 ${W} ${H}" class="vs-svg" style="max-width:${W}px">
+      <polygon points="${x(0)},${H - 22} ${pl} ${x(pts.length - 1)},${H - 22}" fill="#00830033"/><polyline points="${pl}" fill="none" stroke="#2fb52f" stroke-width="2"/>
+      ${pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.v)}" r="3.5" fill="#2fb52f"><title>${vsDate(p.d)} : ${eur(p.v)} · ${dashNb(p.p)} p. encore en stock</title></circle>
+        <text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="10" fill="#a9acc9">${vsDate(p.d).slice(0, 5)}</text>`).join("")}</svg>`;
+  } else courbe = `<div class="vs-sous">La courbe apparaîtra au fil des dépôts qui suivent les libérations.</div>`;
+  const pc = (a, b) => b ? Math.round(100 * a / b) + " %" : "—";
+  zone.innerHTML = `<div class="vs-titre">Écoulement des BL libérés
+      <span class="vs-puces"><button class="vs-puce${tri === "lent" ? " on" : ""}" onclick="VS.triEcoulement='lent'; dessinerEcoulementVS()">Ce qui ne part pas</button>
+      <button class="vs-puce${tri === "rapide" ? " on" : ""}" onclick="VS.triEcoulement='rapide'; dessinerEcoulementVS()">Ce qui part</button>
+      <button class="vs-puce${tri === "recent" ? " on" : ""}" onclick="VS.triEcoulement='recent'; dessinerEcoulementVS()">Plus récents</button></span></div>
+    <div class="vs-deux" style="margin-top:6px">
+      <div class="vs-cartes" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+        <div class="vs-carte" style="cursor:default">${vsIcone("BL_LIBERE", "#2fb52f")}<span class="vs-carte-txt"><b>${vsK(libV)}</b><span>Libéré</span><small>${dashNb(lib)} pièces · ${dashNb(L.length)} lignes</small></span></div>
+        <div class="vs-carte" style="cursor:default">${vsIcone("PICKING", "#d95926")}<span class="vs-carte-txt"><b>${vsK(stV)}</b><span>Encore en stock</span><small>${dashNb(st)} pièces · ${pc(st, base)}</small></span></div>
+        <div class="vs-carte" style="cursor:default">${vsIcone("TRANSIT", "#3987e5")}<span class="vs-carte-txt"><b>${vsK(ecV)}</b><span>Écoulé</span><small>${dashNb(ec)} pièces · ${pc(ec, base)}</small></span></div>
+      </div>
+      <div>${courbe}</div>
+    </div>
+    ${L.length > connus.length ? `<div class="vs-sous" style="margin-top:6px">${dashNb(L.length - connus.length)} libération(s) postérieure(s) au dernier dépôt : leur écoulement sera connu au prochain dépôt.</div>` : ""}
+    <div style="max-height:420px;overflow:auto;margin-top:10px"><table class="tb-table"><thead><tr><th>Libéré le</th><th>BL</th><th>Client</th><th>Référence</th>
+      <th>Désignation</th><th>Taille</th><th class="num">Libéré</th><th class="num">En stock</th><th class="num">Écoulé</th><th class="num">%</th><th class="num">Jours</th></tr></thead>
+    <tbody>${T.map(x => `<tr><td>${new Date(x.le).toLocaleDateString("fr-FR")}</td><td>${echapperHTML(x.bl)}</td><td class="lib">${echapperHTML(x.client || "")}</td>
+      <td>${echapperHTML(x.reference)}</td><td class="lib">${echapperHTML(x.designation || "")}</td><td>${echapperHTML(x.taille || "")}</td>
+      <td class="num">${dashNb(x.libere)}<small>${eur(x.libere * x.pa)}</small></td>
+      <td class="num">${x.stock == null ? "—" : dashNb(x.stock)}</td><td class="num">${x.ecoule == null ? "—" : dashNb(x.ecoule)}</td>
+      <td class="num">${x.stock == null ? "—" : pc(x.ecoule, x.libere)}</td><td class="num">${dashNb(x.jours)}</td></tr>`).join("")}</tbody></table></div>`;
 }
 
 async function chargerValeurStock(id) {
@@ -10852,6 +10930,10 @@ async function exporterToutVS(btn) {
          "Qté restante", "PA", "Valeur PA restante"],
         ...nlRestant.map(l => [l.bl, l.date_bl, l.client_nom, l.reference, l.marque, l.designation, l.couleur, l.taille, l.saison,
           Number(l.quantite), Number(l.qte_basculee), nlReste(l), r2(l.pa), r2(nlReste(l) * l.pa)])] },
+      { nom: "Écoulement BL libérés", gras: [0], largeurs: [12, 14, 24, 18, 36, 8, 9, 11, 11, 9, 8, 12], lignes: [
+        ["Libéré le", "BL", "Client", "Référence", "Désignation", "Taille", "Libéré", "En stock", "Écoulé", "% écoulé", "Jours", "Valeur libérée"],
+        ...lignesEcoulementVS().map(x => [new Date(x.le).toLocaleDateString("fr-FR"), x.bl, x.client, x.reference, x.designation, x.taille,
+          x.libere, x.stock ?? "", x.ecoule ?? "", x.stock == null ? "" : Math.round(100 * x.ecoule / x.libere), x.jours, r2(x.libere * x.pa)])] },
       { nom: "BL libérés", gras: [0], largeurs: [18, 26, 14, 24, 18, 36, 8, 9, 11, 12, 18, 30], lignes: [
         ["Date", "Par", "BL", "Client", "Référence", "Désignation", "Taille", "Pièces", "PA", "Valeur PA", "Annulée le", "Fichier"],
         ...(NL.bascules || []).map(b => [new Date(b.le).toLocaleString("fr-FR"), b.par_email, b.bl, b.client_nom, b.reference, b.designation,
