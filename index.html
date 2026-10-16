@@ -1238,8 +1238,8 @@
   .vs-titre { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
   .vs-sous { font-size: 12.5px; color: #a9acc9; }
   .vs-vide { padding: 30px; text-align: center; color: #a9acc9; background: #1b2050; border-radius: 16px; }
-  .vs-cartes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
-  @media (max-width: 1250px) { .vs-cartes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .vs-cartes { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 1400px) { .vs-cartes { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
   @media (max-width: 640px) { .vs-cartes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .vs-carte { display: flex; align-items: center; gap: 12px; background: #1d2250; border: 0; border-radius: 16px; padding: 14px; color: #fff; font: inherit; text-align: left; cursor: pointer; transition: background .15s, transform .15s; }
   .vs-carte:hover { background: #262c66; transform: translateY(-1px); }
@@ -1946,10 +1946,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792170167"></script>
-<script src="imports.js?v=1792170167"></script>
-<script src="merch-shopify.js?v=1792170167"></script>
-<script src="moteur-merch.js?v=1792170167"></script>
+<script src="config.js?v=1792170779"></script>
+<script src="imports.js?v=1792170779"></script>
+<script src="merch-shopify.js?v=1792170779"></script>
+<script src="moteur-merch.js?v=1792170779"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2530,7 +2530,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792170167";
+    v.src = "hero.mp4?v=1792170779";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -10209,7 +10209,7 @@ async function rendreNonLivrable() {
       <div class="dash-ligne" style="margin-top:10px">
         <input type="file" id="nl-fichier" accept=".xls,.csv,.txt">
         <button class="puce-claire" onclick="analyserFichierNL('photo')">Photo complète du non livrable</button>
-        <button class="puce-claire" onclick="analyserFichierNL('bascule')">Lignes à basculer en picking</button>
+        <button class="puce-claire" onclick="analyserFichierNL('bascule')">Lignes à libérer</button>
       </div>
       <div id="nl-depot" class="compte-produits" style="margin-top:10px"></div>
     </div>
@@ -10243,8 +10243,8 @@ function dessinerNonLivrable() {
       kpi(eur(somme(l => nlReste(l) * l.pa)), "valeur restante (PA)", "pièces encore non livrables × prix d'achat de la fiche")
     + kpi(dashNb(somme(nlReste)), "pièces restantes", "quantité des BL en cours moins ce qui a été basculé")
     + kpi(eur(somme(l => nlReste(l) * l.prix_ht)), "restant au prix HT des BL", "la méthode du mail hebdo : total HT brut des BL")
-    + kpi(eur(somme(l => Number(l.qte_basculee) * l.pa)), "basculé en picking (PA)", "sur les BL encore en cours")
-    + kpi(dashNb(somme(l => Number(l.qte_basculee))), "pièces basculées", "sur les BL encore en cours")
+    + kpi(eur(somme(l => Number(l.qte_basculee) * l.pa)), "BL libérés (PA)", "lignes libérées, comptées en « BL libéré » dans la valeur du stock")
+    + kpi(dashNb(somme(l => Number(l.qte_basculee))), "pièces libérées", "sur les BL encore en cours")
     + kpi(eur(somme(l => Number(l.quantite) * l.pa)), "valeur initiale (PA)", "toutes les lignes des BL en cours");
   const corps = document.getElementById("nl-corps");
   if (!L.length && !NL.photos.length) {
@@ -10264,7 +10264,7 @@ function dessinerNonLivrable() {
   };
   const table = (titre, lib, rangs) => `<div class="dash-section"><h3>${titre}</h3>
     <table class="tb-table" style="margin-top:10px"><thead><tr><th>${lib}</th><th class="num">Réf.</th><th class="num">Pièces restantes</th>
-      <th class="num">Restant PA</th><th class="num">Restant HT BL</th><th class="num">Basculé PA</th></tr></thead>
+      <th class="num">Restant PA</th><th class="num">Restant HT BL</th><th class="num">Libéré PA</th></tr></thead>
     <tbody>${rangs.map(a => `<tr><td class="lib">${echapperHTML(a.k)}</td><td class="num">${dashNb(a.refs.size)}</td><td class="num">${dashNb(a.pieces)}</td>
       <td class="num">${eur(a.pa)}</td><td class="num">${eur(a.ht)}</td><td class="num">${a.bascule ? eur(a.bascule) : "—"}</td></tr>`).join("")}</tbody></table></div>`;
   corps.innerHTML = `
@@ -10277,7 +10277,7 @@ function dessinerNonLivrable() {
         <button class="puce-claire" onclick="exporterNonLivrable()">⬇ Exporter (Excel)</button>
       </div>
       <div id="nl-refs"></div></div>
-    <div class="dash-section"><h3>Bascules en picking</h3><div id="nl-bascules"></div></div>
+    <div class="dash-section"><h3>BL libérés</h3><div id="nl-bascules"></div></div>
     <div class="dash-section"><h3>Photos déposées</h3>${photosNL()}</div>`;
   dessinerRefsNL(); dessinerBasculesNL();
 }
@@ -10307,7 +10307,7 @@ function dessinerRefsNL() {
 function dessinerBasculesNL() {
   const zone = document.getElementById("nl-bascules"); if (!zone) return;
   const B = NL.bascules;
-  if (!B.length) { zone.innerHTML = `<div class="dash-vide">Aucune bascule pour l'instant.</div>`; return; }
+  if (!B.length) { zone.innerHTML = `<div class="dash-vide">Aucun BL libéré pour l'instant.</div>`; return; }
   // regroupées par dépôt (même fichier, même minute)
   const m = new Map();
   for (const b of B) {
@@ -10394,13 +10394,13 @@ async function analyserFichierNL(mode) {
   zone.textContent = "Simulation de la bascule…";
   try {
     const r = await api("/rest/v1/rpc/nl_basculer", { corps: { p_fichier: a.fichier, p_rows: NL.analyse.rows.map(x => ({ cle: x.cle, quantite: x.quantite })), p_simuler: true } });
-    zone.innerHTML = `<b>Bascule en picking (simulation)</b> — ${echapperHTML(a.fichier)} : ${dashNb(r.lignes_basculees)} lignes sur ${dashNb(r.lignes_fichier)},
+    zone.innerHTML = `<b>Libération de BL (simulation)</b> — ${echapperHTML(a.fichier)} : ${dashNb(r.lignes_basculees)} lignes sur ${dashNb(r.lignes_fichier)},
       ${dashNb(r.references)} références, <b>${dashNb(r.pieces)} pièces, ${eur(Number(r.valeur_pa))}</b> au prix d'achat (${eur(Number(r.valeur_ht))} au prix HT des BL).
       ${r.par_marque?.length ? `<br>Par marque : ${r.par_marque.map(m => `${echapperHTML(m.marque || "—")} ${dashNb(m.pieces)} p. (${eur(Number(m.valeur_pa))})`).join(" · ")}` : ""}
-      ${r.deja_basculees ? `<br>${dashNb(r.deja_basculees)} lignes déjà entièrement basculées : ignorées.` : ""}
+      ${r.deja_basculees ? `<br>${dashNb(r.deja_basculees)} lignes déjà entièrement libérées : ignorées.` : ""}
       ${r.cloturees ? `<br>${dashNb(r.cloturees)} lignes sur des BL clôturés : ignorées.` : ""}
       ${r.introuvables ? `<br><b>${dashNb(r.introuvables)} lignes introuvables</b> dans la photo en cours (déposez d'abord la photo complète) : ${echapperHTML(r.exemples_introuvables.join(", "))}` : ""}
-      ${Number(r.pieces) > 0 ? `<br><button class="btn-noir" style="margin-top:8px" onclick="confirmerBasculeNL(this)">BASCULER ${dashNb(r.pieces)} PIÈCES EN PICKING</button>` : ""}`;
+      ${Number(r.pieces) > 0 ? `<br><button class="btn-noir" style="margin-top:8px" onclick="confirmerBasculeNL(this)">LIBÉRER ${dashNb(r.pieces)} PIÈCES</button>` : ""}`;
   } catch (e) { zone.innerHTML = `<b>Erreur</b> : ${echapperHTML(String(e.donnees?.message || e.message || e))}`; }
 }
 
@@ -10428,14 +10428,14 @@ async function confirmerBasculeNL(btn) {
   btn.disabled = true;
   try {
     const r = await api("/rest/v1/rpc/nl_basculer", { corps: { p_fichier: a.fichier, p_rows: a.rows.map(x => ({ cle: x.cle, quantite: x.quantite })), p_simuler: false } });
-    zone.innerHTML = `<b>Bascule enregistrée</b> : ${dashNb(r.pieces)} pièces, ${eur(Number(r.valeur_pa))} passent en picking.`;
+    zone.innerHTML = `<b>Libération enregistrée</b> : ${dashNb(r.pieces)} pièces, ${eur(Number(r.valeur_pa))} deviennent du stock « BL libéré » au prochain dépôt.`;
     NL.analyse = null; document.getElementById("nl-fichier").value = "";
     await chargerNonLivrable();
   } catch (e) { zone.innerHTML = `<b>Erreur</b> : ${echapperHTML(String(e.donnees?.message || e.message || e))}`; btn.disabled = false; }
 }
 
 async function annulerBasculeNL(id) {
-  if (!confirm("Annuler cette bascule ? Les pièces redeviennent non livrables (la trace est conservée).")) return;
+  if (!confirm("Annuler cette libération ? Les pièces redeviennent non livrables (la trace est conservée).")) return;
   try { await api("/rest/v1/rpc/nl_annuler_bascule", { corps: { p_id: id } }); await chargerNonLivrable(); }
   catch (e) { alert(String(e.donnees?.message || e.message || e)); }
 }
@@ -10468,10 +10468,12 @@ function exporterNonLivrable() {
      ce qui n'existe pas dans FTK n'est pas compté (c'est un reclassement, le total ne bouge pas).
    - Transit = réceptions FTK sans date (pas encore arrivées) + réceptions FTK datées prises sur le disponible restant.
      Les réceptions FT2 (transferts FTK → web) ne sont PAS comptées : ces pièces sont déjà en préparation dans FTK.
+   - BL libéré = les lignes de non livrable basculées (libérées) : du stock rendu disponible, suivi à part du picking.
    - Picking = le disponible FTK restant, saisons 26 et suivantes. Valeurs au prix d'achat des fiches produits. */
 const VS_NATURES = [
   ["WEB", "Stock web", "#3987e5"],
   ["PICKING", "Stock picking", "#d95926"],
+  ["BL_LIBERE", "BL libéré", "#008300"],
   ["PREPARATION", "Stock en préparation", "#199e70"],
   ["NON_LIVRABLE", "Non livrable", "#c98500"],
   ["TRANSIT", "Stock en transit", "#d55181"],
@@ -10502,6 +10504,7 @@ const VS_ICONES = {
   PICKING: '<path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/>',
   PREPARATION: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>',
   NON_LIVRABLE: '<circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/>',
+  BL_LIBERE: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2"/>',
   TRANSIT: '<path d="M2 7h11v9H2zM13 10h4l3 3v3h-7z"/><circle cx="6" cy="18" r="2"/><circle cx="16" cy="18" r="2"/>',
 };
 const vsIcone = (k, c) => `<span class="vs-ic" style="color:${c};background:${c}22"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${VS_ICONES[k]}</svg></span>`;
@@ -10517,19 +10520,20 @@ async function rendreValeurStock() {
   }
   vue.innerHTML = `<div class="vs-sombre">
     <div class="vs-tete"><h1>Valeur du stock</h1>
-      <button class="vs-bouton" onclick="ouvrirDepotVS()">＋ Nouveau dépôt</button></div>
+      <button class="vs-bouton" onclick="ouvrirDepotVS()">＋ Nouveau dépôt</button>
+      <button class="vs-bouton discret" onclick="exporterToutVS(this)">⬇ Export Excel complet</button></div>
     <div id="vs-depot"></div>
     <div class="vs-grille">
       <aside class="vs-cote"><div class="vs-titre">Dépôts</div><div id="vs-dates"></div></aside>
       <div id="vs-corps"><div class="vs-vide">Chargement…</div></div>
     </div>
     <div class="vs-panneau" id="vs-nl" style="margin-top:16px">
-      <div class="vs-titre">Non livrable — bascules en picking</div>
+      <div class="vs-titre">Non livrable — BL libérés</div>
       <div class="vs-sous">Pour garder des références, déposez l'export des BL non facturables filtré sur les lignes à garder :
-        elles basculent en picking (pris en compte au prochain dépôt) et la bascule reste tracée.</div>
+        elles deviennent du stock « BL libéré » (pris en compte au prochain dépôt) et la libération reste tracée.</div>
       <div class="dash-ligne" style="margin-top:10px">
         <input type="file" id="nl-fichier" accept=".xls,.csv,.txt">
-        <button class="vs-bouton discret" onclick="analyserFichierNL('bascule')">Lignes à basculer en picking</button>
+        <button class="vs-bouton discret" onclick="analyserFichierNL('bascule')">Lignes à libérer</button>
       </div>
       <div id="nl-depot" class="vs-sous" style="margin-top:10px"></div>
       <div class="dash-kpis" id="nl-kpis" style="margin:14px 0 0"></div>
@@ -10710,6 +10714,57 @@ async function supprimerDepotVS(id) {
   catch (e) { alert(String(e.donnees?.message || e.message || e)); }
 }
 
+/* Export complet : tout ce que montre la page, dans un seul classeur. */
+async function exporterToutVS(btn) {
+  const d = VS.depots.find(x => x.id === VS.choisi);
+  if (!d) { alert("Aucun dépôt à exporter."); return; }
+  if (btn) btn.disabled = true;
+  try {
+    const r2 = n => Math.round(Number(n) * 100) / 100;
+    const libNature = n => (VS_NATURES.find(([k]) => k === vsNature(n)) || [, n])[1] + (VS_SOUS_TRANSIT[n] ? " — " + VS_SOUS_TRANSIT[n] : "");
+    const t = vsTotaux(d), tot = vsTotal(t);
+    const sousTransit = Object.entries(VS_SOUS_TRANSIT).map(([k, l]) => {
+      const v = (d.totaux || {})[k] || { pieces: 0, valeur: 0 };
+      return ["   dont " + l, Number(v.pieces), r2(v.valeur)]; });
+    const parMarque = [];
+    for (const [k, lib] of VS_NATURES) for (const m of vsParMarque(k)) parMarque.push([lib, m.marque, m.p, r2(m.v)]);
+    const nlRestant = (NL.lignes || []).filter(l => nlReste(l) > 0);
+    telechargerXlsx(`FKB2B_valeur_stock_complet_${d.date_stock || ""}.xlsx`, [
+      { nom: "Synthèse", gras: [0, 3], largeurs: [46, 14, 16, 10], lignes: [
+        ["Valeur du stock", `stock du ${vsDate(d)}`, `déposé le ${new Date(d.le).toLocaleString("fr-FR")}`],
+        [`par ${d.par_email || ""}`], [],
+        ["Nature", "Pièces", "Valeur PA", "Part"],
+        ...VS_NATURES.flatMap(([k, lib]) => [[lib, t[k].pieces, r2(t[k].valeur), tot.valeur ? r2(100 * t[k].valeur / tot.valeur) + " %" : ""],
+                                             ...(k === "TRANSIT" ? sousTransit : [])]),
+        ["Total", tot.pieces, r2(tot.valeur), "100 %"], [],
+        ["Contrôles"],
+        ["Pièces sans prix d'achat (comptées à 0 €)", Number(d.controles?.pieces_sans_prix || 0)],
+        ["Pièces non livrables introuvables dans FTK (non comptées)", Number(d.controles?.nl_introuvable || 0)],
+        ["Lignes FTK en double ignorées", Number(d.controles?.lignes_doublons || 0)], [],
+        ["Fichiers du dépôt"], ...Object.entries(d.fichiers || {}).map(([r, n]) => [(VS_ROLES.find(([k]) => k === r) || [, r])[1], n || ""])] },
+      { nom: "Par marque", gras: [0], largeurs: [24, 24, 12, 16], lignes: [["Nature", "Marque", "Pièces", "Valeur PA"], ...parMarque] },
+      { nom: "Détail", gras: [0], largeurs: [46, 20, 18, 38, 10, 10, 14], lignes: [
+        ["Nature", "Référence", "Marque", "Désignation", "Saison", "Pièces", "Valeur PA"],
+        ...[...VS.detail].sort((a, b) => a.nature.localeCompare(b.nature) || b.valeur - a.valeur)
+          .map(x => [libNature(x.nature), x.reference, x.marque, x.designation, x.saison, Number(x.pieces), r2(x.valeur)])] },
+      { nom: "Historique", gras: [0], largeurs: [12, ...VS_NATURES.flatMap(() => [11, 14]), 11, 15, 30], lignes: [
+        ["Stock du", ...VS_NATURES.flatMap(([, lib]) => [lib + " (p.)", lib + " (€)"]), "Total (p.)", "Total (€)", "Déposé par"],
+        ...VS.depots.map(x => { const tx = vsTotaux(x), tt = vsTotal(tx);
+          return [vsDate(x), ...VS_NATURES.flatMap(([k]) => [tx[k].pieces, r2(tx[k].valeur)]), tt.pieces, r2(tt.valeur), x.par_email || ""]; })] },
+      { nom: "Non livrable restant", gras: [0], largeurs: [14, 11, 24, 18, 16, 36, 14, 8, 9, 9, 10, 11, 11, 13], lignes: [
+        ["BL", "Date BL", "Client", "Référence", "Marque", "Désignation", "Couleur", "Taille", "Saison", "Qté BL", "Qté libérée",
+         "Qté restante", "PA", "Valeur PA restante"],
+        ...nlRestant.map(l => [l.bl, l.date_bl, l.client_nom, l.reference, l.marque, l.designation, l.couleur, l.taille, l.saison,
+          Number(l.quantite), Number(l.qte_basculee), nlReste(l), r2(l.pa), r2(nlReste(l) * l.pa)])] },
+      { nom: "BL libérés", gras: [0], largeurs: [18, 26, 14, 24, 18, 36, 8, 9, 11, 12, 18, 30], lignes: [
+        ["Date", "Par", "BL", "Client", "Référence", "Désignation", "Taille", "Pièces", "PA", "Valeur PA", "Annulée le", "Fichier"],
+        ...(NL.bascules || []).map(b => [new Date(b.le).toLocaleString("fr-FR"), b.par_email, b.bl, b.client_nom, b.reference, b.designation,
+          b.taille, Number(b.quantite), r2(b.pa), r2(b.quantite * b.pa), b.annulee_le ? new Date(b.annulee_le).toLocaleString("fr-FR") : "", b.fichier || ""])] },
+    ]);
+  } catch (e) { alert("Export impossible : " + (e.message || e)); }
+  if (btn) btn.disabled = false;
+}
+
 async function exporterValeurStock() {
   const d = VS.depots.find(x => x.id === VS.choisi); if (!d) return;
   const r2 = n => Math.round(Number(n) * 100) / 100;
@@ -10874,10 +10929,14 @@ async function calculValeurStock() {
   const nlFichier = lireLignesNLDepuisTable(F.nl.table);
   const bascules = new Map((await apiTout("/rest/v1/nl_lignes?select=cle,qte_basculee&qte_basculee=gt.0") || []).map(b => [b.cle, Number(b.qte_basculee)]));
   let nlIntrouvable = 0;
+  // les lignes libérées (basculées) restent identifiables : nature « BL libéré », prise sur le même stock
   for (const r of nlFichier) {
-    let q = Math.max(r.quantite - (bascules.get(r.cle) || 0), 0); const c = vsCle(r.gencod);
-    for (const stock of [dispo, prep]) { const t = Math.min(stock.get(c) || 0, q); if (t > 0) { stock.set(c, stock.get(c) - t); q -= t; ajouter("NON_LIVRABLE", infoFtk(c), t); } }
-    nlIntrouvable += q;
+    const c = vsCle(r.gencod), libere = Math.min(bascules.get(r.cle) || 0, r.quantite);
+    for (const [nature, besoin] of [["NON_LIVRABLE", r.quantite - libere], ["BL_LIBERE", libere]]) {
+      let q = besoin;
+      for (const stock of [dispo, prep]) { const t = Math.min(stock.get(c) || 0, q); if (t > 0) { stock.set(c, stock.get(c) - t); q -= t; ajouter(nature, infoFtk(c), t); } }
+      nlIntrouvable += q;
+    }
   }
   // 4. réceptions FTK : sans date = pas encore arrivé ; datées = prises sur le disponible restant
   { const t = F.rec_ftk.table, recu = new Map();
