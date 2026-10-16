@@ -1946,10 +1946,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792170779"></script>
-<script src="imports.js?v=1792170779"></script>
-<script src="merch-shopify.js?v=1792170779"></script>
-<script src="moteur-merch.js?v=1792170779"></script>
+<script src="config.js?v=1792171002"></script>
+<script src="imports.js?v=1792171002"></script>
+<script src="merch-shopify.js?v=1792171002"></script>
+<script src="moteur-merch.js?v=1792171002"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2530,7 +2530,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792170779";
+    v.src = "hero.mp4?v=1792171002";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -10468,7 +10468,9 @@ function exporterNonLivrable() {
      ce qui n'existe pas dans FTK n'est pas compté (c'est un reclassement, le total ne bouge pas).
    - Transit = réceptions FTK sans date (pas encore arrivées) + réceptions FTK datées prises sur le disponible restant.
      Les réceptions FT2 (transferts FTK → web) ne sont PAS comptées : ces pièces sont déjà en préparation dans FTK.
-   - BL libéré = les lignes de non livrable basculées (libérées) : du stock rendu disponible, suivi à part du picking.
+   - BL libéré = les lignes de non livrable libérées (registre nl_bascules, même si le BL est ensuite annulé dans Fastmag),
+     suivies à part du picking. Le stock déjà présent se vend d'abord : le libéré ne baisse que quand le stock du
+     code-barres passe sous la quantité libérée.
    - Picking = le disponible FTK restant, saisons 26 et suivantes. Valeurs au prix d'achat des fiches produits. */
 const VS_NATURES = [
   ["WEB", "Stock web", "#3987e5"],
@@ -10695,6 +10697,7 @@ function controlesVS(c) {
   if (Number(c.pieces_sans_prix)) l.push(`${dashNb(c.pieces_sans_prix)} pièces sans prix d'achat (à 0 €)`);
   if (Number(c.nl_introuvable)) l.push(`${dashNb(c.nl_introuvable)} pièces non livrables introuvables dans FTK (non comptées)`);
   if (Number(c.lignes_doublons)) l.push(`${dashNb(c.lignes_doublons)} lignes FTK en double ignorées`);
+  if (Number(c.libere_total)) l.push(`BL libérés : ${dashNb(c.libere_total)} pièces libérées au total, ${dashNb(c.libere_total - c.libere_ecoule)} encore en stock, ${dashNb(c.libere_ecoule)} écoulées`);
   return l.length ? ` · Contrôles : ${l.join(" · ")}` : "";
 }
 
@@ -10740,7 +10743,9 @@ async function exporterToutVS(btn) {
         ["Contrôles"],
         ["Pièces sans prix d'achat (comptées à 0 €)", Number(d.controles?.pieces_sans_prix || 0)],
         ["Pièces non livrables introuvables dans FTK (non comptées)", Number(d.controles?.nl_introuvable || 0)],
-        ["Lignes FTK en double ignorées", Number(d.controles?.lignes_doublons || 0)], [],
+        ["Lignes FTK en double ignorées", Number(d.controles?.lignes_doublons || 0)],
+        ["BL libérés : pièces libérées au total", Number(d.controles?.libere_total || 0)],
+        ["BL libérés : écoulées (plus en stock)", Number(d.controles?.libere_ecoule || 0)], [],
         ["Fichiers du dépôt"], ...Object.entries(d.fichiers || {}).map(([r, n]) => [(VS_ROLES.find(([k]) => k === r) || [, r])[1], n || ""])] },
       { nom: "Par marque", gras: [0], largeurs: [24, 24, 12, 16], lignes: [["Nature", "Marque", "Pièces", "Valeur PA"], ...parMarque] },
       { nom: "Détail", gras: [0], largeurs: [46, 20, 18, 38, 10, 10, 14], lignes: [
@@ -10927,17 +10932,25 @@ async function calculValeurStock() {
   const infoFtk = c => info(c, ...(repli.get(c) || []));
   // 3. non livrable restant (bascules déduites), pris sur le disponible puis sur la préparation
   const nlFichier = lireLignesNLDepuisTable(F.nl.table);
-  const bascules = new Map((await apiTout("/rest/v1/nl_lignes?select=cle,qte_basculee&qte_basculee=gt.0") || []).map(b => [b.cle, Number(b.qte_basculee)]));
-  let nlIntrouvable = 0;
-  // les lignes libérées (basculées) restent identifiables : nature « BL libéré », prise sur le même stock
-  for (const r of nlFichier) {
-    const c = vsCle(r.gencod), libere = Math.min(bascules.get(r.cle) || 0, r.quantite);
-    for (const [nature, besoin] of [["NON_LIVRABLE", r.quantite - libere], ["BL_LIBERE", libere]]) {
-      let q = besoin;
-      for (const stock of [dispo, prep]) { const t = Math.min(stock.get(c) || 0, q); if (t > 0) { stock.set(c, stock.get(c) - t); q -= t; ajouter(nature, infoFtk(c), t); } }
-      nlIntrouvable += q;
-    }
+  // BL libérés : lus dans le REGISTRE des libérations (pas dans l'export des BL), pour qu'une ligne reste suivie
+  // même quand son BL est annulé ou soldé dans Fastmag. Le stock déjà présent se vend d'abord, le libéré en dernier :
+  // il est donc servi en premier sur le stock du code-barres et ne baisse que si ce stock passe sous la quantité libérée.
+  const registre = await apiTout("/rest/v1/nl_bascules?select=cle,quantite&annulee_le=is.null") || [];
+  const libereParCle = new Map(), libereParCode = new Map();
+  for (const b of registre) {
+    libereParCle.set(b.cle, (libereParCle.get(b.cle) || 0) + Number(b.quantite));
+    const c = vsCle(String(b.cle).split("|").slice(1).join("|"));
+    libereParCode.set(c, (libereParCode.get(c) || 0) + Number(b.quantite));
   }
+  let libereEcoule = 0, nlIntrouvable = 0;
+  const prendre = (nature, c, besoin) => {
+    let q = besoin;
+    for (const stock of [dispo, prep]) { const t = Math.min(stock.get(c) || 0, q); if (t > 0) { stock.set(c, stock.get(c) - t); q -= t; ajouter(nature, infoFtk(c), t); } }
+    return q;   // ce qui n'a pas été trouvé dans FTK
+  };
+  for (const [c, q] of libereParCode) libereEcoule += prendre("BL_LIBERE", c, q);
+  // non livrable : les lignes du BL encore en cours, moins ce qui a été libéré
+  for (const r of nlFichier) nlIntrouvable += prendre("NON_LIVRABLE", vsCle(r.gencod), Math.max(r.quantite - (libereParCle.get(r.cle) || 0), 0));
   // 4. réceptions FTK : sans date = pas encore arrivé ; datées = prises sur le disponible restant
   { const t = F.rec_ftk.table, recu = new Map();
     for (const l of t.lignes) {
@@ -10953,7 +10966,8 @@ async function calculValeurStock() {
   const dateStock = (F.ftk.table.date || "").match(/^(\d{2})\/(\d{2})\/(\d{4})/);
   return { detail: [...detail.values()], totaux, nlFichier,
     date_stock: dateStock ? `${dateStock[3]}-${dateStock[2]}-${dateStock[1]}` : null,
-    controles: { pieces_physiques: physiques, pieces_sans_prix: sansPrix, nl_introuvable: nlIntrouvable, lignes_doublons: doublons } };
+    controles: { pieces_physiques: physiques, pieces_sans_prix: sansPrix, nl_introuvable: nlIntrouvable, lignes_doublons: doublons,
+                 libere_total: [...libereParCode.values()].reduce((a, b) => a + b, 0), libere_ecoule: libereEcoule } };
 }
 
 /* les lignes du fichier des BL non facturables, au format du module Non livrable */
