@@ -1223,6 +1223,81 @@
                cursor: pointer; text-decoration: underline; text-decoration-style: dotted;
                text-underline-offset: 2px; }
   .dash-lien:hover { color: var(--accent); }
+  /* ---- Valeur du stock : tableau de bord sombre ---- */
+  #vue-valeur-stock { background: #141834; color: #fff; min-height: 100vh; }
+  .vs-sombre { padding: 20px 22px 48px; max-width: 1400px; margin: 0 auto; }
+  .vs-tete { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+  .vs-tete h1 { margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -.01em; color: #fff; }
+  .vs-bouton { margin-left: auto; background: #3987e5; color: #fff; border: 0; border-radius: 10px; padding: 10px 16px; font: inherit; font-weight: 700; cursor: pointer; }
+  .vs-bouton.discret { margin-left: 0; background: #2a3070; font-weight: 600; padding: 8px 12px; }
+  .vs-grille { display: grid; grid-template-columns: 170px 1fr; gap: 16px; align-items: start; }
+  .vs-cote { background: #1b2050; border-radius: 16px; padding: 12px; position: sticky; top: 12px; }
+  .vs-date { display: flex; justify-content: space-between; align-items: baseline; width: 100%; background: transparent; color: #d6d8ee; border: 0; border-radius: 8px; padding: 7px 8px; font: inherit; cursor: pointer; text-align: left; }
+  .vs-date small { color: #8f93b8; font-size: 11px; }
+  .vs-date:hover, .vs-date.on { background: #2a3070; color: #fff; }
+  .vs-titre { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  .vs-sous { font-size: 12.5px; color: #a9acc9; }
+  .vs-vide { padding: 30px; text-align: center; color: #a9acc9; background: #1b2050; border-radius: 16px; }
+  .vs-cartes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 1250px) { .vs-cartes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 640px) { .vs-cartes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .vs-carte { display: flex; align-items: center; gap: 12px; background: #1d2250; border: 0; border-radius: 16px; padding: 14px; color: #fff; font: inherit; text-align: left; cursor: pointer; transition: background .15s, transform .15s; }
+  .vs-carte:hover { background: #262c66; transform: translateY(-1px); }
+  .vs-ic { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; }
+  .vs-ic svg { width: 24px; height: 24px; }
+  .vs-carte-txt { display: flex; flex-direction: column; min-width: 0; }
+  .vs-carte-txt b { font-size: 22px; font-weight: 800; line-height: 1.1; }
+  .vs-carte-txt span { font-size: 12.5px; color: #d6d8ee; }
+  .vs-carte-txt small { font-size: 11.5px; color: #8f93b8; white-space: nowrap; }
+  .vs-carte-txt span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vs-carte-txt em, .vs-ligne em { font-style: normal; font-weight: 700; margin-left: 4px; }
+  em.hausse { color: #5ad48a; } em.baisse { color: #ff8a73; }
+  .vs-deux { display: grid; grid-template-columns: 1.7fr 1fr; gap: 14px; margin-top: 14px; }
+  .vs-colonne { display: flex; flex-direction: column; gap: 14px; }
+  .vs-panneau { background: #1b2050; border-radius: 18px; padding: 16px 18px; }
+  .vs-svg { width: 100%; height: auto; display: block; }
+  .vs-barre { cursor: pointer; } .vs-barre:hover rect { filter: brightness(1.12); }
+  .vs-barre:not(.on) rect { opacity: .78; }
+  .vs-legende { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: #d6d8ee; margin-top: 6px; }
+  .vs-legende i, .vs-ligne i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .vs-repart { display: flex; gap: 2px; height: 14px; border-radius: 999px; overflow: hidden; margin: 6px 0 10px; }
+  .vs-ligne { display: grid; grid-template-columns: 16px 1fr auto 44px; align-items: center; gap: 6px; width: 100%; background: transparent; border: 0; color: #d6d8ee; font: inherit; font-size: 13px; padding: 6px 4px; border-radius: 8px; cursor: pointer; text-align: left; }
+  .vs-ligne:hover { background: #262c66; }
+  .vs-ligne b { color: #fff; } .vs-ligne small { color: #8f93b8; text-align: right; }
+  .vs-gros { font-size: 30px; font-weight: 800; }
+  .vs-puces { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .vs-puce { background: #252b63; color: #d6d8ee; border: 0; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 12px; cursor: pointer; }
+  .vs-puce.on { background: #fff; color: #141834; font-weight: 700; }
+  .vs-marques { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 4px 18px; margin-top: 6px; }
+  .vs-marque { display: grid; grid-template-columns: 120px 1fr 78px 64px; align-items: center; gap: 8px; background: transparent; border: 0; color: #d6d8ee; font: inherit; font-size: 13px; padding: 6px 4px; border-radius: 8px; cursor: pointer; text-align: left; }
+  .vs-marque:hover { background: #262c66; }
+  .vs-marque b { color: #fff; text-align: right; } .vs-marque small { color: #8f93b8; text-align: right; }
+  .vs-marque > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vs-jauge { height: 9px; background: #2a3070; border-radius: 999px; overflow: hidden; } .vs-jauge i { display: block; height: 100%; border-radius: 999px; }
+  #vue-valeur-stock .tb-table { background: transparent; border-color: #2a3070; color: #e6e7f4; }
+  #vue-valeur-stock .tb-table th { background: #22285c; color: #a9acc9; }
+  #vue-valeur-stock .tb-table td { border-top-color: #2a3070; }
+  #vue-valeur-stock .tb-table td.num small, #vue-valeur-stock .tb-table .sous { color: #8f93b8; }
+  #vue-valeur-stock .tb-table tr.on td { background: #262c66; }
+  #vue-valeur-stock .tb-table tr.tb-total td { background: #22285c; border-top-color: #fff; }
+  #vue-valeur-stock .dash-kpi { background: #22285c; color: #fff; border: 0; }
+  #vue-valeur-stock .dash-kpi span { color: #a9acc9; }
+  #vue-valeur-stock .dash-section { margin: 14px 0 0; }
+  #vue-valeur-stock .dash-section > h3 { color: #fff; }
+  #vue-valeur-stock .compte-produits, #vue-valeur-stock .dash-vide { color: #a9acc9; }
+  #vue-valeur-stock summary { color: #e6e7f4; cursor: pointer; }
+  #vue-valeur-stock input[type=search], #vue-valeur-stock input[type=file] { color: #e6e7f4; }
+  #vue-valeur-stock .dash-lien { color: #9ec5ff; }
+  #vs-depot .vs-panneau { border: 1px solid #3987e5; margin-bottom: 14px; }
+  .dash-modale.vs-fenetre .boite { background: #1b2050; color: #e6e7f4; }
+  .dash-modale.vs-fenetre h4 { color: #fff; } .vs-fenetre .ref, .vs-fenetre .compte-produits { color: #a9acc9; }
+  .dash-modale.vs-fenetre table th { color: #a9acc9; border-bottom-color: #2a3070; }
+  .dash-modale.vs-fenetre table td { border-bottom-color: #2a3070; color: #e6e7f4; }
+  .dash-modale.vs-fenetre select, .vs-fenetre input { background: #22285c; color: #fff; border: 1px solid #3a4190; border-radius: 8px; padding: 6px 8px; }
+  .dash-modale.vs-fenetre th, .dash-modale.vs-fenetre td { text-align: left; }
+  .dash-modale.vs-fenetre th:nth-last-child(-n+2), .dash-modale.vs-fenetre td:nth-last-child(-n+2) { text-align: right; white-space: nowrap; }
+  .dash-modale.vs-fenetre .puce-claire { background: #2a3070; color: #fff; border-color: #3a4190; }
+  @media (max-width: 900px) { .vs-grille, .vs-deux { grid-template-columns: 1fr; } .vs-cote { position: static; } .vs-marque { grid-template-columns: 100px 1fr 70px; } .vs-marque small { display: none; } }
   .dash-modale { position: fixed; inset: 0; z-index: 95; display: flex; align-items: center;
                  justify-content: center; padding: 16px; background: rgba(0,0,0,.55); }
   .dash-modale .boite { background: #fff; border-radius: 16px; max-width: 520px; width: 100%;
@@ -1322,6 +1397,7 @@
         <a href="#/dashboard" class="lien-dash-magasins" style="display:none">Magasins &amp; produits</a>
         <a href="#/reporting" class="lien-dash-magasins" style="display:none">Analyse CA, marge &amp; saisons</a>
         <a href="#/hebdo" id="lien-hebdo" style="display:none">Reporting hebdo (direction)</a>
+        <a href="#/valeur-stock" id="lien-valeur-stock" style="display:none">Valeur du stock</a>
       </div>
     </div>
     <a href="#/receptions" id="lien-receptions" style="display:none">ARRIVAGES</a>
@@ -1338,7 +1414,6 @@
         <a href="#/merch-shopify" id="bo-merch-shopify">Merch Shopify</a>
         <a href="#/imports" id="bo-imports">Imports</a>
         <a href="#/import-reporting" id="bo-import-reporting">Import reporting</a>
-        <a href="#/non-livrable" id="bo-non-livrable">Non livrable</a>
         <a href="#/utilisateurs" id="bo-utilisateurs">Utilisateurs</a>
       </div>
     </div>
@@ -1609,6 +1684,7 @@
   <section class="vue page-claire" id="vue-hebdo"></section>
   <section class="vue page-claire" id="vue-import-reporting"></section>
   <section class="vue page-claire" id="vue-non-livrable"></section>
+  <section class="vue" id="vue-valeur-stock"></section>
 
   <section class="vue page-claire" id="vue-calendrier">
     <div class="col-tete">
@@ -1870,10 +1946,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792166138"></script>
-<script src="imports.js?v=1792166138"></script>
-<script src="merch-shopify.js?v=1792166138"></script>
-<script src="moteur-merch.js?v=1792166138"></script>
+<script src="config.js?v=1792169936"></script>
+<script src="imports.js?v=1792169936"></script>
+<script src="merch-shopify.js?v=1792169936"></script>
+<script src="moteur-merch.js?v=1792169936"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -1998,7 +2074,10 @@ async function init() {
     montrer("bo-merch-shopify", estAdmin || estMerch);
     montrer("bo-imports", estAdmin || MON_ROLE === "admin_commercial");
     montrer("bo-import-reporting", estAdmin);
-    montrer("bo-non-livrable", estAdmin || MON_ROLE === "admin_commercial");
+    if (estAdmin || MON_ROLE === "admin_commercial") {
+      document.getElementById("lien-dashboard").style.display = "";
+      document.getElementById("lien-valeur-stock").style.display = "";
+    }
     montrer("bo-utilisateurs", estAdmin || MON_ROLE === "admin_commercial");
   }
   if (estMerch) {
@@ -2367,9 +2446,9 @@ function router() {
   } else if (route === "receptions") {
     document.getElementById("vue-receptions").classList.add("active");
     rendreReceptions();
-  } else if (route === "non-livrable") {
-    document.getElementById("vue-non-livrable").classList.add("active");
-    rendreNonLivrable();
+  } else if (route === "valeur-stock" || route === "non-livrable") {
+    document.getElementById("vue-valeur-stock").classList.add("active");
+    rendreValeurStock();
   } else if (route === "import-reporting") {
     document.getElementById("vue-import-reporting").classList.add("active");
     rendreImportReporting();
@@ -2451,7 +2530,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792166138";
+    v.src = "hero.mp4?v=1792169936";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -10376,6 +10455,493 @@ function exporterNonLivrable() {
                ...NL.bascules.map(b => [new Date(b.le).toLocaleString("fr-FR"), b.par_email, b.bl, b.client_nom, b.reference, b.designation,
                  b.taille, Number(b.quantite), r2(b.pa), r2(b.quantite * b.pa), b.annulee_le ? new Date(b.annulee_le).toLocaleString("fr-FR") : ""])] },
   ]);
+}
+
+/* ---- Valeur du stock ----
+   Un dépôt = les exports du jour (WMS Dimo : stocks FTK et FT2, réceptions FTK et FT2 ; Fastmag : BL non
+   facturables et fiches produits). Le calcul se fait ici, dans le navigateur ; seuls les résultats par
+   nature et par référence sont enregistrés (vs_depots / vs_detail) pour suivre l'évolution.
+   Règles validées le 16/10/2026 :
+   - Web = FT2 « Qté disponible » + disponible FTK des saisons avant 26, ITM, PERMANENT, ANCIEN STOCK.
+   - Préparation = FTK réservé + alloué (portefeuille exclu, plafonné au total de la ligne).
+   - Non livrable = BL non facturables restants (moins les bascules), pris sur le disponible FTK puis la préparation ;
+     ce qui n'existe pas dans FTK n'est pas compté (c'est un reclassement, le total ne bouge pas).
+   - Transit = réceptions FTK sans date (pas encore arrivées) + réceptions FTK datées prises sur le disponible restant
+     + réceptions FT2 sans date (transferts vers le web).
+   - Picking = le disponible FTK restant, saisons 26 et suivantes. Valeurs au prix d'achat des fiches produits. */
+const VS_NATURES = [
+  ["WEB", "Stock web", "#3987e5"],
+  ["PICKING", "Stock picking", "#d95926"],
+  ["PREPARATION", "Stock en préparation", "#199e70"],
+  ["NON_LIVRABLE", "Non livrable", "#c98500"],
+  ["TRANSIT", "Stock en transit", "#d55181"],
+];
+const VS_SOUS_TRANSIT = { TRANSIT_FOURNISSEUR: "réceptions fournisseur pas encore arrivées", TRANSIT_RECU: "reçu, pas encore rangé", TRANSIT_WEB: "transferts vers le web non reçus" };
+const vsNature = n => n.startsWith("TRANSIT") ? "TRANSIT" : n;
+const VS_ROLES = [
+  ["ftk", "Stock FTK (WMS)", "FTK_StocksDetail"],
+  ["ft2", "Stock FT2 — web (WMS)", "FT2_StocksDetail"],
+  ["rec_ftk", "Réceptions FTK (WMS)", "FTK_ReceptionsDetail"],
+  ["rec_ft2", "Réceptions FT2 (WMS)", "FT2_ReceptionsDetail"],
+  ["nl", "BL « Réservation non facturable » (Fastmag)", "fastmag - <date>.xls"],
+  ["fiches", "Fiches produits (Fastmag)", "fastmag (n).csv"],
+];
+const VS = { depots: [], detail: [], fichiers: {}, calcul: null, natureDetail: "PICKING", recherche: "" };
+
+const vsTotaux = d => {
+  const t = Object.fromEntries(VS_NATURES.map(([k]) => [k, { pieces: 0, valeur: 0 }]));
+  for (const [n, v] of Object.entries(d?.totaux || {})) { const k = vsNature(n); if (t[k]) { t[k].pieces += Number(v.pieces); t[k].valeur += Number(v.valeur); } }
+  return t;
+};
+const vsTotal = t => Object.values(t).reduce((a, v) => ({ pieces: a.pieces + v.pieces, valeur: a.valeur + v.valeur }), { pieces: 0, valeur: 0 });
+const vsDate = d => d?.date_stock ? new Date(d.date_stock + "T12:00:00").toLocaleDateString("fr-FR") : "—";
+
+/* ---- affichage : tableau de bord sombre, chaque carte et chaque barre ouvre son détail ---- */
+const VS_ICONES = {
+  TOTAL: '<path d="M3 21V9l9-6 9 6v12"/><path d="M8 21v-7h8v7"/><path d="M8 17h8"/>',
+  WEB: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  PICKING: '<path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/>',
+  PREPARATION: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>',
+  NON_LIVRABLE: '<circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/>',
+  TRANSIT: '<path d="M2 7h11v9H2zM13 10h4l3 3v3h-7z"/><circle cx="6" cy="18" r="2"/><circle cx="16" cy="18" r="2"/>',
+};
+const vsIcone = (k, c) => `<span class="vs-ic" style="color:${c};background:${c}22"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${VS_ICONES[k]}</svg></span>`;
+const vsK = v => { const a = Math.abs(v);
+  return a >= 1e6 ? (v / 1e6).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " M€"
+       : a >= 1e3 ? (v / 1e3).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " K€" : Math.round(v) + " €"; };
+
+async function rendreValeurStock() {
+  const vue = document.getElementById("vue-valeur-stock");
+  if (!(estAdmin || MON_ROLE === "admin_commercial")) {
+    vue.innerHTML = `<div class="col-tete"><h1>VALEUR DU STOCK</h1><div class="compte-produits">Réservé à l'administration.</div></div>`;
+    return;
+  }
+  vue.innerHTML = `<div class="vs-sombre">
+    <div class="vs-tete"><h1>Valeur du stock</h1>
+      <button class="vs-bouton" onclick="ouvrirDepotVS()">＋ Nouveau dépôt</button></div>
+    <div id="vs-depot"></div>
+    <div class="vs-grille">
+      <aside class="vs-cote"><div class="vs-titre">Dépôts</div><div id="vs-dates"></div></aside>
+      <div id="vs-corps"><div class="vs-vide">Chargement…</div></div>
+    </div>
+    <div class="vs-panneau" id="vs-nl" style="margin-top:16px">
+      <div class="vs-titre">Non livrable — bascules en picking</div>
+      <div class="vs-sous">Pour garder des références, déposez l'export des BL non facturables filtré sur les lignes à garder :
+        elles basculent en picking (pris en compte au prochain dépôt) et la bascule reste tracée.</div>
+      <div class="dash-ligne" style="margin-top:10px">
+        <input type="file" id="nl-fichier" accept=".xls,.csv,.txt">
+        <button class="vs-bouton discret" onclick="analyserFichierNL('bascule')">Lignes à basculer en picking</button>
+      </div>
+      <div id="nl-depot" class="vs-sous" style="margin-top:10px"></div>
+      <div class="dash-kpis" id="nl-kpis" style="margin:14px 0 0"></div>
+      <div id="nl-corps"></div>
+    </div></div>`;
+  await Promise.all([chargerValeurStock(), chargerNonLivrable()]);
+}
+
+async function chargerValeurStock(id) {
+  try {
+    VS.depots = await api("/rest/v1/vs_depots?select=*&termine=eq.true&order=date_stock.asc,id.asc") || [];
+    VS.choisi = id || VS.choisi;
+    if (!VS.depots.some(d => d.id === VS.choisi)) VS.choisi = VS.depots[VS.depots.length - 1]?.id;
+    VS.detail = VS.choisi ? await apiTout(`/rest/v1/vs_detail?select=*&depot_id=eq.${VS.choisi}`) : [];
+  } catch (e) {
+    document.getElementById("vs-corps").innerHTML = `<div class="vs-vide">${echapperHTML(String(e.donnees?.message || e.message || e))}</div>`;
+    return;
+  }
+  dessinerValeurStock();
+}
+const choisirDepotVS = id => chargerValeurStock(id);
+
+function dessinerValeurStock() {
+  const dates = document.getElementById("vs-dates"), corps = document.getElementById("vs-corps");
+  if (!corps) return;
+  dates.innerHTML = [...VS.depots].reverse().map(d => `<button class="vs-date${d.id === VS.choisi ? " on" : ""}" onclick="choisirDepotVS(${d.id})">
+      <span>${vsDate(d)}</span><small>${vsK(vsTotal(vsTotaux(d)).valeur)}</small></button>`).join("") || `<div class="vs-sous">Aucun dépôt.</div>`;
+  if (!VS.depots.length) { corps.innerHTML = `<div class="vs-vide">Aucun dépôt pour l'instant : cliquez « ＋ Nouveau dépôt ».</div>`; return; }
+  const i = VS.depots.findIndex(d => d.id === VS.choisi), d = VS.depots[i], avant = VS.depots[i - 1];
+  const t = vsTotaux(d), tp = avant ? vsTotaux(avant) : null, tot = vsTotal(t), totp = tp ? vsTotal(tp) : null;
+  const ecart = (v, p) => p == null ? "" : `<em class="${v >= p ? "hausse" : "baisse"}">${v >= p ? "▲" : "▼"} ${vsK(Math.abs(v - p))}</em>`;
+  const carte = (k, lib, v, p, c, clic) => `<button class="vs-carte" onclick="${clic}" title="Voir le détail">${vsIcone(k, c)}
+      <span class="vs-carte-txt"><b>${vsK(v.valeur)}</b><span>${lib}</span><small>${dashNb(v.pieces)} pièces ${ecart(v.valeur, p?.valeur)}</small></span></button>`;
+  corps.innerHTML = `
+    <div class="vs-cartes">
+      ${carte("TOTAL", "Valeur totale", tot, totp, "#ffffff", "ouvrirNatureVS(null)")}
+      ${VS_NATURES.map(([k, lib, c]) => carte(k, lib, t[k], tp?.[k], c, `ouvrirNatureVS('${k}')`)).join("")}
+    </div>
+    <div class="vs-sous" style="margin:8px 2px 0">Stock du ${vsDate(d)} · déposé le ${new Date(d.le).toLocaleString("fr-FR")} par ${echapperHTML(d.par_email || "")}${avant ? ` · écarts comparés au ${vsDate(avant)}` : ""}${controlesVS(d.controles).replace(/<[^>]+>/g, " ")}</div>
+    <div class="vs-deux">
+      <div class="vs-panneau"><div class="vs-titre">Évolution de la valeur par nature</div>${graphiqueVS()}</div>
+      <div class="vs-colonne">
+        <div class="vs-panneau"><div class="vs-titre">Répartition au ${vsDate(d)}</div>${repartitionVS(t, tot)}</div>
+        <div class="vs-panneau"><div class="vs-titre">Valeur totale</div>${courbeVS()}</div>
+      </div>
+    </div>
+    <div class="vs-panneau" style="margin-top:14px"><div class="vs-titre">Par marque
+      <span class="vs-puces">${VS_NATURES.map(([k, lib]) => `<button class="vs-puce${(VS.natureMarque || "PICKING") === k ? " on" : ""}" onclick="VS.natureMarque='${k}'; dessinerValeurStock()">${lib.replace("Stock ", "")}</button>`).join("")}</span></div>
+      ${marquesVS(VS.natureMarque || "PICKING")}</div>
+    <div class="vs-panneau" style="margin-top:14px"><div class="vs-titre">Historique des dépôts
+      <button class="vs-bouton discret" style="margin-left:auto" onclick="exporterValeurStock()">⬇ Exporter ce dépôt (Excel)</button></div>${historiqueVS()}</div>`;
+}
+
+/* barres empilées : une par dépôt (12 derniers), la valeur écrite dans le segment quand il y a la place ; clic = ce dépôt */
+function graphiqueVS() {
+  const D = VS.depots.slice(-12);
+  const L = 640, H = 300, g = 46, b = 24, h = H - b - 10;
+  const max = Math.max(...D.map(d => vsTotal(vsTotaux(d)).valeur), 1);
+  // échelle « ronde » au plus près : 1, 2, 2,5 ou 5 × 10^n
+  const p10 = Math.pow(10, Math.floor(Math.log10(max))), pas = [.1, .2, .25, .5, 1].map(f => f * p10).find(f => max / f <= 8) || p10;
+  const haut = Math.ceil(max / pas) * pas;
+  const slot = (L - g) / Math.max(D.length, 4), larg = Math.min(70, slot * .62);
+  const x = i => g + i * slot + (slot - larg) / 2, y = v => 10 + h - (v / haut) * h;
+  let s = [0, .25, .5, .75, 1].map(f => `<line x1="${g}" x2="${L}" y1="${y(haut * f)}" y2="${y(haut * f)}" stroke="#ffffff14"/>
+    <text x="${g - 6}" y="${y(haut * f) + 4}" text-anchor="end" font-size="11" fill="#a9acc9">${vsK(haut * f)}</text>`).join("");
+  D.forEach((d, i) => {
+    const t = vsTotaux(d); let cumul = 0;
+    s += `<g class="vs-barre${d.id === VS.choisi ? " on" : ""}" onclick="choisirDepotVS(${d.id})">`;
+    for (const [k, lib, c] of VS_NATURES) {
+      const v = t[k].valeur; if (!v) continue;
+      const y0 = y(cumul), y1 = y(cumul + v); cumul += v;
+      s += `<rect x="${x(i)}" y="${y1}" width="${larg}" height="${Math.max(y0 - y1 - 2, .5)}" rx="3" fill="${c}"><title>${vsDate(d)} — ${lib} : ${eur(v)} · ${dashNb(t[k].pieces)} p.</title></rect>`;
+      if (y0 - y1 > 18) s += `<text x="${x(i) + larg / 2}" y="${(y0 + y1) / 2 + 4}" text-anchor="middle" font-size="11" fill="#fff" pointer-events="none">${vsK(v).replace(" €", "")}</text>`;
+    }
+    s += `<text x="${x(i) + larg / 2}" y="${H - 6}" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff">${vsDate(d).slice(0, 5)}</text></g>`;
+  });
+  return `<svg viewBox="0 0 ${L} ${H}" class="vs-svg" role="img" aria-label="Évolution de la valeur du stock par nature">${s}</svg>
+    <div class="vs-legende">${VS_NATURES.map(([, lib, c]) => `<span><i style="background:${c}"></i>${lib}</span>`).join("")}</div>
+    ${D.length < 2 ? `<div class="vs-sous">Les barres s'ajouteront à chaque dépôt.</div>` : ""}`;
+}
+
+function repartitionVS(t, tot) {
+  return `<div class="vs-repart">${VS_NATURES.map(([k, , c]) => `<i style="flex:${t[k].valeur || 0};background:${c}"></i>`).join("")}</div>
+    ${VS_NATURES.map(([k, lib, c]) => `<button class="vs-ligne" onclick="ouvrirNatureVS('${k}')"><i style="background:${c}"></i><span>${lib}</span>
+      <b>${vsK(t[k].valeur)}</b><small>${tot.valeur ? Math.round(100 * t[k].valeur / tot.valeur) : 0} %</small></button>`).join("")}`;
+}
+
+function courbeVS() {
+  const D = VS.depots.slice(-12);
+  if (D.length < 2) return `<div class="vs-gros">${vsK(vsTotal(vsTotaux(D[0])).valeur)}</div><div class="vs-sous">La courbe apparaîtra au deuxième dépôt.</div>`;
+  const L = 320, H = 120, v = D.map(d => vsTotal(vsTotaux(d)).valeur);
+  const min = Math.min(...v) * .97, max = Math.max(...v) * 1.01;
+  const x = i => 22 + i * (L - 44) / (D.length - 1), y = a => 10 + (H - 30) * (1 - (a - min) / (max - min || 1));
+  const pts = v.map((a, i) => `${x(i)},${y(a)}`).join(" ");
+  return `<svg viewBox="0 0 ${L} ${H}" class="vs-svg">
+    <polygon points="${x(0)},${H - 20} ${pts} ${x(D.length - 1)},${H - 20}" fill="#3987e533"/>
+    <polyline points="${pts}" fill="none" stroke="#3987e5" stroke-width="2"/>
+    ${v.map((a, i) => `<circle cx="${x(i)}" cy="${y(a)}" r="${D[i].id === VS.choisi ? 5 : 3.5}" fill="${D[i].id === VS.choisi ? "#fff" : "#3987e5"}" style="cursor:pointer" onclick="choisirDepotVS(${D[i].id})"><title>${vsDate(D[i])} : ${eur(a)}</title></circle>
+      <text x="${x(i)}" y="${H - 4}" text-anchor="middle" font-size="10" fill="#a9acc9">${vsDate(D[i]).slice(0, 5)}</text>`).join("")}</svg>`;
+}
+
+const vsParMarque = nature => {
+  const m = new Map();
+  for (const x of VS.detail) if (!nature || vsNature(x.nature) === nature) {
+    const a = m.get(x.marque || "—") || { marque: x.marque || "—", p: 0, v: 0 }; a.p += Number(x.pieces); a.v += Number(x.valeur); m.set(a.marque, a);
+  }
+  return [...m.values()].sort((a, b) => b.v - a.v);
+};
+
+function marquesVS(nature) {
+  const M = vsParMarque(nature).slice(0, 12), max = M[0]?.v || 1;
+  const c = (VS_NATURES.find(([k]) => k === nature) || [])[2];
+  return M.length ? `<div class="vs-marques">${M.map(m => `<button class="vs-marque" onclick="ouvrirNatureVS('${nature}', '${echapperHTML(m.marque).replace(/'/g, "\\'")}')">
+      <span>${echapperHTML(m.marque)}</span><span class="vs-jauge"><i style="width:${100 * m.v / max}%;background:${c}"></i></span>
+      <b>${vsK(m.v)}</b><small>${dashNb(m.p)} p.</small></button>`).join("")}</div>`
+    : `<div class="vs-vide">Rien dans cette nature.</div>`;
+}
+
+/* le détail : une fenêtre par nature (ou tout le stock), filtrable par marque et par recherche */
+function ouvrirNatureVS(nature, marque) {
+  VS.fen = { nature, marque: marque || "", q: "" };
+  const lib = nature ? (VS_NATURES.find(([k]) => k === nature) || [, nature])[1] : "Valorisation globale";
+  const fond = ouvrirModaleDash(`<div class="entete"><div><h4>${lib}</h4><div class="ref">Stock du ${vsDate(VS.depots.find(d => d.id === VS.choisi))}</div></div>
+      <button class="puce-claire" onclick="fermerModaleDash()">Fermer</button></div><div id="vs-fen"></div>`);
+  fond.classList.add("vs-fenetre");
+  fond.querySelector(".boite").style.maxWidth = "960px";
+  dessinerFenetreVS();
+}
+
+function dessinerFenetreVS() {
+  const zone = document.getElementById("vs-fen"); if (!zone) return;
+  const { nature, marque, q } = VS.fen;
+  const M = vsParMarque(nature);
+  const L = VS.detail.filter(x => (!nature || vsNature(x.nature) === nature) && (!marque || (x.marque || "—") === marque)
+      && (!q || [x.reference, x.designation].some(v => String(v || "").toLowerCase().includes(q.toLowerCase()))))
+    .sort((a, b) => b.valeur - a.valeur);
+  const tot = L.reduce((a, x) => ({ p: a.p + Number(x.pieces), v: a.v + Number(x.valeur) }), { p: 0, v: 0 });
+  const sous = nature === "TRANSIT" ? Object.entries(VS_SOUS_TRANSIT).map(([k, l]) => {
+      const s = VS.detail.filter(x => x.nature === k).reduce((a, x) => ({ p: a.p + Number(x.pieces), v: a.v + Number(x.valeur) }), { p: 0, v: 0 });
+      return `<div>${l} : <b>${eur(s.v)}</b> · ${dashNb(s.p)} p.</div>`; }).join("") : "";
+  zone.innerHTML = `${sous ? `<div class="compte-produits" style="margin-top:10px">${sous}</div>` : ""}
+    <div class="dash-ligne" style="margin-top:12px">
+      <select onchange="VS.fen.marque=this.value; dessinerFenetreVS()"><option value="">Toutes les marques (${M.length})</option>
+        ${M.map(m => `<option value="${echapperHTML(m.marque)}"${m.marque === marque ? " selected" : ""}>${echapperHTML(m.marque)} — ${vsK(m.v)}</option>`).join("")}</select>
+      <input type="search" placeholder="Référence ou désignation…" value="${echapperHTML(q)}" oninput="VS.fen.q=this.value; dessinerFenetreVS()">
+      <span class="compte-produits" style="margin:0"><b>${eur(tot.v)}</b> · ${dashNb(tot.p)} pièces · ${dashNb(L.length)} lignes</span>
+    </div>
+    <table><thead><tr><th>Référence</th><th>Marque</th><th>Désignation</th><th>Saison</th>${!nature || nature === "TRANSIT" ? "<th>Nature</th>" : ""}<th>Pièces</th><th>Valeur PA</th></tr></thead>
+    <tbody>${L.slice(0, 400).map(x => `<tr><td>${echapperHTML(x.reference)}</td><td style="text-align:left">${echapperHTML(x.marque || "")}</td>
+      <td style="text-align:left">${echapperHTML(x.designation || "")}</td><td style="text-align:left">${echapperHTML(x.saison || "")}</td>
+      ${!nature || nature === "TRANSIT" ? `<td style="text-align:left">${VS_SOUS_TRANSIT[x.nature] || (VS_NATURES.find(([k]) => k === x.nature) || [, x.nature])[1]}</td>` : ""}
+      <td>${dashNb(x.pieces)}</td><td>${eur(Number(x.valeur))}</td></tr>`).join("")}</tbody></table>
+    ${L.length > 400 ? `<div class="compte-produits" style="margin-top:6px">… ${dashNb(L.length - 400)} autres lignes : filtrez ou exportez le dépôt.</div>` : ""}`;
+}
+
+function controlesVS(c) {
+  if (!c) return "";
+  const l = [];
+  if (Number(c.pieces_sans_prix)) l.push(`${dashNb(c.pieces_sans_prix)} pièces sans prix d'achat (à 0 €)`);
+  if (Number(c.nl_introuvable)) l.push(`${dashNb(c.nl_introuvable)} pièces non livrables introuvables dans FTK (non comptées)`);
+  if (Number(c.lignes_doublons)) l.push(`${dashNb(c.lignes_doublons)} lignes FTK en double ignorées`);
+  return l.length ? ` · Contrôles : ${l.join(" · ")}` : "";
+}
+
+function historiqueVS() {
+  const D = [...VS.depots].reverse();
+  return `<table class="tb-table" style="margin-top:10px"><thead><tr><th>Stock du</th>${VS_NATURES.map(([, lib]) => `<th class="num">${lib.replace("Stock ", "")}</th>`).join("")}
+      <th class="num">Total</th><th>Déposé par</th><th></th></tr></thead>
+    <tbody>${D.map(d => { const t = vsTotaux(d); return `<tr class="${d.id === VS.choisi ? "on" : ""}" style="cursor:pointer" onclick="choisirDepotVS(${d.id})"><td><b>${vsDate(d)}</b></td>
+      ${VS_NATURES.map(([k]) => `<td class="num">${vsK(t[k].valeur)}<small>${dashNb(t[k].pieces)} p.</small></td>`).join("")}
+      <td class="num"><b>${vsK(vsTotal(t).valeur)}</b><small>${dashNb(vsTotal(t).pieces)} p.</small></td><td class="sous">${echapperHTML(d.par_email || "")}</td>
+      <td>${estAdmin ? `<button class="dash-lien" onclick="event.stopPropagation(); supprimerDepotVS(${d.id})">Supprimer</button>` : ""}</td></tr>`; }).join("")}</tbody></table>`;
+}
+
+async function supprimerDepotVS(id) {
+  if (!confirm("Supprimer ce dépôt de l'historique ?")) return;
+  try { await api("/rest/v1/rpc/vs_depot_supprimer", { corps: { p_depot: id } }); await chargerValeurStock(); }
+  catch (e) { alert(String(e.donnees?.message || e.message || e)); }
+}
+
+async function exporterValeurStock() {
+  const d = VS.depots.find(x => x.id === VS.choisi); if (!d) return;
+  const r2 = n => Math.round(Number(n) * 100) / 100;
+  const t = vsTotaux(d);
+  telechargerXlsx(`FKB2B_valeur_stock_${d.date_stock || ""}.xlsx`, [
+    { nom: "Synthèse", gras: [0, 2], largeurs: [34, 14, 16], lignes: [
+      ["Valeur du stock", `stock du ${vsDate(d)}`], [], ["Nature", "Pièces", "Valeur PA"],
+      ...VS_NATURES.map(([k, lib]) => [lib, t[k].pieces, r2(t[k].valeur)]),
+      ["Total", vsTotal(t).pieces, r2(vsTotal(t).valeur)], [],
+      ...VS_NATURES.flatMap(([k, lib]) => [[lib.toUpperCase(), "Pièces", "Valeur PA"], ...vsParMarque(k).map(m => [m.marque, m.p, r2(m.v)]), []])] },
+    { nom: "Détail", gras: [0], largeurs: [40, 20, 16, 36, 10, 10, 12], lignes: [
+      ["Nature", "Référence", "Marque", "Désignation", "Saison", "Pièces", "Valeur PA"],
+      ...[...VS.detail].sort((a, b) => a.nature.localeCompare(b.nature) || b.valeur - a.valeur)
+        .map(x => [(VS_NATURES.find(([k]) => k === vsNature(x.nature)) || [, x.nature])[1] + (VS_SOUS_TRANSIT[x.nature] ? " — " + VS_SOUS_TRANSIT[x.nature] : ""),
+          x.reference, x.marque, x.designation, x.saison, Number(x.pieces), r2(x.valeur)])] },
+  ]);
+}
+
+/* ---- le dépôt ---- */
+function ouvrirDepotVS() {
+  VS.fichiers = {}; VS.calcul = null;
+  document.getElementById("vs-depot").innerHTML = `<div class="vs-panneau">
+    <div class="vs-titre">Nouveau dépôt</div>
+    <div class="vs-sous">Sélectionnez les six exports du jour (vous pouvez les choisir tous d'un coup, ou en plusieurs fois) :
+      chacun est reconnu à son contenu et rangé à sa place.</div>
+    <div class="dash-ligne" style="margin-top:10px">
+      <input type="file" id="vs-fichiers" multiple onchange="ajouterFichiersVS(this.files)">
+      <button class="vs-bouton discret" onclick="document.getElementById('vs-depot').innerHTML=''">Annuler</button>
+    </div>
+    <div id="vs-liste" style="margin-top:10px"></div><div id="vs-resultat" style="margin-top:10px"></div></div>`;
+  dessinerListeVS();
+}
+
+function dessinerListeVS() {
+  const zone = document.getElementById("vs-liste"); if (!zone) return;
+  zone.innerHTML = `<table class="tb-table"><tbody>${VS_ROLES.map(([r, lib, nom]) => { const f = VS.fichiers[r]; return `<tr>
+      <td style="width:22px">${f ? (f.erreur ? "⚠️" : "✅") : "⬜"}</td><td><b>${lib}</b><div class="sous">${f ? echapperHTML(f.nom) + (f.info ? " · " + echapperHTML(f.info) : "") + (f.erreur ? ` — <b>${echapperHTML(f.erreur)}</b>` : "") : "attendu : " + nom}</div></td></tr>`; }).join("")}</tbody></table>
+    ${VS_ROLES.every(([r]) => VS.fichiers[r] && !VS.fichiers[r].erreur)
+      ? `<button class="vs-bouton" style="margin:10px 0 0" onclick="calculerDepotVS(this)">Calculer la valorisation</button>` : ""}`;
+}
+
+const vsNombre = s => parseFloat(String(s ?? "").replace(/\s/g, "").replace(",", ".")) || 0;
+const vsCle = c => { c = String(c || "").trim(); return c.startsWith("#") ? c : c.replace(/^0+/, ""); };
+
+async function lireTableVS(fichier) {
+  const tampon = await fichier.arrayBuffer();
+  let texte;
+  try { texte = new TextDecoder("utf-8", { fatal: true }).decode(tampon); } catch (e) { texte = new TextDecoder("windows-1252").decode(tampon); }
+  texte = texte.replace(/^(﻿|ï»¿)+/, "");
+  const premiere = texte.slice(0, 4000).split(/\r?\n/)[0];
+  const sep = premiere.includes("\t") ? "\t" : ";";
+  const lignes = decouperTexte(texte, sep);
+  const tete = (lignes.shift() || []).map(c => c.trim().replace(/^(﻿|ï»¿)+/, ""));
+  const i = Object.fromEntries(tete.map((c, k) => [c, k]));
+  return { tete, i, lignes, get: (l, c) => String(l[i[c]] ?? "").trim() };
+}
+
+async function ajouterFichiersVS(liste) {
+  for (const fichier of liste) {
+    let t;
+    try { t = await lireTableVS(fichier); } catch (e) { continue; }
+    const a = c => c in t.i;
+    let role = null, info = "", erreur = null;
+    if (a("Date stock") && a("Qté disponible")) {
+      const alloc = t.lignes.slice(0, 50).map(l => t.get(l, "Allocation")).find(Boolean);
+      role = /FT2/i.test(fichier.name) ? "ft2" : /FTK/i.test(fichier.name) ? "ftk" : alloc === "N" ? "ft2" : "ftk";
+      const date = t.lignes.map(l => t.get(l, "Date stock")).find(Boolean) || "";
+      info = `stock du ${date} · ${dashNb(t.lignes.length)} lignes`;
+      t.date = date;
+    } else if (a("Numéro de réception") && a("Date de réception")) {
+      const tiers = t.lignes.slice(0, 50).map(l => t.get(l, "Code tiers"));
+      role = /FT2/i.test(fichier.name) ? "rec_ft2" : /FTK/i.test(fichier.name) ? "rec_ftk" : tiers.includes("FTK") ? "rec_ft2" : "rec_ftk";
+      info = `${dashNb(t.lignes.length)} lignes`;
+    } else if (a("TypeBL") && a("Piece") && a("PA_Fiche")) {
+      role = "nl";
+      const nf = t.lignes.filter(l => /non\s*factur/i.test(t.get(l, "TypeBL")) && t.get(l, "nature") === "BL" && t.get(l, "Soldee") !== "1");
+      info = `${dashNb(nf.length)} lignes non facturables`;
+      if (!nf.length) erreur = "aucune ligne « Réservation non facturable » (ce n'est pas le bon export de BL)";
+    } else if (a("Reference_Article") && a("Gencod") && a("Prix_achat") && a("Saison")) {
+      role = "fiches"; info = `${dashNb(t.lignes.length)} fiches`;
+    }
+    if (!role) { alert(`${fichier.name} : fichier non reconnu.`); continue; }
+    VS.fichiers[role] = { nom: fichier.name, table: t, fichier, info, erreur };
+  }
+  // les deux stocks WMS doivent être du même jour
+  const d1 = VS.fichiers.ftk?.table.date, d2 = VS.fichiers.ft2?.table.date;
+  if (d1 && d2 && d1 !== d2) VS.fichiers.ft2.erreur = `pas du même jour que FTK (${d1})`;
+  else if (VS.fichiers.ft2?.erreur?.startsWith("pas du même jour")) VS.fichiers.ft2.erreur = null;
+  dessinerListeVS();
+}
+
+function vsSaisonWeb(s) {
+  s = String(s || "").trim().toUpperCase();
+  if (s.startsWith("ANCIEN") || s === "ITM" || s === "PERMANENT") return true;
+  const m = s.match(/(\d{2})/); return !!m && Number(m[1]) < 26;
+}
+
+async function calculerDepotVS(btn) {
+  const res = document.getElementById("vs-resultat");
+  btn.disabled = true; res.textContent = "Calcul en cours…";
+  await new Promise(r => setTimeout(r, 30));
+  try {
+    VS.calcul = await calculValeurStock();
+    const c = VS.calcul, t = Object.fromEntries(VS_NATURES.map(([k]) => [k, { pieces: 0, valeur: 0 }]));
+    for (const [n, v] of Object.entries(c.totaux)) { t[vsNature(n)].pieces += v.pieces; t[vsNature(n)].valeur += v.valeur; }
+    const tot = vsTotal(t);
+    res.innerHTML = `<table class="tb-table"><thead><tr><th>Nature</th><th class="num">Pièces</th><th class="num">Valeur PA</th></tr></thead><tbody>
+      ${VS_NATURES.map(([k, lib]) => `<tr><td>${lib}${k === "TRANSIT" ? `<div class="sous">${Object.entries(VS_SOUS_TRANSIT).map(([s, l]) => `${l} : ${dashNb(c.totaux[s]?.pieces || 0)} p. · ${eur(c.totaux[s]?.valeur || 0)}`).join("<br>")}</div>` : ""}</td>
+        <td class="num">${dashNb(t[k].pieces)}</td><td class="num">${eur(t[k].valeur)}</td></tr>`).join("")}
+      <tr class="tb-total"><td>Valorisation globale</td><td class="num">${dashNb(tot.pieces)}</td><td class="num">${eur(tot.valeur)}</td></tr></tbody></table>
+      <div class="compte-produits" style="margin-top:8px">Contrôle : ${dashNb(c.controles.pieces_physiques)} pièces dans les fichiers, ${dashNb(tot.pieces)} réparties
+        ${Math.round(c.controles.pieces_physiques) === Math.round(tot.pieces) ? "✅" : "⚠️ écart"}. ${controlesVS(c.controles).replace(/<[^>]+>/g, "")}</div>
+      <button class="vs-bouton" style="margin:10px 0 0" onclick="enregistrerDepotVS(this)">Enregistrer le dépôt</button>`;
+  } catch (e) { res.innerHTML = `<b>Erreur</b> : ${echapperHTML(String(e.message || e))}`; btn.disabled = false; }
+}
+
+async function calculValeurStock() {
+  const F = VS.fichiers;
+  // fiches produits : prix d'achat, marque, saison, désignation par code-barres et par identifiant « #… »
+  const fi = new Map(), parRef = new Map();
+  { const t = F.fiches.table;
+    for (const l of t.lignes) {
+      const pa = vsNombre(t.get(l, "Prix_achat")), ref = t.get(l, "Reference_Article");
+      const x = { ref, marque: t.get(l, "Marque"), des: t.get(l, "Designation"), saison: t.get(l, "Saison"), pa };
+      for (const c of [vsCle(t.get(l, "Gencod")), t.get(l, "Produit")]) if (c && (!fi.has(c) || (pa > 0 && !fi.get(c).pa))) fi.set(c, x);
+      const r = parRef.get(ref); if (ref && (!r || pa > r.pa)) parRef.set(ref, x);
+    } }
+  const info = (code, refRepli, marqueRepli, libRepli) => {
+    const f = fi.get(vsCle(code)); if (f) return f;
+    const r = parRef.get(refRepli);
+    return { ref: refRepli || code, marque: r?.marque || marqueRepli || "", des: r?.des || libRepli || "", saison: r?.saison || "", pa: r?.pa || 0 };
+  };
+  const detail = new Map(), totaux = {}; let sansPrix = 0;
+  const ajouter = (nature, x, q) => {
+    if (!(q > 0)) return;
+    if (!x.pa) sansPrix += q;
+    const k = nature + "|" + x.ref;
+    const d = detail.get(k) || { nature, reference: x.ref, marque: x.marque, designation: x.des, saison: x.saison, pieces: 0, valeur: 0 };
+    d.pieces += q; d.valeur += q * x.pa; detail.set(k, d);
+    const t = totaux[nature] || (totaux[nature] = { pieces: 0, valeur: 0 }); t.pieces += q; t.valeur += q * x.pa;
+  };
+  let physiques = 0;
+  // 1. web : FT2 disponible
+  { const t = F.ft2.table;
+    for (const l of t.lignes) { const q = vsNombre(t.get(l, "Qté disponible")); physiques += q;
+      ajouter("WEB", info(t.get(l, "Référence"), null, t.get(l, "Complément 3"), t.get(l, "Libellé")), q); } }
+  // 2. FTK : disponible (zone « Disponible a la vente ») et préparation, par code-barres
+  const dispo = new Map(), prep = new Map(), repli = new Map(); let doublons = 0;
+  { const t = F.ftk.table, vues = new Set();
+    for (const l of t.lignes) {
+      const zone = t.get(l, "Zone"); if (!zone) continue;
+      const empreinte = l.join("\u0001"); if (vues.has(empreinte)) { doublons++; continue; } vues.add(empreinte);
+      const c = vsCle(t.get(l, "Référence"));
+      repli.set(c, [t.get(l, "Complément 2"), t.get(l, "Complément 3"), t.get(l, "Libellé")]);
+      const p = Math.min(vsNombre(t.get(l, "Qté totale")), vsNombre(t.get(l, "Qté réservée")) + vsNombre(t.get(l, "Qté allouée")));
+      prep.set(c, (prep.get(c) || 0) + p); physiques += p;
+      if (zone === "Disponible a la vente") { const q = vsNombre(t.get(l, "Qté disponible")); dispo.set(c, (dispo.get(c) || 0) + q); physiques += q; }
+    } }
+  const infoFtk = c => info(c, ...(repli.get(c) || []));
+  // 3. non livrable restant (bascules déduites), pris sur le disponible puis sur la préparation
+  const nlFichier = lireLignesNLDepuisTable(F.nl.table);
+  const bascules = new Map((await apiTout("/rest/v1/nl_lignes?select=cle,qte_basculee&qte_basculee=gt.0") || []).map(b => [b.cle, Number(b.qte_basculee)]));
+  let nlIntrouvable = 0;
+  for (const r of nlFichier) {
+    let q = Math.max(r.quantite - (bascules.get(r.cle) || 0), 0); const c = vsCle(r.gencod);
+    for (const stock of [dispo, prep]) { const t = Math.min(stock.get(c) || 0, q); if (t > 0) { stock.set(c, stock.get(c) - t); q -= t; ajouter("NON_LIVRABLE", infoFtk(c), t); } }
+    nlIntrouvable += q;
+  }
+  // 4. réceptions FTK : sans date = pas encore arrivé ; datées = prises sur le disponible restant
+  { const t = F.rec_ftk.table, recu = new Map();
+    for (const l of t.lignes) {
+      const c = vsCle(t.get(l, "Code barre article"));
+      if (t.get(l, "Date de réception")) recu.set(c, (recu.get(c) || 0) + vsNombre(t.get(l, "Qté réceptionnée")));
+      else { const q = vsNombre(t.get(l, "Qté commandée")) - vsNombre(t.get(l, "Qté réceptionnée")); if (q > 0) physiques += q;
+        ajouter("TRANSIT_FOURNISSEUR", info(c, t.get(l, "CA2"), t.get(l, "CA3"), t.get(l, "Description article")), q); }
+    }
+    for (const [c, q] of recu) { const pris = Math.min(dispo.get(c) || 0, q); if (pris > 0) { dispo.set(c, dispo.get(c) - pris); ajouter("TRANSIT_RECU", infoFtk(c), pris); } } }
+  // 5. le disponible restant : saisons anciennes → web, le reste → picking ; la préparation restante
+  for (const [c, q] of dispo) { const x = infoFtk(c); ajouter(vsSaisonWeb(x.saison) ? "WEB" : "PICKING", x, q); }
+  for (const [c, q] of prep) ajouter("PREPARATION", infoFtk(c), q);
+  // 6. réceptions FT2 sans date : transferts vers le web pas encore reçus
+  { const t = F.rec_ft2.table;
+    for (const l of t.lignes) if (!t.get(l, "Date de réception")) {
+      const q = vsNombre(t.get(l, "Qté commandée")) - vsNombre(t.get(l, "Qté réceptionnée")); if (q > 0) physiques += q;
+      ajouter("TRANSIT_WEB", info(t.get(l, "Code barre article"), t.get(l, "CA2"), t.get(l, "CA3"), t.get(l, "Description article")), q);
+    } }
+  const dateStock = (F.ftk.table.date || "").match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  return { detail: [...detail.values()], totaux, nlFichier,
+    date_stock: dateStock ? `${dateStock[3]}-${dateStock[2]}-${dateStock[1]}` : null,
+    controles: { pieces_physiques: physiques, pieces_sans_prix: sansPrix, nl_introuvable: nlIntrouvable, lignes_doublons: doublons } };
+}
+
+/* les lignes du fichier des BL non facturables, au format du module Non livrable */
+function lireLignesNLDepuisTable(t) {
+  const rows = [];
+  const date = s => { const m = String(s).match(/^(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : ""; };
+  for (const l of t.lignes) {
+    if (t.get(l, "nature") !== "BL" || t.get(l, "Soldee") === "1" || !/non\s*factur/i.test(t.get(l, "TypeBL"))) continue;
+    const bl = t.get(l, "Piece"); if (!bl) continue;
+    const gencod = t.get(l, "gencod") || t.get(l, "barcode") + "|" + t.get(l, "taille");
+    rows.push({ cle: bl + "|" + gencod, bl, date_bl: date(t.get(l, "Date")), client: t.get(l, "CLIENT"), client_nom: t.get(l, "nomcommercial") || t.get(l, "NomClient"),
+      code_analytique: t.get(l, "CodeAnalytique"), cli_bloque: t.get(l, "CliBloquer") === "1", reference: t.get(l, "barcode"), gencod: t.get(l, "gencod"),
+      designation: t.get(l, "designation"), marque: t.get(l, "marque"), couleur: t.get(l, "couleur"), taille: t.get(l, "taille"), saison: t.get(l, "saison"),
+      famille: t.get(l, "famille"), quantite: vsNombre(t.get(l, "quantite")), prix_ht: vsNombre(t.get(l, "Prix")), pa: vsNombre(t.get(l, "PA_Fiche")) });
+  }
+  return rows;
+}
+
+async function enregistrerDepotVS(btn) {
+  const c = VS.calcul; if (!c) return;
+  const res = document.getElementById("vs-resultat");
+  btn.disabled = true;
+  try {
+    // 1. la photo du non livrable (suivi des bascules)
+    const nl = c.nlFichier;
+    const idPhoto = await api("/rest/v1/rpc/nl_photo_debut", { corps: { p_fichier: VS.fichiers.nl.nom, p_empreinte: null } });
+    for (let i = 0; i < nl.length; i += 1000) await api("/rest/v1/rpc/nl_photo_lot", { corps: { p_photo: idPhoto, p_rows: nl.slice(i, i + 1000) } });
+    await api("/rest/v1/rpc/nl_photo_fin", { corps: { p_photo: idPhoto } });
+    // 2. le dépôt valorisé
+    const fichiers = Object.fromEntries(VS_ROLES.map(([r]) => [r, VS.fichiers[r]?.nom]));
+    const id = await api("/rest/v1/rpc/vs_depot_creer", { corps: { p_date_stock: c.date_stock, p_fichiers: fichiers, p_totaux: c.totaux, p_controles: c.controles } });
+    const lignes = c.detail.map(d => ({ ...d, pieces: Math.round(d.pieces * 1000) / 1000, valeur: Math.round(d.valeur * 100) / 100 }));
+    for (let i = 0; i < lignes.length; i += 2000) {
+      await api("/rest/v1/rpc/vs_detail_lot", { corps: { p_depot: id, p_rows: lignes.slice(i, i + 2000) } });
+      res.lastElementChild.textContent = `Enregistrement… ${Math.min(i + 2000, lignes.length)} / ${lignes.length}`;
+    }
+    await api("/rest/v1/rpc/vs_depot_terminer", { corps: { p_depot: id } });
+    document.getElementById("vs-depot").innerHTML = "";
+    VS.fichiers = {}; VS.calcul = null;
+    await Promise.all([chargerValeurStock(), chargerNonLivrable()]);
+  } catch (e) { res.insertAdjacentHTML("beforeend", `<div><b>Erreur</b> : ${echapperHTML(String(e.donnees?.message || e.message || e))}</div>`); btn.disabled = false; }
 }
 
 async function rendreImportReporting() {
