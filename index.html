@@ -1289,6 +1289,10 @@
   #vue-valeur-stock input[type=search], #vue-valeur-stock input[type=file] { color: #e6e7f4; }
   #vue-valeur-stock .dash-lien { color: #9ec5ff; }
   #vs-depot .vs-panneau { border: 1px solid #3987e5; margin-bottom: 14px; }
+  .nl-alerte { border: 1px solid #c98500; margin-bottom: 14px; }
+  #vue-valeur-stock details.nl-bl { border-top: 1px solid #2a3070; padding: 6px 2px; }
+  #vue-valeur-stock details.nl-bl summary { font-size: 13px; }
+  #vue-valeur-stock details.nl-bl input[type=checkbox] { width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px; }
   .dash-modale.vs-fenetre .boite { background: #1b2050; color: #e6e7f4; }
   .dash-modale.vs-fenetre h4 { color: #fff; } .vs-fenetre .ref, .vs-fenetre .compte-produits { color: #a9acc9; }
   .dash-modale.vs-fenetre table th { color: #a9acc9; border-bottom-color: #2a3070; }
@@ -1946,10 +1950,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792171002"></script>
-<script src="imports.js?v=1792171002"></script>
-<script src="merch-shopify.js?v=1792171002"></script>
-<script src="moteur-merch.js?v=1792171002"></script>
+<script src="config.js?v=1792171543"></script>
+<script src="imports.js?v=1792171543"></script>
+<script src="merch-shopify.js?v=1792171543"></script>
+<script src="moteur-merch.js?v=1792171543"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2530,7 +2534,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792171002";
+    v.src = "hero.mp4?v=1792171543";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -10268,6 +10272,9 @@ function dessinerNonLivrable() {
     <tbody>${rangs.map(a => `<tr><td class="lib">${echapperHTML(a.k)}</td><td class="num">${dashNb(a.refs.size)}</td><td class="num">${dashNb(a.pieces)}</td>
       <td class="num">${eur(a.pa)}</td><td class="num">${eur(a.ht)}</td><td class="num">${a.bascule ? eur(a.bascule) : "—"}</td></tr>`).join("")}</tbody></table></div>`;
   corps.innerHTML = `
+    <div class="dash-section"><h3>BL non livrables — à libérer</h3>
+      <div class="compte-produits">Du plus récent au plus ancien. Cochez un BL entier, ou ouvrez-le pour choisir des lignes.</div>
+      <div id="nl-bls"></div></div>
     ${table("Restant par marque", "Marque", grouper(l => l.marque))}
     ${table("Restant par magasin client", "Client", grouper(l => l.client_nom + (l.cli_bloque ? " · bloqué" : "")))}
     <div class="dash-section"><h3>Restant par référence</h3>
@@ -10279,7 +10286,85 @@ function dessinerNonLivrable() {
       <div id="nl-refs"></div></div>
     <div class="dash-section"><h3>BL libérés</h3><div id="nl-bascules"></div></div>
     <div class="dash-section"><h3>Photos déposées</h3>${photosNL()}</div>`;
-  dessinerRefsNL(); dessinerBasculesNL();
+  dessinerRefsNL(); dessinerBasculesNL(); dessinerBLsNL(); dessinerAlertesNL();
+}
+
+/* La liste des BL non livrables, du numéro le plus élevé au plus bas, à cocher pour les libérer. */
+function dessinerBLsNL() {
+  const zone = document.getElementById("nl-bls"); if (!zone) return;
+  NL.selection = NL.selection || new Set();
+  const parBL = new Map();
+  for (const l of NL.lignes) if (nlReste(l) > 0) (parBL.get(l.bl) || parBL.set(l.bl, []).get(l.bl)).push(l);
+  const bls = [...parBL.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  if (!bls.length) { zone.innerHTML = `<div class="dash-vide">Plus rien à libérer.</div>`; return; }
+  const sel = NL.lignes.filter(l => NL.selection.has(l.cle));
+  const p = sel.reduce((s, l) => s + nlReste(l), 0), v = sel.reduce((s, l) => s + nlReste(l) * l.pa, 0);
+  zone.innerHTML = `<div class="dash-ligne" style="margin:8px 0">
+      <b>${dashNb(sel.length)} lignes sélectionnées · ${dashNb(p)} pièces · ${eur(v)}</b>
+      ${sel.length ? `<button class="vs-bouton" style="margin:0" onclick="libererSelectionNL()">Libérer la sélection</button>
+        <button class="dash-lien" onclick="NL.selection.clear(); dessinerBLsNL()">Tout décocher</button>` : ""}</div>
+    <div style="max-height:420px;overflow:auto">${bls.map(([bl, L]) => {
+      const tout = L.every(l => NL.selection.has(l.cle)), partiel = !tout && L.some(l => NL.selection.has(l.cle));
+      const pp = L.reduce((s, l) => s + nlReste(l), 0), vv = L.reduce((s, l) => s + nlReste(l) * l.pa, 0);
+      return `<details class="nl-bl" data-bl="${echapperHTML(bl)}" ${NL.ouverts?.has(bl) ? "open" : ""}
+          ontoggle="NL.ouverts = NL.ouverts || new Set(); this.open ? NL.ouverts.add(this.dataset.bl) : NL.ouverts.delete(this.dataset.bl)"><summary>
+          <input type="checkbox" ${tout ? "checked" : ""} ${partiel ? 'data-partiel="1"' : ""} onclick="event.stopPropagation(); cocherBLNL('${echapperHTML(bl)}', this.checked)">
+          <b>${echapperHTML(bl)}</b> · ${L[0].date_bl ? new Date(L[0].date_bl + "T12:00:00").toLocaleDateString("fr-FR") : ""} · ${echapperHTML(L[0].client_nom || "")}${L[0].cli_bloque ? " · bloqué" : ""}
+          · ${dashNb(L.length)} lignes · ${dashNb(pp)} p. · <b>${eur(vv)}</b></summary>
+        <table class="tb-table" style="margin:6px 0 10px"><tbody>${L.map(l => `<tr>
+          <td style="width:24px"><input type="checkbox" ${NL.selection.has(l.cle) ? "checked" : ""} onclick="cocherLigneNL('${echapperHTML(l.cle)}', this.checked)"></td>
+          <td>${echapperHTML(l.reference)}</td><td class="lib">${echapperHTML(l.designation || "")}</td><td>${echapperHTML(l.taille || "")}</td>
+          <td class="num">${dashNb(nlReste(l))} p.</td><td class="num">${eur(nlReste(l) * l.pa)}</td></tr>`).join("")}</tbody></table></details>`;
+    }).join("")}</div>`;
+  const defile = zone.querySelector("div[style*='max-height']");
+  if (defile && NL.defile) defile.scrollTop = NL.defile;     // garder la position dans la liste après un clic
+  if (defile) defile.onscroll = () => { NL.defile = defile.scrollTop; };
+  zone.querySelectorAll('input[data-partiel]').forEach(c => c.indeterminate = true);
+}
+function cocherBLNL(bl, oui) {
+  for (const l of NL.lignes) if (l.bl === bl && nlReste(l) > 0) oui ? NL.selection.add(l.cle) : NL.selection.delete(l.cle);
+  dessinerBLsNL();
+}
+function cocherLigneNL(cle, oui) { oui ? NL.selection.add(cle) : NL.selection.delete(cle); dessinerBLsNL(); }
+
+/* Libérer la sélection : même chemin que le fichier filtré (simulation, puis confirmation). */
+async function libererSelectionNL() {
+  const rows = NL.lignes.filter(l => NL.selection.has(l.cle) && nlReste(l) > 0).map(l => ({ cle: l.cle, quantite: nlReste(l) }));
+  if (!rows.length) return;
+  NL.analyse = { fichier: `sélection dans la page (${rows.length} lignes)`, mode: "bascule", rows };
+  const zone = document.getElementById("nl-depot");
+  zone.scrollIntoView({ behavior: "smooth", block: "center" });
+  zone.textContent = "Simulation…";
+  try {
+    const r = await api("/rest/v1/rpc/nl_basculer", { corps: { p_fichier: NL.analyse.fichier, p_rows: rows, p_simuler: true } });
+    zone.innerHTML = `<b>Libération (simulation)</b> : ${dashNb(r.lignes_basculees)} lignes, ${dashNb(r.references)} références,
+      <b>${dashNb(r.pieces)} pièces, ${eur(Number(r.valeur_pa))}</b> au prix d'achat (${eur(Number(r.valeur_ht))} au prix HT des BL).
+      ${r.par_marque?.length ? `<br>Par marque : ${r.par_marque.map(m => `${echapperHTML(m.marque || "—")} ${dashNb(m.pieces)} p. (${eur(Number(m.valeur_pa))})`).join(" · ")}` : ""}
+      ${Number(r.pieces) > 0 ? `<br><button class="btn-noir" style="margin-top:8px" onclick="confirmerBasculeNL(this).then(() => NL.selection.clear())">LIBÉRER ${dashNb(r.pieces)} PIÈCES</button>` : ""}`;
+  } catch (e) { zone.innerHTML = `<b>Erreur</b> : ${echapperHTML(String(e.donnees?.message || e.message || e))}`; }
+}
+
+/* Alertes : un BL libéré encore (ou de nouveau) présent dans l'export Fastmag → à valider. */
+function dessinerAlertesNL() {
+  const zone = document.getElementById("vs-alertes"); if (!zone) return;
+  const A = NL.lignes.filter(l => l.alerte);
+  if (!A.length) { zone.innerHTML = ""; return; }
+  const parBL = new Map();
+  for (const l of A) (parBL.get(l.bl) || parBL.set(l.bl, []).get(l.bl)).push(l);
+  zone.innerHTML = `<div class="vs-panneau nl-alerte"><div class="vs-titre">⚠️ ${dashNb(parBL.size)} BL libéré${parBL.size > 1 ? "s" : ""} à valider</div>
+    <div class="vs-sous">Ces BL ont été libérés mais sont ${A.some(l => l.alerte === "revenu") ? "revenus" : "toujours présents"} dans l'export Fastmag des BL non facturables.
+      Gardez la libération, ou remettez les lignes en non livrable.</div>
+    ${[...parBL.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([bl, L]) => `<div class="dash-ligne" style="margin-top:8px">
+      <b>${echapperHTML(bl)}</b> · ${echapperHTML(L[0].client_nom || "")} · ${dashNb(L.length)} ligne${L.length > 1 ? "s" : ""} ·
+      ${dashNb(L.reduce((s, l) => s + Number(l.qte_basculee), 0))} p. libérées · ${L[0].alerte === "revenu" ? "<b>revenu</b> après avoir disparu" : "toujours présent"}
+      <button class="vs-bouton discret" onclick="validerAlerteNL('${echapperHTML(bl)}', true)">Garder libéré</button>
+      <button class="vs-bouton discret" onclick="validerAlerteNL('${echapperHTML(bl)}', false)">Remettre en non livrable</button></div>`).join("")}</div>`;
+}
+async function validerAlerteNL(bl, garder) {
+  const cles = NL.lignes.filter(l => l.bl === bl && l.alerte).map(l => l.cle);
+  if (!garder && !confirm(`Remettre ${bl} en non livrable ? Ses libérations sont annulées (la trace reste).`)) return;
+  try { await api("/rest/v1/rpc/nl_valider_alerte", { corps: { p_cles: cles, p_garder: garder } }); await chargerNonLivrable(); }
+  catch (e) { alert(String(e.donnees?.message || e.message || e)); }
 }
 
 function dessinerRefsNL() {
@@ -10308,6 +10393,9 @@ function dessinerBasculesNL() {
   const zone = document.getElementById("nl-bascules"); if (!zone) return;
   const B = NL.bascules;
   if (!B.length) { zone.innerHTML = `<div class="dash-vide">Aucun BL libéré pour l'instant.</div>`; return; }
+  // « encore en stock » : calculé au dernier dépôt de la page Valeur du stock (le BL le plus ancien s'écoule d'abord)
+  const dernier = typeof VS !== "undefined" ? VS.depots?.[VS.depots.length - 1] : null;
+  const enStock = dernier?.controles?.liberes ? new Map(dernier.controles.liberes.map(x => [x.cle, Number(x.en_stock)])) : null;
   // regroupées par dépôt (même fichier, même minute)
   const m = new Map();
   for (const b of B) {
@@ -10321,10 +10409,11 @@ function dessinerBasculesNL() {
     return `<details style="margin-top:8px"><summary><b>${new Date(a.le).toLocaleString("fr-FR")}</b> · ${echapperHTML(a.par || "")} ·
         ${dashNb(actives.reduce((s, b) => s + Number(b.quantite), 0))} pièces · ${eur(pa)} · ${echapperHTML(a.fichier || "")}</summary>
       <table class="tb-table" style="margin-top:8px"><thead><tr><th>BL</th><th>Client</th><th>Référence</th><th>Désignation</th><th>Taille</th>
-        <th class="num">Pièces</th><th class="num">Valeur PA</th><th></th></tr></thead>
+        <th class="num">Pièces</th><th class="num">Valeur PA</th>${enStock ? '<th class="num">Encore en stock</th>' : ""}<th></th></tr></thead>
       <tbody>${a.lignes.map(b => `<tr style="${b.annulee_le ? "opacity:.45;text-decoration:line-through" : ""}"><td>${echapperHTML(b.bl)}</td>
         <td>${echapperHTML(b.client_nom || "")}</td><td>${echapperHTML(b.reference)}</td><td class="lib">${echapperHTML(b.designation || "")}</td>
         <td>${echapperHTML(b.taille || "")}</td><td class="num">${dashNb(b.quantite)}</td><td class="num">${eur(b.quantite * b.pa)}</td>
+        ${enStock ? `<td class="num">${b.annulee_le ? "—" : enStock.has(b.cle) ? dashNb(Math.min(enStock.get(b.cle), b.quantite)) : "?"}</td>` : ""}
         <td>${b.annulee_le ? `<span class="sous">annulée</span>` : `<button class="dash-lien" onclick="annulerBasculeNL(${b.id})">Annuler</button>`}</td></tr>`).join("")}</tbody></table></details>`;
   }).join("");
 }
@@ -10524,6 +10613,7 @@ async function rendreValeurStock() {
     <div class="vs-tete"><h1>Valeur du stock</h1>
       <button class="vs-bouton" onclick="ouvrirDepotVS()">＋ Nouveau dépôt</button>
       <button class="vs-bouton discret" onclick="exporterToutVS(this)">⬇ Export Excel complet</button></div>
+    <div id="vs-alertes"></div>
     <div id="vs-depot"></div>
     <div class="vs-grille">
       <aside class="vs-cote"><div class="vs-titre">Dépôts</div><div id="vs-dates"></div></aside>
@@ -10542,6 +10632,7 @@ async function rendreValeurStock() {
       <div id="nl-corps"></div>
     </div></div>`;
   await Promise.all([chargerValeurStock(), chargerNonLivrable()]);
+  dessinerBasculesNL();     // la colonne « encore en stock » a besoin du dernier dépôt
 }
 
 async function chargerValeurStock(id) {
@@ -10948,7 +11039,16 @@ async function calculValeurStock() {
     for (const stock of [dispo, prep]) { const t = Math.min(stock.get(c) || 0, q); if (t > 0) { stock.set(c, stock.get(c) - t); q -= t; ajouter(nature, infoFtk(c), t); } }
     return q;   // ce qui n'a pas été trouvé dans FTK
   };
-  for (const [c, q] of libereParCode) libereEcoule += prendre("BL_LIBERE", c, q);
+  const enStockParCode = new Map();
+  for (const [c, q] of libereParCode) { const manque = prendre("BL_LIBERE", c, q); libereEcoule += manque; enStockParCode.set(c, q - manque); }
+  // ligne par ligne : le BL au numéro le plus bas s'écoule en premier, les plus récents gardent le stock
+  const liberes = [];
+  { const parCode = new Map();
+    for (const [cle, q] of libereParCle) { const c = vsCle(String(cle).split("|").slice(1).join("|")); (parCode.get(c) || parCode.set(c, []).get(c)).push({ cle, libere: q }); }
+    for (const [c, L] of parCode) {
+      let reste = enStockParCode.get(c) || 0;
+      for (const x of L.sort((a, b) => b.cle.localeCompare(a.cle))) { const e = Math.min(reste, x.libere); reste -= e; liberes.push({ ...x, en_stock: e }); }
+    } }
   // non livrable : les lignes du BL encore en cours, moins ce qui a été libéré
   for (const r of nlFichier) nlIntrouvable += prendre("NON_LIVRABLE", vsCle(r.gencod), Math.max(r.quantite - (libereParCle.get(r.cle) || 0), 0));
   // 4. réceptions FTK : sans date = pas encore arrivé ; datées = prises sur le disponible restant
@@ -10967,7 +11067,7 @@ async function calculValeurStock() {
   return { detail: [...detail.values()], totaux, nlFichier,
     date_stock: dateStock ? `${dateStock[3]}-${dateStock[2]}-${dateStock[1]}` : null,
     controles: { pieces_physiques: physiques, pieces_sans_prix: sansPrix, nl_introuvable: nlIntrouvable, lignes_doublons: doublons,
-                 libere_total: [...libereParCode.values()].reduce((a, b) => a + b, 0), libere_ecoule: libereEcoule } };
+                 libere_total: [...libereParCode.values()].reduce((a, b) => a + b, 0), libere_ecoule: libereEcoule, liberes } };
 }
 
 /* les lignes du fichier des BL non facturables, au format du module Non livrable */
