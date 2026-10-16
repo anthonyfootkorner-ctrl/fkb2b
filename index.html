@@ -1946,10 +1946,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792169936"></script>
-<script src="imports.js?v=1792169936"></script>
-<script src="merch-shopify.js?v=1792169936"></script>
-<script src="moteur-merch.js?v=1792169936"></script>
+<script src="config.js?v=1792170167"></script>
+<script src="imports.js?v=1792170167"></script>
+<script src="merch-shopify.js?v=1792170167"></script>
+<script src="moteur-merch.js?v=1792170167"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2530,7 +2530,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792169936";
+    v.src = "hero.mp4?v=1792170167";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -10466,8 +10466,8 @@ function exporterNonLivrable() {
    - Préparation = FTK réservé + alloué (portefeuille exclu, plafonné au total de la ligne).
    - Non livrable = BL non facturables restants (moins les bascules), pris sur le disponible FTK puis la préparation ;
      ce qui n'existe pas dans FTK n'est pas compté (c'est un reclassement, le total ne bouge pas).
-   - Transit = réceptions FTK sans date (pas encore arrivées) + réceptions FTK datées prises sur le disponible restant
-     + réceptions FT2 sans date (transferts vers le web).
+   - Transit = réceptions FTK sans date (pas encore arrivées) + réceptions FTK datées prises sur le disponible restant.
+     Les réceptions FT2 (transferts FTK → web) ne sont PAS comptées : ces pièces sont déjà en préparation dans FTK.
    - Picking = le disponible FTK restant, saisons 26 et suivantes. Valeurs au prix d'achat des fiches produits. */
 const VS_NATURES = [
   ["WEB", "Stock web", "#3987e5"],
@@ -10476,13 +10476,12 @@ const VS_NATURES = [
   ["NON_LIVRABLE", "Non livrable", "#c98500"],
   ["TRANSIT", "Stock en transit", "#d55181"],
 ];
-const VS_SOUS_TRANSIT = { TRANSIT_FOURNISSEUR: "réceptions fournisseur pas encore arrivées", TRANSIT_RECU: "reçu, pas encore rangé", TRANSIT_WEB: "transferts vers le web non reçus" };
+const VS_SOUS_TRANSIT = { TRANSIT_FOURNISSEUR: "réceptions fournisseur pas encore arrivées", TRANSIT_RECU: "reçu, pas encore rangé" };
 const vsNature = n => n.startsWith("TRANSIT") ? "TRANSIT" : n;
 const VS_ROLES = [
   ["ftk", "Stock FTK (WMS)", "FTK_StocksDetail"],
   ["ft2", "Stock FT2 — web (WMS)", "FT2_StocksDetail"],
   ["rec_ftk", "Réceptions FTK (WMS)", "FTK_ReceptionsDetail"],
-  ["rec_ft2", "Réceptions FT2 (WMS)", "FT2_ReceptionsDetail"],
   ["nl", "BL « Réservation non facturable » (Fastmag)", "fastmag - <date>.xls"],
   ["fiches", "Fiches produits (Fastmag)", "fastmag (n).csv"],
 ];
@@ -10734,7 +10733,7 @@ function ouvrirDepotVS() {
   VS.fichiers = {}; VS.calcul = null;
   document.getElementById("vs-depot").innerHTML = `<div class="vs-panneau">
     <div class="vs-titre">Nouveau dépôt</div>
-    <div class="vs-sous">Sélectionnez les six exports du jour (vous pouvez les choisir tous d'un coup, ou en plusieurs fois) :
+    <div class="vs-sous">Sélectionnez les cinq exports du jour (vous pouvez les choisir tous d'un coup, ou en plusieurs fois) :
       chacun est reconnu à son contenu et rangé à sa place.</div>
     <div class="dash-ligne" style="margin-top:10px">
       <input type="file" id="vs-fichiers" multiple onchange="ajouterFichiersVS(this.files)">
@@ -10792,6 +10791,7 @@ async function ajouterFichiersVS(liste) {
     } else if (a("Reference_Article") && a("Gencod") && a("Prix_achat") && a("Saison")) {
       role = "fiches"; info = `${dashNb(t.lignes.length)} fiches`;
     }
+    if (role === "rec_ft2") { alert(`${fichier.name} : les réceptions FT2 ne sont pas utilisées (ces pièces sont déjà en préparation dans FTK).`); continue; }
     if (!role) { alert(`${fichier.name} : fichier non reconnu.`); continue; }
     VS.fichiers[role] = { nom: fichier.name, table: t, fichier, info, erreur };
   }
@@ -10891,12 +10891,6 @@ async function calculValeurStock() {
   // 5. le disponible restant : saisons anciennes → web, le reste → picking ; la préparation restante
   for (const [c, q] of dispo) { const x = infoFtk(c); ajouter(vsSaisonWeb(x.saison) ? "WEB" : "PICKING", x, q); }
   for (const [c, q] of prep) ajouter("PREPARATION", infoFtk(c), q);
-  // 6. réceptions FT2 sans date : transferts vers le web pas encore reçus
-  { const t = F.rec_ft2.table;
-    for (const l of t.lignes) if (!t.get(l, "Date de réception")) {
-      const q = vsNombre(t.get(l, "Qté commandée")) - vsNombre(t.get(l, "Qté réceptionnée")); if (q > 0) physiques += q;
-      ajouter("TRANSIT_WEB", info(t.get(l, "Code barre article"), t.get(l, "CA2"), t.get(l, "CA3"), t.get(l, "Description article")), q);
-    } }
   const dateStock = (F.ftk.table.date || "").match(/^(\d{2})\/(\d{2})\/(\d{4})/);
   return { detail: [...detail.values()], totaux, nlFichier,
     date_stock: dateStock ? `${dateStock[3]}-${dateStock[2]}-${dateStock[1]}` : null,
