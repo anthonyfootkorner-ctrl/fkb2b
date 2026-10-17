@@ -1289,6 +1289,7 @@
   #vue-valeur-stock input[type=search], #vue-valeur-stock input[type=file] { color: #e6e7f4; }
   #vue-valeur-stock .dash-lien { color: #9ec5ff; }
   #vs-depot .vs-panneau { border: 1px solid #3987e5; margin-bottom: 14px; }
+  #vue-valeur-stock.lecture-seule .vs-gerer { display: none !important; }
   .nl-alerte { border: 1px solid #c98500; margin-bottom: 14px; }
   #vue-valeur-stock details.nl-bl { border-top: 1px solid #2a3070; padding: 6px 2px; }
   #vue-valeur-stock details.nl-bl summary { font-size: 13px; }
@@ -1950,10 +1951,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792174008"></script>
-<script src="imports.js?v=1792174008"></script>
-<script src="merch-shopify.js?v=1792174008"></script>
-<script src="moteur-merch.js?v=1792174008"></script>
+<script src="config.js?v=1792230223"></script>
+<script src="imports.js?v=1792230223"></script>
+<script src="merch-shopify.js?v=1792230223"></script>
+<script src="moteur-merch.js?v=1792230223"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2118,6 +2119,7 @@ async function init() {
   chargerMesCampagnes();
   activerLienDashboard();
   activerLienHebdo();
+  activerLienValeurStock();
 
   document.getElementById("recherche").oninput = e => { texteRecherche = e.target.value.trim().toLowerCase(); rendreCollection(); };
   document.getElementById("btn-panier").onclick = () => basculer("panier", true);
@@ -2534,7 +2536,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792174008";
+    v.src = "hero.mp4?v=1792230223";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -5169,12 +5171,14 @@ async function rendreUtilisateurs() {
   // référentiel sociétés pour la saisie (l'admin les voit toutes)
   initialiserExclusions();
 
-  const [liste, magasinsDash, accesDash, accesRep] = await Promise.all([
+  const [liste, magasinsDash, accesDash, accesRep, accesVS] = await Promise.all([
     api("/rest/v1/rpc/admin_utilisateurs", { corps: {} }),
     api("/rest/v1/magasins?select=code,nom,groupe,ordre&actif=eq.true&order=ordre,nom").catch(() => []),
     api("/rest/v1/rpc/dash_acces_liste", { corps: {} }).catch(() => []),
     api("/rest/v1/rpc/reporting_acces_liste", { corps: {} }).catch(() => ({})),
+    api("/rest/v1/rpc/vs_acces_liste", { corps: {} }).catch(() => ({})),
   ]);
+  VS_ACCES = accesVS || {};
   DASH_MAGASINS_REF = magasinsDash || [];
   DASH_ACCES = Object.fromEntries((accesDash || []).map(a => [a.user_id, a.magasins || []]));
   REPORTING_ACCES = accesRep || {};
@@ -5206,6 +5210,7 @@ async function rendreUtilisateurs() {
         <div class="chips" id="edit-${u.user_id}">${chipsHTML(u.societes.map(s => s.compte), true, `retirerAcces_${u.user_id.replaceAll("-", "_")}`)}</div>` : ""}
         ${u.role !== "admin" ? blocAccesDashboard(u) : `<div class="compte-produits" style="margin-top:8px">Dashboard magasins : tous les magasins (administrateur).</div>`}
         ${u.role !== "admin" ? blocAccesReporting(u) : `<div class="compte-produits">Reporting hebdomadaire : enseigne et succursales (administrateur).</div>`}
+        ${blocAccesValeurStock(u)}
       </div>
     </div>`).join("");
 
@@ -9700,6 +9705,33 @@ async function enregistrerAccesReporting(userId) {
   }
 }
 
+/* Valeur du stock : admin et admin commercial y ont accès par leur rôle ; les autres compte par compte. */
+let VS_ACCES = {};
+function blocAccesValeurStock(u) {
+  if (["admin", "admin_commercial"].includes(u.role))
+    return `<div class="compte-produits">Valeur du stock : consulter et gérer (${u.role === "admin" ? "administrateur" : "admin commercial"}).</div>`;
+  const n = VS_ACCES[u.user_id] || "";
+  return `<div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--hairline)">
+    <div class="compte-produits" style="margin:0 0 6px">Valeur du stock</div>
+    <div class="formu">
+      <select onchange="enregistrerAccesValeurStock('${u.user_id}', this.value)">
+        <option value=""${!n ? " selected" : ""}>Pas d'accès</option>
+        <option value="consulter"${n === "consulter" ? " selected" : ""}>Consulter (voir, exporter)</option>
+        <option value="gerer"${n === "gerer" ? " selected" : ""}>Gérer (dépôts, libérations, alertes)</option>
+      </select>
+      <span class="compte-produits" id="vs-etat-${u.user_id}"></span>
+    </div></div>`;
+}
+async function enregistrerAccesValeurStock(userId, niveau) {
+  const etat = document.getElementById(`vs-etat-${userId}`);
+  etat.textContent = "enregistrement…";
+  try {
+    await api("/rest/v1/rpc/vs_acces_definir", { corps: { p_user: userId, p_niveau: niveau } });
+    VS_ACCES[userId] = niveau;
+    etat.textContent = niveau ? `accès « ${niveau === "gerer" ? "gérer" : "consulter"} » enregistré ✓` : "accès retiré ✓";
+  } catch (e) { etat.textContent = "échec : " + String(e.donnees?.message || e.message).slice(0, 120); }
+}
+
 function blocAccesDashboard(u) {
   const codes = DASH_ACCES[u.user_id] || [];
   const id = u.user_id.replaceAll("-", "_");
@@ -10050,6 +10082,19 @@ async function telechargerHebdo(chemin) {
   } catch (e) { alert("Téléchargement impossible : " + (e.donnees?.message || e.message)); }
 }
 
+// Valeur du stock : rôle admin / admin commercial, ou accès nominatif (consulter / gérer)
+async function activerLienValeurStock() {
+  try {
+    const niveau = await api("/rest/v1/rpc/vs_mon_niveau", { corps: {} });
+    if (niveau) {
+      document.getElementById("lien-dashboard").style.display = "";
+      document.getElementById("lien-valeur-stock").style.display = "";
+      if (!document.querySelector(".lien-dash-magasins:not([style*='none'])") && document.getElementById("lien-hebdo").style.display === "none")
+        document.getElementById("lien-dashboard-tete").href = "#/valeur-stock";
+    }
+  } catch (e) { /* pas d'accès */ }
+}
+
 async function activerLienHebdo() {
   try {
     const acces = await api("/rest/v1/rpc/reporting_mes_acces", { corps: {} });
@@ -10300,7 +10345,7 @@ function dessinerBLsNL() {
   if (!bls.length) { zone.innerHTML = `<div class="dash-vide">Plus rien à libérer.</div>`; return; }
   const sel = NL.lignes.filter(l => NL.selection.has(l.cle));
   const p = sel.reduce((s, l) => s + nlReste(l), 0), v = sel.reduce((s, l) => s + nlReste(l) * l.pa, 0);
-  zone.innerHTML = `<div class="dash-ligne" style="margin:8px 0">
+  zone.innerHTML = `<div class="dash-ligne vs-gerer" style="margin:8px 0">
       <b>${dashNb(sel.length)} lignes sélectionnées · ${dashNb(p)} pièces · ${eur(v)}</b>
       ${sel.length ? `<button class="vs-bouton" style="margin:0" onclick="libererSelectionNL()">Libérer la sélection</button>
         <button class="dash-lien" onclick="NL.selection.clear(); dessinerBLsNL()">Tout décocher</button>` : ""}</div>
@@ -10309,11 +10354,11 @@ function dessinerBLsNL() {
       const pp = L.reduce((s, l) => s + nlReste(l), 0), vv = L.reduce((s, l) => s + nlReste(l) * l.pa, 0);
       return `<details class="nl-bl" data-bl="${echapperHTML(bl)}" ${NL.ouverts?.has(bl) ? "open" : ""}
           ontoggle="NL.ouverts = NL.ouverts || new Set(); this.open ? NL.ouverts.add(this.dataset.bl) : NL.ouverts.delete(this.dataset.bl)"><summary>
-          <input type="checkbox" ${tout ? "checked" : ""} ${partiel ? 'data-partiel="1"' : ""} onclick="event.stopPropagation(); cocherBLNL('${echapperHTML(bl)}', this.checked)">
+          <input type="checkbox" class="vs-gerer" ${tout ? "checked" : ""} ${partiel ? 'data-partiel="1"' : ""} onclick="event.stopPropagation(); cocherBLNL('${echapperHTML(bl)}', this.checked)">
           <b>${echapperHTML(bl)}</b> · ${L[0].date_bl ? new Date(L[0].date_bl + "T12:00:00").toLocaleDateString("fr-FR") : ""} · ${echapperHTML(L[0].client_nom || "")}${L[0].cli_bloque ? " · bloqué" : ""}
           · ${dashNb(L.length)} lignes · ${dashNb(pp)} p. · <b>${eur(vv)}</b></summary>
         <table class="tb-table" style="margin:6px 0 10px"><tbody>${L.map(l => `<tr>
-          <td style="width:24px"><input type="checkbox" ${NL.selection.has(l.cle) ? "checked" : ""} onclick="cocherLigneNL('${echapperHTML(l.cle)}', this.checked)"></td>
+          <td style="width:24px"><input type="checkbox" class="vs-gerer" ${NL.selection.has(l.cle) ? "checked" : ""} onclick="cocherLigneNL('${echapperHTML(l.cle)}', this.checked)"></td>
           <td>${echapperHTML(l.reference)}</td><td class="lib">${echapperHTML(l.designation || "")}</td><td>${echapperHTML(l.taille || "")}</td>
           <td class="num">${dashNb(nlReste(l))} p.</td><td class="num">${eur(nlReste(l) * l.pa)}</td></tr>`).join("")}</tbody></table></details>`;
     }).join("")}</div>`;
@@ -10358,8 +10403,8 @@ function dessinerAlertesNL() {
     ${[...parBL.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([bl, L]) => `<div class="dash-ligne" style="margin-top:8px">
       <b>${echapperHTML(bl)}</b> · ${echapperHTML(L[0].client_nom || "")} · ${dashNb(L.length)} ligne${L.length > 1 ? "s" : ""} ·
       ${dashNb(L.reduce((s, l) => s + Number(l.qte_basculee), 0))} p. libérées · ${L[0].alerte === "revenu" ? "<b>revenu</b> après avoir disparu" : "toujours présent"}
-      <button class="vs-bouton discret" onclick="validerAlerteNL('${echapperHTML(bl)}', true)">Garder libéré</button>
-      <button class="vs-bouton discret" onclick="validerAlerteNL('${echapperHTML(bl)}', false)">Remettre en non livrable</button></div>`).join("")}</div>`;
+      <button class="vs-bouton discret vs-gerer" onclick="validerAlerteNL('${echapperHTML(bl)}', true)">Garder libéré</button>
+      <button class="vs-bouton discret vs-gerer" onclick="validerAlerteNL('${echapperHTML(bl)}', false)">Remettre en non livrable</button></div>`).join("")}</div>`;
 }
 async function validerAlerteNL(bl, garder) {
   const cles = NL.lignes.filter(l => l.bl === bl && l.alerte).map(l => l.cle);
@@ -10415,7 +10460,7 @@ function dessinerBasculesNL() {
         <td>${echapperHTML(b.client_nom || "")}</td><td>${echapperHTML(b.reference)}</td><td class="lib">${echapperHTML(b.designation || "")}</td>
         <td>${echapperHTML(b.taille || "")}</td><td class="num">${dashNb(b.quantite)}</td><td class="num">${eur(b.quantite * b.pa)}</td>
         ${enStock ? `<td class="num">${b.annulee_le ? "—" : enStock.has(b.cle) ? dashNb(Math.min(enStock.get(b.cle), b.quantite)) : "?"}</td>` : ""}
-        <td>${b.annulee_le ? `<span class="sous">annulée</span>` : `<button class="dash-lien" onclick="annulerBasculeNL(${b.id})">Annuler</button>`}</td></tr>`).join("")}</tbody></table></details>`;
+        <td>${b.annulee_le ? `<span class="sous">annulée</span>` : `<button class="dash-lien vs-gerer" onclick="annulerBasculeNL(${b.id})">Annuler</button>`}</td></tr>`).join("")}</tbody></table></details>`;
   }).join("");
 }
 
@@ -10606,13 +10651,15 @@ const vsK = v => { const a = Math.abs(v);
 
 async function rendreValeurStock() {
   const vue = document.getElementById("vue-valeur-stock");
-  if (!(estAdmin || MON_ROLE === "admin_commercial")) {
+  VS.niveau = await api("/rest/v1/rpc/vs_mon_niveau", { corps: {} }).catch(() => null);
+  vue.classList.toggle("lecture-seule", VS.niveau !== "gerer");
+  if (!VS.niveau) {
     vue.innerHTML = `<div class="col-tete"><h1>VALEUR DU STOCK</h1><div class="compte-produits">Réservé à l'administration.</div></div>`;
     return;
   }
   vue.innerHTML = `<div class="vs-sombre">
     <div class="vs-tete"><h1>Valeur du stock</h1>
-      <button class="vs-bouton" onclick="ouvrirDepotVS()">＋ Nouveau dépôt</button>
+      <button class="vs-bouton vs-gerer" onclick="ouvrirDepotVS()">＋ Nouveau dépôt</button>
       <button class="vs-bouton discret" onclick="exporterToutVS(this)">⬇ Export Excel complet</button></div>
     <div id="vs-alertes"></div>
     <div id="vs-depot"></div>
@@ -10625,7 +10672,7 @@ async function rendreValeurStock() {
       <div class="vs-titre">Non livrable — BL libérés</div>
       <div class="vs-sous">Pour garder des références, déposez l'export des BL non facturables filtré sur les lignes à garder :
         elles deviennent du stock « BL libéré » (pris en compte au prochain dépôt) et la libération reste tracée.</div>
-      <div class="dash-ligne" style="margin-top:10px">
+      <div class="dash-ligne vs-gerer" style="margin-top:10px">
         <input type="file" id="nl-fichier" accept=".xls,.csv,.txt">
         <button class="vs-bouton discret" onclick="analyserFichierNL('bascule')">Lignes à libérer</button>
       </div>
