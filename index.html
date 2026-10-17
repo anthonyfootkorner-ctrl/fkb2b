@@ -1953,10 +1953,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792231093"></script>
-<script src="imports.js?v=1792231093"></script>
-<script src="merch-shopify.js?v=1792231093"></script>
-<script src="moteur-merch.js?v=1792231093"></script>
+<script src="config.js?v=1792231211"></script>
+<script src="imports.js?v=1792231211"></script>
+<script src="merch-shopify.js?v=1792231211"></script>
+<script src="moteur-merch.js?v=1792231211"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2538,7 +2538,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792231093";
+    v.src = "hero.mp4?v=1792231211";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -10606,7 +10606,8 @@ function exporterNonLivrable() {
    - Préparation = FTK réservé + alloué (portefeuille exclu, plafonné au total de la ligne).
    - Non livrable = BL non facturables restants (moins les bascules), pris sur le disponible FTK puis la préparation ;
      ce qui n'existe pas dans FTK n'est pas compté (c'est un reclassement, le total ne bouge pas).
-   - Transit = réceptions FTK sans date (pas encore arrivées) + réceptions FTK datées prises sur le disponible restant.
+   - Transit = réceptions FTK sans date (pas encore arrivées) + réceptions FTK reçues dans les 7 jours avant la date
+     du stock, prises sur le disponible restant (au-delà, la marchandise est rangée : elle reste en picking).
      Les réceptions FT2 (transferts FTK → web) ne sont PAS comptées : ces pièces sont déjà en préparation dans FTK.
    - BL libéré = les lignes de non livrable libérées (registre nl_bascules, même si le BL est ensuite annulé dans Fastmag),
      suivies à part du picking. Le stock déjà présent se vend d'abord : le libéré ne baisse que quand le stock du
@@ -10620,7 +10621,8 @@ const VS_NATURES = [
   ["NON_LIVRABLE", "Non livrable", "#b04a12"],
   ["TRANSIT", "Stock en transit", "#5f5f5f"],
 ];
-const VS_SOUS_TRANSIT = { TRANSIT_FOURNISSEUR: "réceptions fournisseur pas encore arrivées", TRANSIT_RECU: "reçu, pas encore rangé" };
+const VS_JOURS_TRANSIT = 7;   // une réception compte en transit pendant 7 jours après sa date de réception
+const VS_SOUS_TRANSIT = { TRANSIT_FOURNISSEUR: "réceptions fournisseur pas encore arrivées", TRANSIT_RECU: "reçu depuis moins de 7 jours" };
 const vsNature = n => n.startsWith("TRANSIT") ? "TRANSIT" : n;
 const VS_ROLES = [
   ["ftk", "Stock FTK (WMS)", "FTK_StocksDetail"],
@@ -11185,11 +11187,19 @@ async function calculValeurStock() {
     } }
   // non livrable : les lignes du BL encore en cours, moins ce qui a été libéré
   for (const r of nlFichier) nlIntrouvable += prendre("NON_LIVRABLE", vsCle(r.gencod), Math.max(r.quantite - (libereParCle.get(r.cle) || 0), 0));
-  // 4. réceptions FTK : sans date = pas encore arrivé ; datées = prises sur le disponible restant
+  // 4. réceptions FTK : sans date = pas encore arrivé ; reçues depuis moins de VS_JOURS_TRANSIT jours = prises sur le
+  //    disponible restant ; plus anciennes = rangées, elles restent dans le picking
+  const jourStock = (() => { const m = String(F.ftk.table.date || "").match(/^(\d{2})\/(\d{2})\/(\d{4})/); return m ? new Date(`${m[3]}-${m[2]}-${m[1]}T23:59:59`) : new Date(); })();
+  const limiteRecu = new Date(jourStock - VS_JOURS_TRANSIT * 864e5);
+  let recuesAnciennes = 0;
   { const t = F.rec_ftk.table, recu = new Map();
     for (const l of t.lignes) {
-      const c = vsCle(t.get(l, "Code barre article"));
-      if (t.get(l, "Date de réception")) recu.set(c, (recu.get(c) || 0) + vsNombre(t.get(l, "Qté réceptionnée")));
+      const c = vsCle(t.get(l, "Code barre article")), dr = t.get(l, "Date de réception");
+      if (dr) {
+        const m = dr.match(/^(\d{2})\/(\d{2})\/(\d{4})/), quand = m ? new Date(`${m[3]}-${m[2]}-${m[1]}T12:00:00`) : null;
+        if (quand && quand < limiteRecu) { recuesAnciennes += vsNombre(t.get(l, "Qté réceptionnée")); continue; }
+        recu.set(c, (recu.get(c) || 0) + vsNombre(t.get(l, "Qté réceptionnée")));
+      }
       else { const q = vsNombre(t.get(l, "Qté commandée")) - vsNombre(t.get(l, "Qté réceptionnée")); if (q > 0) physiques += q;
         ajouter("TRANSIT_FOURNISSEUR", info(c, t.get(l, "CA2"), t.get(l, "CA3"), t.get(l, "Description article")), q); }
     }
@@ -11201,7 +11211,8 @@ async function calculValeurStock() {
   return { detail: [...detail.values()], totaux, nlFichier,
     date_stock: dateStock ? `${dateStock[3]}-${dateStock[2]}-${dateStock[1]}` : null,
     controles: { pieces_physiques: physiques, pieces_sans_prix: sansPrix, nl_introuvable: nlIntrouvable, lignes_doublons: doublons,
-                 libere_total: [...libereParCode.values()].reduce((a, b) => a + b, 0), libere_ecoule: libereEcoule, liberes } };
+                 libere_total: [...libereParCode.values()].reduce((a, b) => a + b, 0), libere_ecoule: libereEcoule, liberes,
+                 receptions_anciennes: recuesAnciennes, jours_transit: VS_JOURS_TRANSIT } };
 }
 
 /* les lignes du fichier des BL non facturables, au format du module Non livrable */
