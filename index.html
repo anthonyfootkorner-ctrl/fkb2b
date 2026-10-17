@@ -1224,84 +1224,86 @@
                text-underline-offset: 2px; }
   .dash-lien:hover { color: var(--accent); }
   /* ---- Valeur du stock : tableau de bord sombre ---- */
-  #vue-valeur-stock { background: #141834; color: #fff; min-height: 100vh; }
+  #vue-valeur-stock { background: #0e0e0e; color: #fff; min-height: 100vh; }
   .vs-sombre { padding: 20px 22px 48px; max-width: 1400px; margin: 0 auto; }
   .vs-tete { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
-  .vs-tete h1 { margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -.01em; color: #fff; }
-  .vs-bouton { margin-left: auto; background: #3987e5; color: #fff; border: 0; border-radius: 10px; padding: 10px 16px; font: inherit; font-weight: 700; cursor: pointer; }
-  .vs-bouton.discret { margin-left: 0; background: #2a3070; font-weight: 600; padding: 8px 12px; }
+  .vs-tete h1 { margin: 0; font-size: 30px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; color: #fff; }
+  .vs-bouton { margin-left: auto; background: #f2751f; color: #fff; border: 0; border-radius: 10px; padding: 10px 16px; font: inherit; font-weight: 700; cursor: pointer; }
+  .vs-bouton.discret { margin-left: 0; background: #2b2b2b; font-weight: 600; padding: 8px 12px; }
   .vs-grille { display: grid; grid-template-columns: 170px 1fr; gap: 16px; align-items: start; }
-  .vs-cote { background: #1b2050; border-radius: 16px; padding: 12px; position: sticky; top: 12px; }
-  .vs-date { display: flex; justify-content: space-between; align-items: baseline; width: 100%; background: transparent; color: #d6d8ee; border: 0; border-radius: 8px; padding: 7px 8px; font: inherit; cursor: pointer; text-align: left; }
-  .vs-date small { color: #8f93b8; font-size: 11px; }
-  .vs-date:hover, .vs-date.on { background: #2a3070; color: #fff; }
+  .vs-cote { background: #181818; border-radius: 16px; padding: 12px; position: sticky; top: 12px; }
+  .vs-date { display: flex; justify-content: space-between; align-items: baseline; width: 100%; background: transparent; color: #e4e4e4; border: 0; border-radius: 8px; padding: 7px 8px; font: inherit; cursor: pointer; text-align: left; }
+  .vs-date small { color: #8c8c8c; font-size: 11px; }
+  .vs-date:hover, .vs-date.on { background: #2b2b2b; color: #fff; }
   .vs-titre { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
-  .vs-sous { font-size: 12.5px; color: #a9acc9; }
-  .vs-vide { padding: 30px; text-align: center; color: #a9acc9; background: #1b2050; border-radius: 16px; }
-  .vs-cartes { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
-  @media (max-width: 1400px) { .vs-cartes { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-  @media (max-width: 640px) { .vs-cartes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  .vs-carte { display: flex; align-items: center; gap: 12px; background: #1d2250; border: 0; border-radius: 16px; padding: 14px; color: #fff; font: inherit; text-align: left; cursor: pointer; transition: background .15s, transform .15s; }
-  .vs-carte:hover { background: #262c66; transform: translateY(-1px); }
-  .vs-ic { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; }
-  .vs-ic svg { width: 24px; height: 24px; }
+  .vs-sous { font-size: 12.5px; color: #a3a3a3; }
+  .vs-vide { padding: 30px; text-align: center; color: #a3a3a3; background: #181818; border-radius: 16px; }
+  .vs-cartes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .vs-cartes-total { grid-template-columns: 1fr; margin-bottom: 12px; }
+  .vs-cartes-total .vs-carte { padding: 20px 24px; border: 1px solid #f2751f55; }
+  .vs-cartes-total .vs-carte-txt b { font-size: 40px; }
+  @media (max-width: 760px) { .vs-cartes { grid-template-columns: 1fr; } }
+  .vs-carte { display: flex; align-items: center; gap: 16px; background: #1c1c1c; border: 1px solid #262626; border-radius: 16px; padding: 18px 20px; color: #fff; font: inherit; text-align: left; cursor: pointer; transition: background .15s, transform .15s; }
+  .vs-carte:hover { background: #242424; border-color: #f2751f; transform: translateY(-1px); }
+  .vs-ic { flex: 0 0 auto; width: 56px; height: 56px; border-radius: 14px; display: grid; place-items: center; }
+  .vs-ic svg { width: 28px; height: 28px; }
   .vs-carte-txt { display: flex; flex-direction: column; min-width: 0; }
-  .vs-carte-txt b { font-size: 22px; font-weight: 800; line-height: 1.1; }
-  .vs-carte-txt span { font-size: 12.5px; color: #d6d8ee; }
-  .vs-carte-txt small { font-size: 11.5px; color: #8f93b8; white-space: nowrap; }
+  .vs-carte-txt b { font-size: 30px; font-weight: 800; line-height: 1.1; }
+  .vs-carte-txt span { font-size: 14px; color: #e4e4e4; }
+  .vs-carte-txt small { font-size: 12.5px; color: #8c8c8c; white-space: nowrap; }
   .vs-carte-txt span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .vs-carte-txt em, .vs-ligne em { font-style: normal; font-weight: 700; margin-left: 4px; }
   em.hausse { color: #5ad48a; } em.baisse { color: #ff8a73; }
   .vs-deux { display: grid; grid-template-columns: 1.7fr 1fr; gap: 14px; margin-top: 14px; }
   .vs-colonne { display: flex; flex-direction: column; gap: 14px; }
-  .vs-panneau { background: #1b2050; border-radius: 18px; padding: 16px 18px; }
+  .vs-panneau { background: #181818; border-radius: 18px; padding: 16px 18px; }
   .vs-svg { width: 100%; height: auto; display: block; }
   .vs-barre { cursor: pointer; } .vs-barre:hover rect { filter: brightness(1.12); }
   .vs-barre:not(.on) rect { opacity: .78; }
-  .vs-legende { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: #d6d8ee; margin-top: 6px; }
+  .vs-legende { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: #e4e4e4; margin-top: 6px; }
   .vs-legende i, .vs-ligne i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
   .vs-repart { display: flex; gap: 2px; height: 14px; border-radius: 999px; overflow: hidden; margin: 6px 0 10px; }
-  .vs-ligne { display: grid; grid-template-columns: 16px 1fr auto 44px; align-items: center; gap: 6px; width: 100%; background: transparent; border: 0; color: #d6d8ee; font: inherit; font-size: 13px; padding: 6px 4px; border-radius: 8px; cursor: pointer; text-align: left; }
-  .vs-ligne:hover { background: #262c66; }
-  .vs-ligne b { color: #fff; } .vs-ligne small { color: #8f93b8; text-align: right; }
+  .vs-ligne { display: grid; grid-template-columns: 16px 1fr auto 44px; align-items: center; gap: 6px; width: 100%; background: transparent; border: 0; color: #e4e4e4; font: inherit; font-size: 13px; padding: 6px 4px; border-radius: 8px; cursor: pointer; text-align: left; }
+  .vs-ligne:hover { background: #2a2a2a; }
+  .vs-ligne b { color: #fff; } .vs-ligne small { color: #8c8c8c; text-align: right; }
   .vs-gros { font-size: 30px; font-weight: 800; }
   .vs-puces { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
-  .vs-puce { background: #252b63; color: #d6d8ee; border: 0; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 12px; cursor: pointer; }
-  .vs-puce.on { background: #fff; color: #141834; font-weight: 700; }
+  .vs-puce { background: #262626; color: #e4e4e4; border: 0; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 12px; cursor: pointer; }
+  .vs-puce.on { background: #f2751f; color: #fff; font-weight: 700; }
   .vs-marques { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 4px 18px; margin-top: 6px; }
-  .vs-marque { display: grid; grid-template-columns: 120px 1fr 78px 64px; align-items: center; gap: 8px; background: transparent; border: 0; color: #d6d8ee; font: inherit; font-size: 13px; padding: 6px 4px; border-radius: 8px; cursor: pointer; text-align: left; }
-  .vs-marque:hover { background: #262c66; }
-  .vs-marque b { color: #fff; text-align: right; } .vs-marque small { color: #8f93b8; text-align: right; }
+  .vs-marque { display: grid; grid-template-columns: 120px 1fr 78px 64px; align-items: center; gap: 8px; background: transparent; border: 0; color: #e4e4e4; font: inherit; font-size: 13px; padding: 6px 4px; border-radius: 8px; cursor: pointer; text-align: left; }
+  .vs-marque:hover { background: #2a2a2a; }
+  .vs-marque b { color: #fff; text-align: right; } .vs-marque small { color: #8c8c8c; text-align: right; }
   .vs-marque > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .vs-jauge { height: 9px; background: #2a3070; border-radius: 999px; overflow: hidden; } .vs-jauge i { display: block; height: 100%; border-radius: 999px; }
-  #vue-valeur-stock .tb-table { background: transparent; border-color: #2a3070; color: #e6e7f4; }
-  #vue-valeur-stock .tb-table th { background: #22285c; color: #a9acc9; }
-  #vue-valeur-stock .tb-table td { border-top-color: #2a3070; }
-  #vue-valeur-stock .tb-table td.num small, #vue-valeur-stock .tb-table .sous { color: #8f93b8; }
-  #vue-valeur-stock .tb-table tr.on td { background: #262c66; }
-  #vue-valeur-stock .tb-table tr.tb-total td { background: #22285c; border-top-color: #fff; }
-  #vue-valeur-stock .dash-kpi { background: #22285c; color: #fff; border: 0; }
-  #vue-valeur-stock .dash-kpi span { color: #a9acc9; }
+  .vs-jauge { height: 9px; background: #2b2b2b; border-radius: 999px; overflow: hidden; } .vs-jauge i { display: block; height: 100%; border-radius: 999px; }
+  #vue-valeur-stock .tb-table { background: transparent; border-color: #2b2b2b; color: #ececec; }
+  #vue-valeur-stock .tb-table th { background: #232323; color: #a3a3a3; }
+  #vue-valeur-stock .tb-table td { border-top-color: #2b2b2b; }
+  #vue-valeur-stock .tb-table td.num small, #vue-valeur-stock .tb-table .sous { color: #8c8c8c; }
+  #vue-valeur-stock .tb-table tr.on td { background: #2a2a2a; }
+  #vue-valeur-stock .tb-table tr.tb-total td { background: #232323; border-top-color: #fff; }
+  #vue-valeur-stock .dash-kpi { background: #232323; color: #fff; border: 0; }
+  #vue-valeur-stock .dash-kpi span { color: #a3a3a3; }
   #vue-valeur-stock .dash-section { margin: 14px 0 0; }
   #vue-valeur-stock .dash-section > h3 { color: #fff; }
-  #vue-valeur-stock .compte-produits, #vue-valeur-stock .dash-vide { color: #a9acc9; }
-  #vue-valeur-stock summary { color: #e6e7f4; cursor: pointer; }
-  #vue-valeur-stock input[type=search], #vue-valeur-stock input[type=file] { color: #e6e7f4; }
-  #vue-valeur-stock .dash-lien { color: #9ec5ff; }
-  #vs-depot .vs-panneau { border: 1px solid #3987e5; margin-bottom: 14px; }
+  #vue-valeur-stock .compte-produits, #vue-valeur-stock .dash-vide { color: #a3a3a3; }
+  #vue-valeur-stock summary { color: #ececec; cursor: pointer; }
+  #vue-valeur-stock input[type=search], #vue-valeur-stock input[type=file] { color: #ececec; }
+  #vue-valeur-stock .dash-lien { color: #f6a46a; }
+  #vs-depot .vs-panneau { border: 1px solid #f2751f; margin-bottom: 14px; }
   #vue-valeur-stock.lecture-seule .vs-gerer { display: none !important; }
-  .nl-alerte { border: 1px solid #c98500; margin-bottom: 14px; }
-  #vue-valeur-stock details.nl-bl { border-top: 1px solid #2a3070; padding: 6px 2px; }
+  .nl-alerte { border: 1px solid #f2751f; margin-bottom: 14px; }
+  #vue-valeur-stock details.nl-bl { border-top: 1px solid #2b2b2b; padding: 6px 2px; }
   #vue-valeur-stock details.nl-bl summary { font-size: 13px; }
   #vue-valeur-stock details.nl-bl input[type=checkbox] { width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px; }
-  .dash-modale.vs-fenetre .boite { background: #1b2050; color: #e6e7f4; }
-  .dash-modale.vs-fenetre h4 { color: #fff; } .vs-fenetre .ref, .vs-fenetre .compte-produits { color: #a9acc9; }
-  .dash-modale.vs-fenetre table th { color: #a9acc9; border-bottom-color: #2a3070; }
-  .dash-modale.vs-fenetre table td { border-bottom-color: #2a3070; color: #e6e7f4; }
-  .dash-modale.vs-fenetre select, .vs-fenetre input { background: #22285c; color: #fff; border: 1px solid #3a4190; border-radius: 8px; padding: 6px 8px; }
+  .dash-modale.vs-fenetre .boite { background: #181818; color: #ececec; }
+  .dash-modale.vs-fenetre h4 { color: #fff; } .vs-fenetre .ref, .vs-fenetre .compte-produits { color: #a3a3a3; }
+  .dash-modale.vs-fenetre table th { color: #a3a3a3; border-bottom-color: #2b2b2b; }
+  .dash-modale.vs-fenetre table td { border-bottom-color: #2b2b2b; color: #ececec; }
+  .dash-modale.vs-fenetre select, .vs-fenetre input { background: #232323; color: #fff; border: 1px solid #3a3a3a; border-radius: 8px; padding: 6px 8px; }
   .dash-modale.vs-fenetre th, .dash-modale.vs-fenetre td { text-align: left; }
   .dash-modale.vs-fenetre th:nth-last-child(-n+2), .dash-modale.vs-fenetre td:nth-last-child(-n+2) { text-align: right; white-space: nowrap; }
-  .dash-modale.vs-fenetre .puce-claire { background: #2a3070; color: #fff; border-color: #3a4190; }
+  .dash-modale.vs-fenetre .puce-claire { background: #2b2b2b; color: #fff; border-color: #3a3a3a; }
   @media (max-width: 900px) { .vs-grille, .vs-deux { grid-template-columns: 1fr; } .vs-cote { position: static; } .vs-marque { grid-template-columns: 100px 1fr 70px; } .vs-marque small { display: none; } }
   .dash-modale { position: fixed; inset: 0; z-index: 95; display: flex; align-items: center;
                  justify-content: center; padding: 16px; background: rgba(0,0,0,.55); }
@@ -1951,10 +1953,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792230972"></script>
-<script src="imports.js?v=1792230972"></script>
-<script src="merch-shopify.js?v=1792230972"></script>
-<script src="moteur-merch.js?v=1792230972"></script>
+<script src="config.js?v=1792231093"></script>
+<script src="imports.js?v=1792231093"></script>
+<script src="merch-shopify.js?v=1792231093"></script>
+<script src="moteur-merch.js?v=1792231093"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2536,7 +2538,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792230972";
+    v.src = "hero.mp4?v=1792231093";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -10611,12 +10613,12 @@ function exporterNonLivrable() {
      code-barres passe sous la quantité libérée.
    - Picking = le disponible FTK restant, saisons 26 et suivantes. Valeurs au prix d'achat des fiches produits. */
 const VS_NATURES = [
-  ["WEB", "Stock web", "#3987e5"],
-  ["PICKING", "Stock picking", "#d95926"],
-  ["BL_LIBERE", "BL libéré", "#008300"],
-  ["PREPARATION", "Stock en préparation", "#199e70"],
-  ["NON_LIVRABLE", "Non livrable", "#c98500"],
-  ["TRANSIT", "Stock en transit", "#d55181"],
+  ["WEB", "Stock web", "#f4f4f4"],
+  ["PICKING", "Stock picking", "#f2751f"],
+  ["BL_LIBERE", "BL libéré", "#f9c08f"],
+  ["PREPARATION", "Stock en préparation", "#9b9b9b"],
+  ["NON_LIVRABLE", "Non livrable", "#b04a12"],
+  ["TRANSIT", "Stock en transit", "#5f5f5f"],
 ];
 const VS_SOUS_TRANSIT = { TRANSIT_FOURNISSEUR: "réceptions fournisseur pas encore arrivées", TRANSIT_RECU: "reçu, pas encore rangé" };
 const vsNature = n => n.startsWith("TRANSIT") ? "TRANSIT" : n;
@@ -10736,9 +10738,9 @@ function dessinerEcoulementVS() {
     const x = i => 24 + i * (W - 48) / (pts.length - 1), y = v => 10 + (H - 32) * (1 - v / max);
     const pl = pts.map((p, i) => `${x(i)},${y(p.v)}`).join(" ");
     courbe = `<svg viewBox="0 0 ${W} ${H}" class="vs-svg" style="max-width:${W}px">
-      <polygon points="${x(0)},${H - 22} ${pl} ${x(pts.length - 1)},${H - 22}" fill="#00830033"/><polyline points="${pl}" fill="none" stroke="#2fb52f" stroke-width="2"/>
-      ${pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.v)}" r="3.5" fill="#2fb52f"><title>${vsDate(p.d)} : ${eur(p.v)} · ${dashNb(p.p)} p. encore en stock</title></circle>
-        <text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="10" fill="#a9acc9">${vsDate(p.d).slice(0, 5)}</text>`).join("")}</svg>`;
+      <polygon points="${x(0)},${H - 22} ${pl} ${x(pts.length - 1)},${H - 22}" fill="#f6a46a33"/><polyline points="${pl}" fill="none" stroke="#f6a46a" stroke-width="2"/>
+      ${pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.v)}" r="3.5" fill="#f6a46a"><title>${vsDate(p.d)} : ${eur(p.v)} · ${dashNb(p.p)} p. encore en stock</title></circle>
+        <text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="10" fill="#a3a3a3">${vsDate(p.d).slice(0, 5)}</text>`).join("")}</svg>`;
   } else courbe = `<div class="vs-sous">La courbe apparaîtra au fil des dépôts qui suivent les libérations.</div>`;
   const pc = (a, b) => b ? Math.round(100 * a / b) + " %" : "—";
   zone.innerHTML = `<div class="vs-titre">Écoulement des BL libérés
@@ -10747,9 +10749,9 @@ function dessinerEcoulementVS() {
       <button class="vs-puce${tri === "recent" ? " on" : ""}" onclick="VS.triEcoulement='recent'; dessinerEcoulementVS()">Plus récents</button></span></div>
     <div class="vs-deux" style="margin-top:6px">
       <div class="vs-cartes" style="grid-template-columns:repeat(3,minmax(0,1fr))">
-        <div class="vs-carte" style="cursor:default">${vsIcone("BL_LIBERE", "#2fb52f")}<span class="vs-carte-txt"><b>${vsK(libV)}</b><span>Libéré</span><small>${dashNb(lib)} pièces · ${dashNb(L.length)} lignes</small></span></div>
-        <div class="vs-carte" style="cursor:default">${vsIcone("PICKING", "#d95926")}<span class="vs-carte-txt"><b>${vsK(stV)}</b><span>Encore en stock</span><small>${dashNb(st)} pièces · ${pc(st, base)}</small></span></div>
-        <div class="vs-carte" style="cursor:default">${vsIcone("TRANSIT", "#3987e5")}<span class="vs-carte-txt"><b>${vsK(ecV)}</b><span>Écoulé</span><small>${dashNb(ec)} pièces · ${pc(ec, base)}</small></span></div>
+        <div class="vs-carte" style="cursor:default">${vsIcone("BL_LIBERE", "#f6a46a")}<span class="vs-carte-txt"><b>${vsK(libV)}</b><span>Libéré</span><small>${dashNb(lib)} pièces · ${dashNb(L.length)} lignes</small></span></div>
+        <div class="vs-carte" style="cursor:default">${vsIcone("PICKING", "#f2751f")}<span class="vs-carte-txt"><b>${vsK(stV)}</b><span>Encore en stock</span><small>${dashNb(st)} pièces · ${pc(st, base)}</small></span></div>
+        <div class="vs-carte" style="cursor:default">${vsIcone("TRANSIT", "#f2751f")}<span class="vs-carte-txt"><b>${vsK(ecV)}</b><span>Écoulé</span><small>${dashNb(ec)} pièces · ${pc(ec, base)}</small></span></div>
       </div>
       <div>${courbe}</div>
     </div>
@@ -10789,8 +10791,8 @@ function dessinerValeurStock() {
   const carte = (k, lib, v, p, c, clic) => `<button class="vs-carte" onclick="${clic}" title="Voir le détail">${vsIcone(k, c)}
       <span class="vs-carte-txt"><b>${vsK(v.valeur)}</b><span>${lib}</span><small>${dashNb(v.pieces)} pièces ${ecart(v.valeur, p?.valeur)}</small></span></button>`;
   corps.innerHTML = `
+    <div class="vs-cartes vs-cartes-total">${carte("TOTAL", "Valeur totale du stock", tot, totp, "#f2751f", "ouvrirNatureVS(null)")}</div>
     <div class="vs-cartes">
-      ${carte("TOTAL", "Valeur totale", tot, totp, "#ffffff", "ouvrirNatureVS(null)")}
       ${VS_NATURES.map(([k, lib, c]) => carte(k, lib, t[k], tp?.[k], c, `ouvrirNatureVS('${k}')`)).join("")}
     </div>
     <div class="vs-sous" style="margin:8px 2px 0">Stock du ${vsDate(d)} · déposé le ${new Date(d.le).toLocaleString("fr-FR")} par ${echapperHTML(d.par_email || "")}${avant ? ` · écarts comparés au ${vsDate(avant)}` : ""}${controlesVS(d.controles).replace(/<[^>]+>/g, " ")}</div>
@@ -10819,7 +10821,7 @@ function graphiqueVS() {
   const slot = (L - g) / Math.max(D.length, 4), larg = Math.min(70, slot * .62);
   const x = i => g + i * slot + (slot - larg) / 2, y = v => 10 + h - (v / haut) * h;
   let s = [0, .25, .5, .75, 1].map(f => `<line x1="${g}" x2="${L}" y1="${y(haut * f)}" y2="${y(haut * f)}" stroke="#ffffff14"/>
-    <text x="${g - 6}" y="${y(haut * f) + 4}" text-anchor="end" font-size="11" fill="#a9acc9">${vsK(haut * f)}</text>`).join("");
+    <text x="${g - 6}" y="${y(haut * f) + 4}" text-anchor="end" font-size="11" fill="#a3a3a3">${vsK(haut * f)}</text>`).join("");
   D.forEach((d, i) => {
     const t = vsTotaux(d); let cumul = 0;
     s += `<g class="vs-barre${d.id === VS.choisi ? " on" : ""}" onclick="choisirDepotVS(${d.id})">`;
@@ -10827,7 +10829,7 @@ function graphiqueVS() {
       const v = t[k].valeur; if (!v) continue;
       const y0 = y(cumul), y1 = y(cumul + v); cumul += v;
       s += `<rect x="${x(i)}" y="${y1}" width="${larg}" height="${Math.max(y0 - y1 - 2, .5)}" rx="3" fill="${c}"><title>${vsDate(d)} — ${lib} : ${eur(v)} · ${dashNb(t[k].pieces)} p.</title></rect>`;
-      if (y0 - y1 > 18) s += `<text x="${x(i) + larg / 2}" y="${(y0 + y1) / 2 + 4}" text-anchor="middle" font-size="11" fill="#fff" pointer-events="none">${vsK(v).replace(" €", "")}</text>`;
+      if (y0 - y1 > 18) s += `<text x="${x(i) + larg / 2}" y="${(y0 + y1) / 2 + 4}" text-anchor="middle" font-size="11" fill="${["WEB", "BL_LIBERE"].includes(k) ? "#111" : "#fff"}" pointer-events="none">${vsK(v).replace(" €", "")}</text>`;
     }
     s += `<text x="${x(i) + larg / 2}" y="${H - 6}" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff">${vsDate(d).slice(0, 5)}</text></g>`;
   });
@@ -10850,10 +10852,10 @@ function courbeVS() {
   const x = i => 22 + i * (L - 44) / (D.length - 1), y = a => 10 + (H - 30) * (1 - (a - min) / (max - min || 1));
   const pts = v.map((a, i) => `${x(i)},${y(a)}`).join(" ");
   return `<svg viewBox="0 0 ${L} ${H}" class="vs-svg">
-    <polygon points="${x(0)},${H - 20} ${pts} ${x(D.length - 1)},${H - 20}" fill="#3987e533"/>
-    <polyline points="${pts}" fill="none" stroke="#3987e5" stroke-width="2"/>
-    ${v.map((a, i) => `<circle cx="${x(i)}" cy="${y(a)}" r="${D[i].id === VS.choisi ? 5 : 3.5}" fill="${D[i].id === VS.choisi ? "#fff" : "#3987e5"}" style="cursor:pointer" onclick="choisirDepotVS(${D[i].id})"><title>${vsDate(D[i])} : ${eur(a)}</title></circle>
-      <text x="${x(i)}" y="${H - 4}" text-anchor="middle" font-size="10" fill="#a9acc9">${vsDate(D[i]).slice(0, 5)}</text>`).join("")}</svg>`;
+    <polygon points="${x(0)},${H - 20} ${pts} ${x(D.length - 1)},${H - 20}" fill="#f2751f33"/>
+    <polyline points="${pts}" fill="none" stroke="#f2751f" stroke-width="2"/>
+    ${v.map((a, i) => `<circle cx="${x(i)}" cy="${y(a)}" r="${D[i].id === VS.choisi ? 5 : 3.5}" fill="${D[i].id === VS.choisi ? "#fff" : "#f2751f"}" style="cursor:pointer" onclick="choisirDepotVS(${D[i].id})"><title>${vsDate(D[i])} : ${eur(a)}</title></circle>
+      <text x="${x(i)}" y="${H - 4}" text-anchor="middle" font-size="10" fill="#a3a3a3">${vsDate(D[i]).slice(0, 5)}</text>`).join("")}</svg>`;
 }
 
 const vsParMarque = nature => {
