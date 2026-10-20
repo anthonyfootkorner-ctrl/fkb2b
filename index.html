@@ -1293,6 +1293,11 @@
   #vs-depot .vs-panneau { border: 1px solid #f2751f; margin-bottom: 14px; }
   #vue-valeur-stock.lecture-seule .vs-gerer { display: none !important; }
   .nl-alerte { border: 1px solid #f2751f; margin-bottom: 14px; }
+  .vs-sous-bloc { padding: 12px 0 6px; border-top: 1px solid #262626; }
+  .vs-sous-bloc:first-of-type { border-top: 0; padding-top: 2px; }
+  .vs-sous-titre { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #fff; margin-bottom: 4px; }
+  .vs-sous-titre i { width: 10px; height: 10px; border-radius: 3px; }
+  .vs-sous-titre span { margin-left: auto; font-weight: 600; letter-spacing: 0; text-transform: none; color: #a3a3a3; }
   #vue-valeur-stock details.nl-bl { border-top: 1px solid #2b2b2b; padding: 6px 2px; }
   #vue-valeur-stock details.nl-bl summary { font-size: 13px; }
   #vue-valeur-stock details.nl-bl input[type=checkbox] { width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px; }
@@ -1953,10 +1958,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792483986"></script>
-<script src="imports.js?v=1792483986"></script>
-<script src="merch-shopify.js?v=1792483986"></script>
-<script src="moteur-merch.js?v=1792483986"></script>
+<script src="config.js?v=1792485013"></script>
+<script src="imports.js?v=1792485013"></script>
+<script src="merch-shopify.js?v=1792485013"></script>
+<script src="moteur-merch.js?v=1792485013"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2538,7 +2543,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792483986";
+    v.src = "hero.mp4?v=1792485013";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -10668,7 +10673,8 @@ async function rendreValeurStock() {
   vue.innerHTML = `<div class="vs-sombre">
     <div class="vs-tete"><h1>Valeur du stock</h1>
       <button class="vs-bouton vs-gerer" onclick="ouvrirDepotVS()">＋ Nouveau dépôt</button>
-      <button class="vs-bouton discret" onclick="exporterToutVS(this)">⬇ Export Excel complet</button></div>
+      <button class="vs-bouton discret" onclick="exporterToutVS(this)">⬇ Export Excel complet</button>
+      <button class="vs-bouton discret" onclick="imageMailVS(this)">📷 Image pour mail</button></div>
     <div id="vs-alertes"></div>
     <div id="vs-depot"></div>
     <div class="vs-grille">
@@ -10806,9 +10812,10 @@ function dessinerValeurStock() {
         <div class="vs-panneau"><div class="vs-titre">Valeur totale</div>${courbeVS()}</div>
       </div>
     </div>
-    <div class="vs-panneau" style="margin-top:14px"><div class="vs-titre">Par marque
-      <span class="vs-puces">${VS_NATURES.map(([k, lib]) => `<button class="vs-puce${(VS.natureMarque || "PICKING") === k ? " on" : ""}" onclick="VS.natureMarque='${k}'; dessinerValeurStock()">${lib.replace("Stock ", "")}</button>`).join("")}</span></div>
-      ${marquesVS(VS.natureMarque || "PICKING")}</div>
+    <div class="vs-panneau" style="margin-top:14px"><div class="vs-titre">Par marque</div>
+      ${VS_NATURES.map(([k, lib, c]) => { const tn = t[k]; return `<div class="vs-sous-bloc">
+        <div class="vs-sous-titre"><i style="background:${c}"></i>${lib}<span>${vsK(tn.valeur)} · ${dashNb(tn.pieces)} p.</span></div>
+        ${marquesVS(k)}</div>`; }).join("")}</div>
     <div class="vs-panneau" style="margin-top:14px"><div class="vs-titre">Historique des dépôts
       <button class="vs-bouton discret" style="margin-left:auto" onclick="exporterValeurStock()">⬇ Exporter ce dépôt (Excel)</button></div>${historiqueVS()}</div>`;
 }
@@ -10996,6 +11003,110 @@ async function exporterToutVS(btn) {
     ]);
   } catch (e) { alert("Export impossible : " + (e.message || e)); }
   if (btn) btn.disabled = false;
+}
+
+/* ---- Image pour mail ----
+   Le haut de la page (total, natures, évolution, répartition) et le bloc « Par marque », redessinés en SVG
+   puis convertis en PNG. Pas de bibliothèque : du SVG pur se dessine dans un canevas sur tous les navigateurs. */
+function svgRapportVS() {
+  const d = VS.depots.find(x => x.id === VS.choisi); if (!d) return null;
+  const i = VS.depots.indexOf(d), avant = VS.depots[i - 1];
+  const t = vsTotaux(d), tp = avant ? vsTotaux(avant) : null, tot = vsTotal(t), totp = tp ? vsTotal(tp) : null;
+  const W = 1200, M = 32, e = echapperHTML, police = `font-family="Helvetica Neue, Helvetica, Arial, sans-serif"`;
+  const ecart = (v, p) => p == null ? "" : `${v >= p ? "▲" : "▼"} ${vsK(Math.abs(v - p))}`;
+  const coulEcart = (v, p) => p == null ? "#8c8c8c" : v >= p ? "#5ad48a" : "#ff8a73";
+  let y = M, s = "";
+  // en-tête
+  s += `<text x="${M}" y="${y + 30}" font-size="30" font-weight="800" fill="#fff" ${police}>VALEUR DU STOCK</text>
+        <text x="${W - M}" y="${y + 18}" font-size="15" fill="#a3a3a3" text-anchor="end" ${police}>Stock du ${vsDate(d)}</text>
+        <text x="${W - M}" y="${y + 38}" font-size="13" fill="#6f6f6f" text-anchor="end" ${police}>${avant ? `écarts comparés au ${vsDate(avant)}` : ""}</text>`;
+  y += 56;
+  // carte du total
+  s += `<rect x="${M}" y="${y}" width="${W - 2 * M}" height="104" rx="16" fill="#1c1c1c" stroke="#f2751f88"/>
+        <text x="${M + 28}" y="${y + 60}" font-size="46" font-weight="800" fill="#fff" ${police}>${e(vsK(tot.valeur))}</text>
+        <text x="${M + 28}" y="${y + 86}" font-size="15" fill="#e4e4e4" ${police}>Valeur totale du stock · ${dashNb(tot.pieces)} pièces
+          <tspan fill="${coulEcart(tot.valeur, totp?.valeur)}" font-weight="700">  ${e(ecart(tot.valeur, totp?.valeur))}</tspan></text>`;
+  y += 104 + 14;
+  // 6 natures, 2 lignes de 3
+  const lc = (W - 2 * M - 2 * 14) / 3;
+  VS_NATURES.forEach(([k, lib, c], n) => {
+    const x = M + (n % 3) * (lc + 14), yy = y + Math.floor(n / 3) * (92 + 14);
+    s += `<rect x="${x}" y="${yy}" width="${lc}" height="92" rx="14" fill="#1c1c1c" stroke="#262626"/>
+          <rect x="${x + 20}" y="${yy + 22}" width="14" height="14" rx="3" fill="${c}"/>
+          <text x="${x + 44}" y="${yy + 36}" font-size="15" fill="#e4e4e4" ${police}>${e(lib)}</text>
+          <text x="${x + 20}" y="${yy + 68}" font-size="28" font-weight="800" fill="#fff" ${police}>${e(vsK(t[k].valeur))}</text>
+          <text x="${x + lc - 20}" y="${yy + 68}" font-size="13" fill="#8c8c8c" text-anchor="end" ${police}>${dashNb(t[k].pieces)} p.
+            <tspan fill="${coulEcart(t[k].valeur, tp?.[k]?.valeur)}" font-weight="700"> ${e(ecart(t[k].valeur, tp?.[k]?.valeur))}</tspan></text>`;
+  });
+  y += 2 * 92 + 14 + 18;
+  // évolution (le même graphique que la page) + répartition
+  const lg = 720, ld = W - 2 * M - lg - 14, hh = 330;
+  s += `<rect x="${M}" y="${y}" width="${lg}" height="${hh}" rx="16" fill="#181818"/>
+        <text x="${M + 18}" y="${y + 28}" font-size="15" font-weight="700" fill="#fff" ${police}>Évolution de la valeur par nature</text>
+        <svg x="${M + 10}" y="${y + 40}" width="${lg - 20}" height="${hh - 60}" viewBox="0 0 640 300" ${police}>${graphiqueVS().match(/<svg[^>]*>([\s\S]*?)<\/svg>/)[1]}</svg>`;
+  let lx = M + 18, ly = y + hh - 12;
+  for (const [, lib, c] of VS_NATURES) { s += `<rect x="${lx}" y="${ly - 10}" width="10" height="10" rx="2" fill="${c}"/><text x="${lx + 14}" y="${ly}" font-size="11.5" fill="#e4e4e4" ${police}>${e(lib)}</text>`; lx += 24 + lib.length * 6.4; }
+  const rx = M + lg + 14;
+  s += `<rect x="${rx}" y="${y}" width="${ld}" height="${hh}" rx="16" fill="#181818"/>
+        <text x="${rx + 18}" y="${y + 28}" font-size="15" font-weight="700" fill="#fff" ${police}>Répartition au ${vsDate(d)}</text>`;
+  let bx = rx + 18; const bw = ld - 36;
+  for (const [k, , c] of VS_NATURES) { const w = tot.valeur ? bw * t[k].valeur / tot.valeur : 0; if (w > 0) s += `<rect x="${bx}" y="${y + 44}" width="${Math.max(w - 2, .5)}" height="14" fill="${c}"/>`; bx += w; }
+  VS_NATURES.forEach(([k, lib, c], n) => {
+    const yy = y + 92 + n * 36;
+    s += `<rect x="${rx + 18}" y="${yy - 11}" width="11" height="11" rx="3" fill="${c}"/>
+          <text x="${rx + 36}" y="${yy}" font-size="14" fill="#e4e4e4" ${police}>${e(lib)}</text>
+          <text x="${rx + ld - 70}" y="${yy}" font-size="14" font-weight="700" fill="#fff" text-anchor="end" ${police}>${e(vsK(t[k].valeur))}</text>
+          <text x="${rx + ld - 18}" y="${yy}" font-size="12" fill="#8c8c8c" text-anchor="end" ${police}>${tot.valeur ? Math.round(100 * t[k].valeur / tot.valeur) : 0} %</text>`;
+  });
+  y += hh + 18;
+  // par marque : les natures à la suite, 10 marques en 2 colonnes
+  const blocs = VS_NATURES.map(([k, lib, c]) => ({ k, lib, c, M: vsParMarque(k).slice(0, 10) })).filter(b => b.M.length);
+  const hb = b => 40 + Math.ceil(b.M.length / 2) * 26 + 10;
+  const htot = 50 + blocs.reduce((a, b) => a + hb(b), 0);
+  s += `<rect x="${M}" y="${y}" width="${W - 2 * M}" height="${htot}" rx="16" fill="#181818"/>
+        <text x="${M + 18}" y="${y + 30}" font-size="17" font-weight="700" fill="#fff" ${police}>Par marque</text>`;
+  let yb = y + 50;
+  const colW = (W - 2 * M - 36 - 24) / 2;
+  for (const b of blocs) {
+    const max = b.M[0].v || 1;
+    s += `<line x1="${M + 18}" x2="${W - M - 18}" y1="${yb}" y2="${yb}" stroke="#262626"/>
+          <rect x="${M + 18}" y="${yb + 14}" width="11" height="11" rx="3" fill="${b.c}"/>
+          <text x="${M + 36}" y="${yb + 25}" font-size="13" font-weight="700" fill="#fff" letter-spacing="1" ${police}>${e(b.lib.toUpperCase())}</text>
+          <text x="${W - M - 18}" y="${yb + 25}" font-size="13" fill="#a3a3a3" text-anchor="end" ${police}>${e(vsK(t[b.k].valeur))} · ${dashNb(t[b.k].pieces)} p.</text>`;
+    b.M.forEach((m, n) => {
+      const x = M + 18 + (n % 2) * (colW + 24), yy = yb + 52 + Math.floor(n / 2) * 26;
+      s += `<text x="${x}" y="${yy}" font-size="13" fill="#e4e4e4" ${police}>${e(String(m.marque).slice(0, 22))}</text>
+            <rect x="${x + 170}" y="${yy - 9}" width="${colW - 370}" height="8" rx="4" fill="#2b2b2b"/>
+            <rect x="${x + 170}" y="${yy - 9}" width="${Math.max((colW - 370) * m.v / max, 3)}" height="8" rx="4" fill="${b.c}"/>
+            <text x="${x + colW - 110}" y="${yy}" font-size="13" font-weight="700" fill="#fff" text-anchor="end" ${police}>${e(vsK(m.v))}</text>
+            <text x="${x + colW}" y="${yy}" font-size="12" fill="#8c8c8c" text-anchor="end" ${police}>${dashNb(m.p)} p.</text>`;
+    });
+    yb += hb(b);
+  }
+  y += htot + M;
+  return { svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${y}" viewBox="0 0 ${W} ${y}"><rect width="${W}" height="${y}" fill="#0e0e0e"/>${s}</svg>`, W, H: y, d };
+}
+
+async function imageMailVS(btn) {
+  const r = svgRapportVS(); if (!r) { alert("Aucun dépôt à mettre en image."); return; }
+  const libelle = btn.textContent; btn.disabled = true; btn.textContent = "Image en cours…";
+  try {
+    const img = new Image();
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(r.svg);
+    await img.decode();
+    const k = 2, can = document.createElement("canvas");      // double résolution : net dans un mail
+    can.width = r.W * k; can.height = r.H * k;
+    const ctx = can.getContext("2d"); ctx.scale(k, k); ctx.drawImage(img, 0, 0);
+    const blob = await new Promise(ok => can.toBlob(ok, "image/png"));
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `valeur-du-stock-${r.d.date_stock || ""}.png`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    let copie = false;
+    try { await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]); copie = true; } catch (e) { /* navigateur sans copie d'image */ }
+    btn.textContent = copie ? "✓ Image téléchargée et copiée" : "✓ Image téléchargée";
+    setTimeout(() => { btn.textContent = libelle; }, 3500);
+  } catch (e) { alert("Image impossible : " + (e.message || e)); btn.textContent = libelle; }
+  btn.disabled = false;
 }
 
 async function exporterValeurStock() {
