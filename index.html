@@ -1953,10 +1953,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792483604"></script>
-<script src="imports.js?v=1792483604"></script>
-<script src="merch-shopify.js?v=1792483604"></script>
-<script src="moteur-merch.js?v=1792483604"></script>
+<script src="config.js?v=1792483986"></script>
+<script src="imports.js?v=1792483986"></script>
+<script src="merch-shopify.js?v=1792483986"></script>
+<script src="moteur-merch.js?v=1792483986"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2538,7 +2538,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792483604";
+    v.src = "hero.mp4?v=1792483986";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -11068,8 +11068,11 @@ async function ajouterFichiersVS(liste) {
       info = `stock du ${date} · ${dashNb(t.lignes.length)} lignes`;
       t.date = date;
     } else if (a("Numéro de réception") && a("Date de réception")) {
-      const tiers = t.lignes.slice(0, 50).map(l => t.get(l, "Code tiers"));
-      role = /FT2/i.test(fichier.name) ? "rec_ft2" : /FTK/i.test(fichier.name) ? "rec_ftk" : tiers.includes("FTK") ? "rec_ft2" : "rec_ftk";
+      // nom de fichier d'abord ; sinon le contenu : un export FT2 ne contient que des transferts venant de FTK
+      // (« FK SIEGE »), un export FTK des fournisseurs (avec parfois quelques retours internes venant de FTK)
+      const depuisFtk = t.lignes.filter(l => t.get(l, "Code tiers") === "FTK").length;
+      role = /FT2/i.test(fichier.name) ? "rec_ft2" : /FTK/i.test(fichier.name) ? "rec_ftk"
+           : depuisFtk > t.lignes.length * 0.8 ? "rec_ft2" : "rec_ftk";
       info = `${dashNb(t.lignes.length)} lignes`;
     } else if (a("TypeBL") && a("Piece") && a("PA_Fiche")) {
       role = "nl";
