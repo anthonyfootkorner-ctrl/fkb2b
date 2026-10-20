@@ -1953,10 +1953,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792231809"></script>
-<script src="imports.js?v=1792231809"></script>
-<script src="merch-shopify.js?v=1792231809"></script>
-<script src="moteur-merch.js?v=1792231809"></script>
+<script src="config.js?v=1792483604"></script>
+<script src="imports.js?v=1792483604"></script>
+<script src="merch-shopify.js?v=1792483604"></script>
+<script src="moteur-merch.js?v=1792483604"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2538,7 +2538,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792231809";
+    v.src = "hero.mp4?v=1792483604";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -11111,8 +11111,32 @@ async function calculerDepotVS(btn) {
       <tr class="tb-total"><td>Valorisation globale</td><td class="num">${dashNb(tot.pieces)}</td><td class="num">${eur(tot.valeur)}</td></tr></tbody></table>
       <div class="compte-produits" style="margin-top:8px">Contrôle : ${dashNb(c.controles.pieces_physiques)} pièces dans les fichiers, ${dashNb(tot.pieces)} réparties
         ${Math.round(c.controles.pieces_physiques) === Math.round(tot.pieces) ? "✅" : "⚠️ écart"}. ${controlesVS(c.controles).replace(/<[^>]+>/g, "")}</div>
-      <button class="vs-bouton" style="margin:10px 0 0" onclick="enregistrerDepotVS(this)">Enregistrer le dépôt</button>`;
+      ${gardeFousVS(c)}
+      <button class="vs-bouton" id="vs-enregistrer" style="margin:10px 0 0" ${c.alertes.length ? "disabled" : ""} onclick="enregistrerDepotVS(this)">Enregistrer le dépôt</button>`;
   } catch (e) { res.innerHTML = `<b>Erreur</b> : ${echapperHTML(String(e.message || e))}`; btn.disabled = false; }
+}
+
+/* Garde-fous : un fichier incomplet (export filtré, mauvais fichier de fiches) fausse toute la valorisation.
+   On compare au dernier dépôt enregistré ; en cas d'écart, l'enregistrement demande une confirmation explicite. */
+function gardeFousVS(c) {
+  const prec = [...VS.depots].reverse().find(d => d.controles?.pieces_physiques);
+  const ref = d => Number(d?.controles?.pieces_ft2) || Number(d?.totaux?.WEB?.pieces) || 0;
+  const pct = (a, b) => Math.round(100 * (a - b) / b);
+  const A = [], k = c.controles;
+  if (prec && ref(prec) > 0 && k.pieces_ft2 < ref(prec) * 0.7)
+    A.push(`Le stock web (FT2) ne compte que <b>${dashNb(k.pieces_ft2)} pièces</b>, contre ${dashNb(ref(prec))} au dépôt du ${vsDate(prec)} (${pct(k.pieces_ft2, ref(prec))} %) : l'export FT2 est-il complet ?`);
+  if (k.pieces_physiques && k.pieces_sans_prix > k.pieces_physiques * 0.03)
+    A.push(`<b>${dashNb(k.pieces_sans_prix)} pièces sans prix d'achat</b> (${Math.round(100 * k.pieces_sans_prix / k.pieces_physiques)} % du stock) : le fichier des fiches produits est-il l'export complet ?`);
+  if (k.fiches < 150000)
+    A.push(`Le fichier des fiches produits ne contient que <b>${dashNb(k.fiches)} fiches</b> (environ 198 000 attendues) : ce n'est sans doute pas l'export complet.`);
+  if (prec && Number(prec.controles.pieces_physiques) > 0 && Math.abs(k.pieces_physiques - prec.controles.pieces_physiques) > prec.controles.pieces_physiques * 0.3)
+    A.push(`Le stock total (<b>${dashNb(k.pieces_physiques)} pièces</b>) s'écarte de ${pct(k.pieces_physiques, prec.controles.pieces_physiques)} % du dépôt du ${vsDate(prec)} (${dashNb(prec.controles.pieces_physiques)}).`);
+  c.alertes = A;
+  if (!A.length) return `<div class="vs-sous" style="margin-top:8px">✅ Garde-fous : fichiers complets, rien d'anormal par rapport au dépôt précédent.</div>`;
+  return `<div class="vs-panneau nl-alerte" style="margin-top:10px"><div class="vs-titre">⚠️ Ce dépôt semble faux</div>
+    <ul style="margin:6px 0 8px 18px;padding:0;font-size:13px;line-height:1.5">${A.map(x => `<li>${x}</li>`).join("")}</ul>
+    <label class="vs-sous"><input type="checkbox" onchange="document.getElementById('vs-enregistrer').disabled = !this.checked; VS.calcul.confirme = this.checked">
+      Je confirme que ces écarts sont réels et je veux enregistrer quand même</label></div>`;
 }
 
 async function calculValeurStock() {
@@ -11140,10 +11164,10 @@ async function calculValeurStock() {
     d.pieces += q; d.valeur += q * x.pa; detail.set(k, d);
     const t = totaux[nature] || (totaux[nature] = { pieces: 0, valeur: 0 }); t.pieces += q; t.valeur += q * x.pa;
   };
-  let physiques = 0;
+  let physiques = 0, piecesFt2 = 0;
   // 1. web : FT2 disponible
   { const t = F.ft2.table;
-    for (const l of t.lignes) { const q = vsNombre(t.get(l, "Qté disponible")); physiques += q;
+    for (const l of t.lignes) { const q = vsNombre(t.get(l, "Qté disponible")); physiques += q; piecesFt2 += q;
       ajouter("WEB", info(t.get(l, "Référence"), null, t.get(l, "Complément 3"), t.get(l, "Libellé")), q); } }
   // 2. FTK : disponible (zone « Disponible a la vente ») et préparation, par code-barres
   const dispo = new Map(), prep = new Map(), repli = new Map(); let doublons = 0;
@@ -11219,7 +11243,8 @@ async function calculValeurStock() {
     date_stock: dateStock ? `${dateStock[3]}-${dateStock[2]}-${dateStock[1]}` : null,
     controles: { pieces_physiques: physiques, pieces_sans_prix: sansPrix, nl_introuvable: nlIntrouvable, lignes_doublons: doublons,
                  libere_total: [...libereParCode.values()].reduce((a, b) => a + b, 0), libere_ecoule: libereEcoule, liberes,
-                 receptions_anciennes: recuesAnciennes, receptions_deja_commandees: recuesCommandees, jours_transit: VS_JOURS_TRANSIT } };
+                 receptions_anciennes: recuesAnciennes, receptions_deja_commandees: recuesCommandees, jours_transit: VS_JOURS_TRANSIT,
+                 pieces_ft2: piecesFt2, fiches: F.fiches.table.lignes.length } };
 }
 
 /* les lignes du fichier des BL non facturables, au format du module Non livrable */
@@ -11250,7 +11275,9 @@ async function enregistrerDepotVS(btn) {
     await api("/rest/v1/rpc/nl_photo_fin", { corps: { p_photo: idPhoto } });
     // 2. le dépôt valorisé
     const fichiers = Object.fromEntries(VS_ROLES.map(([r]) => [r, VS.fichiers[r]?.nom]));
-    const id = await api("/rest/v1/rpc/vs_depot_creer", { corps: { p_date_stock: c.date_stock, p_fichiers: fichiers, p_totaux: c.totaux, p_controles: c.controles } });
+    if (c.alertes?.length && !c.confirme) throw new Error("dépôt bloqué par les garde-fous : cochez la confirmation pour enregistrer malgré les écarts");
+    const id = await api("/rest/v1/rpc/vs_depot_creer", { corps: { p_date_stock: c.date_stock, p_fichiers: fichiers, p_totaux: c.totaux,
+      p_controles: { ...c.controles, alertes: c.alertes || [], confirme_malgre_ecarts: !!c.alertes?.length } } });
     const lignes = c.detail.map(d => ({ ...d, pieces: Math.round(d.pieces * 1000) / 1000, valeur: Math.round(d.valeur * 100) / 100 }));
     for (let i = 0; i < lignes.length; i += 2000) {
       await api("/rest/v1/rpc/vs_detail_lot", { corps: { p_depot: id, p_rows: lignes.slice(i, i + 2000) } });
