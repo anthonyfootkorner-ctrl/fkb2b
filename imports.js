@@ -85,7 +85,7 @@ const MODELES_IMPORT = {
     sep: ["\t", ";"], encodage: ["windows-1252", "utf-8"],
     signature: ["Référence", "Taille", "Magasin", "Stock", "Valeur_Stock"],
     remplacement_complet: true,
-    remplacement_libelle: "remplace l'état de stock Fastmag connu — le stock B2B vendable n'est pas touché",
+    remplacement_libelle: "remplace l'état de stock Fastmag connu ET plafonne le stock vendable du catalogue (CENTRAL/WEB) à ce niveau — jamais à la hausse",
   },
   stock_web_egonet: {
     /* Export du WMS (EGONet) : le stock réel de l'entrepôt web, une ligne par
@@ -98,7 +98,7 @@ const MODELES_IMPORT = {
     signatures: [["Stock à date", "Référence", "Quantité disponible", "Quantité totale", "Adresse de stockage"],
                  ["Date stock", "Référence", "Qté disponible", "Qté totale", "Adresse stockage"]],
     remplacement_complet: true,
-    remplacement_libelle: "remplace le stock WEB connu — le stock central et le stock B2B ne sont pas touchés",
+    remplacement_libelle: "remplace le stock WEB connu et plafonne le stock WEB vendable du catalogue à ce niveau — le central n'est pas touché",
   },
   receptions_wms: {
     /* Réceptions fournisseur attendues au central (export WMS « FTK_ReceptionsDetail ») :
@@ -815,6 +815,7 @@ async function executerStockWebEgonet(analyse, surProgres) {
     surProgres(`stock web : ${total}/${rows.length} codes-barres…`);
   }
   if (inconnus) surProgres(`${inconnus} codes-barres sans fiche Fastmag (${piecesInconnues} pièces) ignorés`);
+  await plafonnerStockVendable(["WEB"], surProgres);
   await apiFonction("journal", { entree: {
     fichier: `${analyse.fichier} (stock web)`, modele: "stock_web_egonet", empreinte: analyse.empreinte,
     lignes_lues: analyse.lues, crees: Number(bilan?.total_web) || total, maj: 0, inchanges: 0,
@@ -1040,6 +1041,34 @@ async function executerStockMagasins(analyse, surProgres) {
   return total;
 }
 
+/* Le stock théorique (état Fastmag / WMS) sert de PLAFOND au stock vendable du
+   catalogue : si le théorique descend à 10 alors que la mise B2B affichait 12, le
+   vendable redescend à 10 — jamais l'inverse (la mise reste le maximum). Les lignes
+   vendables absentes du théorique passent à zéro, sauf si le fichier semble partiel. */
+async function plafonnerStockVendable(magasins, surProgres) {
+  const vendables = [...new Set(magasins.map(m => (m || "").toUpperCase()))]
+    .filter(m => m === "CENTRAL" || m === "WEB");
+  if (!vendables.length) return;
+  surProgres("plafonnement du stock vendable sur l'état théorique…");
+  let retour = null;
+  try {
+    retour = await api("/rest/v1/rpc/plafonner_stock_vendable", { corps: { p_magasins: vendables } });
+  } catch (e) {
+    surProgres("⚠ plafonnement du stock vendable impossible : " + (e.message || e));
+    return;
+  }
+  for (const m of retour?.magasins || []) {
+    const touchees = (m.reduites || 0) + (m.a_zero || 0);
+    surProgres(touchees
+      ? `✓ stock vendable ${m.magasin} plafonné : ${touchees} ligne(s) abaissée(s) dont ${m.a_zero} à zéro · ${m.pieces_retirees} pièce(s) retirée(s)`
+      : `✓ stock vendable ${m.magasin} : déjà sous le théorique, rien à abaisser`);
+    if (m.zeros_ignores) {
+      surProgres(`⚠ ${m.zeros_ignores} ligne(s) vendable(s) ${m.magasin} absentes du fichier NON mises à zéro`
+        + " (fichier incomplet ? redéposez l'état de stock complet)");
+    }
+  }
+}
+
 async function executerStockFastmag(analyse, surProgres) {
   const nombre = v => parseFloat(String(v || "0").replace(/\s/g, "").replace(",", ".")) || 0;
   const rows = analyse.lignes
@@ -1057,6 +1086,7 @@ async function executerStockFastmag(analyse, surProgres) {
   }
   const magasins = [...new Set(rows.map(r => r.magasin))];
   surProgres(`✓ ${bilan?.total ?? envoyees} lignes d'état de stock (${magasins.join(", ")}) · ${rows.reduce((s, r) => s + r.quantite, 0)} pièces`);
+  await plafonnerStockVendable(magasins, surProgres);
   await apiFonction("journal", { entree: {
     fichier: analyse.fichier, modele: analyse.modele, empreinte: analyse.empreinte,
     lignes_lues: analyse.lues, crees: envoyees, maj: 0, inchanges: 0,
