@@ -1958,10 +1958,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792575217"></script>
-<script src="imports.js?v=1792575217"></script>
-<script src="merch-shopify.js?v=1792575217"></script>
-<script src="moteur-merch.js?v=1792575217"></script>
+<script src="config.js?v=1792680854"></script>
+<script src="imports.js?v=1792680854"></script>
+<script src="merch-shopify.js?v=1792680854"></script>
+<script src="moteur-merch.js?v=1792680854"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2543,7 +2543,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792485013";
+    v.src = "hero.mp4?v=1792680854";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -10355,24 +10355,37 @@ function dessinerBLsNL() {
   zone.innerHTML = `<div class="dash-ligne vs-gerer" style="margin:8px 0">
       <b>${dashNb(sel.length)} lignes sélectionnées · ${dashNb(p)} pièces · ${eur(v)}</b>
       ${sel.length ? `<button class="vs-bouton" style="margin:0" onclick="libererSelectionNL()">Libérer la sélection</button>
-        <button class="dash-lien" onclick="NL.selection.clear(); dessinerBLsNL()">Tout décocher</button>` : ""}</div>
+        <button class="dash-lien" onclick="NL.selection.clear(); dessinerBLsNL()">Tout décocher</button>` : ""}
+      <button class="dash-lien" onclick="selectionnerNL(() => true)">Tout sélectionner</button>
+      <button class="dash-lien" onclick="selectionnerNL(l => l.cli_bloque)">Sélectionner les BL bloqués</button></div>
     <div style="max-height:420px;overflow:auto">${bls.map(([bl, L]) => {
       const tout = L.every(l => NL.selection.has(l.cle)), partiel = !tout && L.some(l => NL.selection.has(l.cle));
       const pp = L.reduce((s, l) => s + nlReste(l), 0), vv = L.reduce((s, l) => s + nlReste(l) * l.pa, 0);
       return `<details class="nl-bl" data-bl="${echapperHTML(bl)}" ${NL.ouverts?.has(bl) ? "open" : ""}
-          ontoggle="NL.ouverts = NL.ouverts || new Set(); this.open ? NL.ouverts.add(this.dataset.bl) : NL.ouverts.delete(this.dataset.bl)"><summary>
+          ontoggle="basculerBLNL(this)"><summary>
           <input type="checkbox" class="vs-gerer" ${tout ? "checked" : ""} ${partiel ? 'data-partiel="1"' : ""} onclick="event.stopPropagation(); cocherBLNL('${echapperHTML(bl)}', this.checked)">
           <b>${echapperHTML(bl)}</b> · ${L[0].date_bl ? new Date(L[0].date_bl + "T12:00:00").toLocaleDateString("fr-FR") : ""} · ${echapperHTML(L[0].client_nom || "")}${L[0].cli_bloque ? " · bloqué" : ""}
           · ${dashNb(L.length)} lignes · ${dashNb(pp)} p. · <b>${eur(vv)}</b></summary>
-        <table class="tb-table" style="margin:6px 0 10px"><tbody>${L.map(l => `<tr>
+        ${!NL.ouverts?.has(bl) ? "" : `<table class="tb-table" style="margin:6px 0 10px"><tbody>${L.map(l => `<tr>
           <td style="width:24px"><input type="checkbox" class="vs-gerer" ${NL.selection.has(l.cle) ? "checked" : ""} onclick="cocherLigneNL('${echapperHTML(l.cle)}', this.checked)"></td>
           <td>${echapperHTML(l.reference)}</td><td class="lib">${echapperHTML(l.designation || "")}</td><td>${echapperHTML(l.taille || "")}</td>
-          <td class="num">${dashNb(nlReste(l))} p.</td><td class="num">${eur(nlReste(l) * l.pa)}</td></tr>`).join("")}</tbody></table></details>`;
+          <td class="num">${dashNb(nlReste(l))} p.</td><td class="num">${eur(nlReste(l) * l.pa)}</td></tr>`).join("")}</tbody></table>`}</details>`;
     }).join("")}</div>`;
   const defile = zone.querySelector("div[style*='max-height']");
   if (defile && NL.defile) defile.scrollTop = NL.defile;     // garder la position dans la liste après un clic
   if (defile) defile.onscroll = () => { NL.defile = defile.scrollTop; };
   zone.querySelectorAll('input[data-partiel]').forEach(c => c.indeterminate = true);
+}
+function basculerBLNL(el) {
+  NL.ouverts = NL.ouverts || new Set();
+  const avant = NL.ouverts.has(el.dataset.bl);
+  el.open ? NL.ouverts.add(el.dataset.bl) : NL.ouverts.delete(el.dataset.bl);
+  if (avant !== el.open) dessinerBLsNL();     // dessiner (ou retirer) les lignes de ce BL
+}
+function selectionnerNL(filtre) {
+  NL.selection = NL.selection || new Set();
+  for (const l of NL.lignes) if (nlReste(l) > 0 && filtre(l)) NL.selection.add(l.cle);
+  dessinerBLsNL();
 }
 function cocherBLNL(bl, oui) {
   for (const l of NL.lignes) if (l.bl === bl && nlReste(l) > 0) oui ? NL.selection.add(l.cle) : NL.selection.delete(l.cle);
