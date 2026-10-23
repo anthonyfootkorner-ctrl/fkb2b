@@ -1958,10 +1958,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792745846"></script>
-<script src="imports.js?v=1792745846"></script>
-<script src="merch-shopify.js?v=1792745846"></script>
-<script src="moteur-merch.js?v=1792745846"></script>
+<script src="config.js?v=1792746155"></script>
+<script src="imports.js?v=1792746155"></script>
+<script src="merch-shopify.js?v=1792746155"></script>
+<script src="moteur-merch.js?v=1792746155"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -4599,6 +4599,19 @@ async function chargerPriorites() {
   return PRIORITES;
 }
 
+/* Session expirée en plein travail : on ne recharge surtout pas la page — le rangement en
+   cours serait perdu. On propose de se reconnecter dans un autre onglet, puis de réessayer. */
+function signalerSessionExpiree() {
+  const zone = document.getElementById("alerte-encours");
+  const message = `<div class="alerte-encours" style="background:#fdecea; border-color:#f3b9b3; color:#a33">
+      ⚠ <b>Votre session a expiré</b> — rien n'a été enregistré. Reconnectez-vous
+      <a href="login.html" target="_blank" rel="noopener" style="text-decoration:underline; font-weight:600">dans un nouvel onglet</a>,
+      puis refaites l'action ici : votre rangement en cours reste affiché.</div>`;
+  if (zone) zone.innerHTML = message;
+  const etat = document.getElementById("dernier-merch");
+  if (etat) etat.textContent = "⚠ session expirée — reconnectez-vous puis réessayez";
+}
+
 /* Présence : une ligne par collection ouverte, rafraîchie chaque minute. Deux personnes
    qui rangent la même collection en même temps s'écrasent l'une l'autre à l'export —
    mieux vaut le voir avant de commencer. Une présence sans signe de vie depuis 3 minutes
@@ -4674,6 +4687,7 @@ async function enregistrerSuiviMerch(collection, nbProduits, source) {
     await rendreSuiviShopify();
     if (document.getElementById("sel-collection")?.value === collection) await afficherDernierMerch(collection);
   } catch (e) {
+    if (e?.sessionExpiree) return signalerSessionExpiree();
     // un refus RLS veut dire « ce compte n'a pas le droit d'écrire le suivi » : le dire en clair
     const refus = /row-level security|violates/i.test(e?.message || "");
     document.getElementById("dernier-merch").textContent = refus

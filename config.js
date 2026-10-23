@@ -26,14 +26,25 @@ async function sessionValide() {
         headers: { "apikey": FKB2B.cle, "Content-Type": "application/json" },
         body: JSON.stringify({ refresh_token: s.refresh_token }),
       });
-      if (!rep.ok) throw new Error("rafraîchissement refusé");
+      if (!rep.ok) {
+        /* Deux onglets ouverts rafraîchissent avec le même jeton : le second reçoit un
+           refus alors que la session est bien vivante, écrite par le premier. On relit
+           donc avant de conclure, sinon on déconnecte quelqu'un en plein travail. */
+        const relu = sessionCourante();
+        if (relu && relu.access_token !== s.access_token && relu.expire_a > Date.now() / 1000 + 30) return relu;
+        // le serveur dit que le jeton n'est plus valable : là, la session est vraiment finie
+        if (rep.status === 400 || rep.status === 401) { localStorage.removeItem("fkb2b-session"); return null; }
+        throw new Error("rafraîchissement indisponible");
+      }
       const r = await rep.json();
       const neuf = { access_token: r.access_token, refresh_token: r.refresh_token,
                      expire_a: r.expires_at, email: r.user.email };
       localStorage.setItem("fkb2b-session", JSON.stringify(neuf));
       return neuf;
     } catch (e) {
-      localStorage.removeItem("fkb2b-session");
+      // coupure réseau ou serveur indisponible : on garde la session tant qu'elle vit
+      const relu = sessionCourante();
+      if (relu && relu.expire_a > Date.now() / 1000 + 30) return relu;
       return null;
     } finally {
       setTimeout(() => { rafraichissementEnCours = null; }, 1000);
@@ -44,6 +55,13 @@ async function sessionValide() {
 
 async function api(chemin, { corps, methode, jwt } = {}) {
   const session = jwt ? null : await sessionValide();
+  /* Sans session, la requête partait quand même : le serveur la traitait en anonyme et
+     la refusait par RLS (« new row violates row-level security policy »), ce qui faisait
+     croire à un problème de droits alors que la session avait simplement expiré. */
+  if (!jwt && !session && !chemin.startsWith("/auth/v1/")) {
+    throw Object.assign(new Error("session expirée — reconnectez-vous"),
+                        { statut: 401, sessionExpiree: true });
+  }
   const rep = await fetch(FKB2B.url + chemin, {
     method: methode || (corps !== undefined ? "POST" : "GET"),
     headers: {
