@@ -1958,10 +1958,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1792680854"></script>
-<script src="imports.js?v=1792680854"></script>
-<script src="merch-shopify.js?v=1792680854"></script>
-<script src="moteur-merch.js?v=1792680854"></script>
+<script src="config.js?v=1792745846"></script>
+<script src="imports.js?v=1792745846"></script>
+<script src="merch-shopify.js?v=1792745846"></script>
+<script src="moteur-merch.js?v=1792745846"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -4674,7 +4674,11 @@ async function enregistrerSuiviMerch(collection, nbProduits, source) {
     await rendreSuiviShopify();
     if (document.getElementById("sel-collection")?.value === collection) await afficherDernierMerch(collection);
   } catch (e) {
-    document.getElementById("dernier-merch").textContent = "⚠ suivi non enregistré : " + (e?.message || e);
+    // un refus RLS veut dire « ce compte n'a pas le droit d'écrire le suivi » : le dire en clair
+    const refus = /row-level security|violates/i.test(e?.message || "");
+    document.getElementById("dernier-merch").textContent = refus
+      ? `⚠ suivi non enregistré : votre compte (rôle ${MON_ROLE || "inconnu"}) n'a pas le droit de valider un merch — demandez à un administrateur`
+      : "⚠ suivi non enregistré : " + (e?.message || e);
   }
 }
 
