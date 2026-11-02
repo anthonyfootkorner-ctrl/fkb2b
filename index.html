@@ -1958,10 +1958,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1793603091"></script>
-<script src="imports.js?v=1793603091"></script>
-<script src="merch-shopify.js?v=1792746155"></script>
-<script src="moteur-merch.js?v=1792746155"></script>
+<script src="config.js?v=1793613993"></script>
+<script src="imports.js?v=1793613993"></script>
+<script src="merch-shopify.js?v=1793613993"></script>
+<script src="moteur-merch.js?v=1793613993"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2543,7 +2543,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1792680854";
+    v.src = "hero.mp4?v=1793613993";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -10638,7 +10638,7 @@ function exporterNonLivrable() {
    facturables et fiches produits). Le calcul se fait ici, dans le navigateur ; seuls les résultats par
    nature et par référence sont enregistrés (vs_depots / vs_detail) pour suivre l'évolution.
    Règles validées le 16/10/2026 :
-   - Web = FT2 « Qté disponible » + disponible FTK des saisons avant 26, ITM, PERMANENT, ANCIEN STOCK.
+   - Web = FT2 « Qté disponible » (zone « Disponible a la vente ») + disponible FTK des saisons avant 26, ITM, PERMANENT, ANCIEN STOCK.
    - Préparation = FTK réservé + alloué (portefeuille exclu, plafonné au total de la ligne).
    - Non livrable = BL non facturables restants (moins les bascules), pris sur le disponible FTK puis la préparation ;
      ce qui n'existe pas dans FTK n'est pas compté (c'est un reclassement, le total ne bouge pas).
@@ -11184,6 +11184,15 @@ function dessinerListeVS() {
 const vsNombre = s => parseFloat(String(s ?? "").replace(/\s/g, "").replace(",", ".")) || 0;
 const vsCle = c => { c = String(c || "").trim(); return c.startsWith("#") ? c : c.replace(/^0+/, ""); };
 
+/* Le WMS renomme ses colonnes d'un export à l'autre (novembre 2026) : on ramène tout à un seul nom interne. */
+const VS_ALIAS = { "Date du stock": "Date stock", "Zone d'adresse": "Zone", "Adresse de stockage": "Adresse stockage",
+  "Allocation automatique": "Allocation", "N° de réception": "Numéro de réception", "N° de ligne": "Numéro de ligne" };
+const VS_COLONNES = {
+  stock: ["Référence", "Date stock", "Zone", "Qté totale", "Qté disponible", "Qté réservée", "Qté allouée", "Libellé", "Complément 2", "Complément 3"],
+  receptions: ["Numéro de réception", "Date de réception", "Code barre article", "Qté commandée", "Qté réceptionnée", "CA2", "CA3", "Description article"],
+};
+const vsManque = (t, liste) => { const m = liste.filter(c => !(c in t.i)); return m.length ? `colonnes introuvables : ${m.join(", ")}` : null; };
+
 async function lireTableVS(fichier) {
   const tampon = await fichier.arrayBuffer();
   let texte;
@@ -11192,7 +11201,7 @@ async function lireTableVS(fichier) {
   const premiere = texte.slice(0, 4000).split(/\r?\n/)[0];
   const sep = premiere.includes("\t") ? "\t" : ";";
   const lignes = decouperTexte(texte, sep);
-  const tete = (lignes.shift() || []).map(c => c.trim().replace(/^(﻿|ï»¿)+/, ""));
+  const tete = (lignes.shift() || []).map(c => c.trim().replace(/^(﻿|ï»¿)+/, "")).map(c => VS_ALIAS[c] || c);
   const i = Object.fromEntries(tete.map((c, k) => [c, k]));
   return { tete, i, lignes, get: (l, c) => String(l[i[c]] ?? "").trim() };
 }
@@ -11203,12 +11212,13 @@ async function ajouterFichiersVS(liste) {
     try { t = await lireTableVS(fichier); } catch (e) { continue; }
     const a = c => c in t.i;
     let role = null, info = "", erreur = null;
-    if (a("Date stock") && a("Qté disponible")) {
+    if (a("Qté disponible") && a("Qté totale") && a("Code barre")) {
       const alloc = t.lignes.slice(0, 50).map(l => t.get(l, "Allocation")).find(Boolean);
       role = /FT2/i.test(fichier.name) ? "ft2" : /FTK/i.test(fichier.name) ? "ftk" : alloc === "N" ? "ft2" : "ftk";
       const date = t.lignes.map(l => t.get(l, "Date stock")).find(Boolean) || "";
-      info = `stock du ${date} · ${dashNb(t.lignes.length)} lignes`;
+      info = `stock du ${date} · ${dashNb(t.lignes.filter(l => t.get(l, "Zone")).length)} lignes de stock`;
       t.date = date;
+      erreur = vsManque(t, VS_COLONNES.stock);
     } else if (a("Numéro de réception") && a("Date de réception")) {
       // nom de fichier d'abord ; sinon le contenu : un export FT2 ne contient que des transferts venant de FTK
       // (« FK SIEGE »), un export FTK des fournisseurs (avec parfois quelques retours internes venant de FTK)
@@ -11216,6 +11226,7 @@ async function ajouterFichiersVS(liste) {
       role = /FT2/i.test(fichier.name) ? "rec_ft2" : /FTK/i.test(fichier.name) ? "rec_ftk"
            : depuisFtk > t.lignes.length * 0.8 ? "rec_ft2" : "rec_ftk";
       info = `${dashNb(t.lignes.length)} lignes`;
+      erreur = vsManque(t, VS_COLONNES.receptions);
     } else if (a("TypeBL") && a("Piece") && a("PA_Fiche")) {
       role = "nl";
       const nf = t.lignes.filter(l => /non\s*factur/i.test(t.get(l, "TypeBL")) && t.get(l, "nature") === "BL" && t.get(l, "Soldee") !== "1");
@@ -11312,7 +11323,9 @@ async function calculValeurStock() {
   let physiques = 0, piecesFt2 = 0;
   // 1. web : FT2 disponible
   { const t = F.ft2.table;
-    for (const l of t.lignes) { const q = vsNombre(t.get(l, "Qté disponible")); physiques += q; piecesFt2 += q;
+    // comme pour FTK : ni expédition, ni réception, ni chariot (l'export complet les contient, l'export court non)
+    for (const l of t.lignes) { if (t.get(l, "Zone") !== "Disponible a la vente") continue;
+      const q = vsNombre(t.get(l, "Qté disponible")); physiques += q; piecesFt2 += q;
       ajouter("WEB", info(t.get(l, "Référence"), null, t.get(l, "Complément 3"), t.get(l, "Libellé")), q); } }
   // 2. FTK : disponible (zone « Disponible a la vente ») et préparation, par code-barres
   const dispo = new Map(), prep = new Map(), repli = new Map(); let doublons = 0;

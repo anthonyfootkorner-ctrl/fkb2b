@@ -107,7 +107,8 @@ const MODELES_IMPORT = {
        une ligne par commande d'achat et par taille. Alimente l'onglet « Arrivages ». */
     libelle: "Réceptions attendues au central — export WMS (ReceptionsDetail)",
     sep: ";", encodage: "utf-8",
-    signature: ["Numéro de réception", "Nom tiers", "Date prévue", "Article commandé", "Qté commandée", "CA2"],
+    // « Numéro de réception » est devenu « N° de réception » en novembre 2026 : colonnes stables seulement
+    signature: ["Nom tiers", "Date prévue", "Article commandé", "Qté commandée", "CA2"],
     remplacement_complet: true,
     remplacement_libelle: "remplace la liste des réceptions attendues — aucun stock n'est touché",
   },
@@ -968,7 +969,7 @@ function lignesReceptions(L) {
   const jour = v => { const m = String(v || "").match(/^(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
   const parCle = new Map();
   for (const l of L) {
-    const numero = (l["Numéro de réception"] || "").trim();
+    const numero = (l["N° de réception"] || l["Numéro de réception"] || "").trim();
     const reference = (l.CA2 || "").trim();
     if (!numero || !reference) continue;
     const ca1 = (l.CA1 || "").trim();
