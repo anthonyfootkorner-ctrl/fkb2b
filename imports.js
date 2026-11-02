@@ -95,8 +95,10 @@ const MODELES_IMPORT = {
     sep: ";", encodage: "utf-8",
     // deux générations du même export : EGONet (« Stock à date », « Quantité disponible »)
     // et FT2 StocksDetail depuis octobre 2026 (« Date stock », « Qté disponible »)
+    // les intitulés FT2 bougent d'un export à l'autre (« Date stock » / « Date du stock »,
+    // « Adresse stockage » / « Adresse de stockage ») : on ne retient que les colonnes stables
     signatures: [["Stock à date", "Référence", "Quantité disponible", "Quantité totale", "Adresse de stockage"],
-                 ["Date stock", "Référence", "Qté disponible", "Qté totale", "Adresse stockage"]],
+                 ["Référence", "Référence 2", "Code barre", "Qté disponible", "Qté totale"]],
     remplacement_complet: true,
     remplacement_libelle: "remplace le stock WEB connu et plafonne le stock WEB vendable du catalogue à ce niveau — le central n'est pas touché",
   },
