@@ -268,6 +268,11 @@
   /* Sélection puis saisie en grille : le planner fournisseur, repris tel quel. */
   /* Vitrine de campagne : une tuile par catégorie fournisseur, dans l'esprit du planner
      Nike. Sans visuels fournisseur, les tuiles sont typographiques, comme l'accueil. */
+  /* Hero vidéo d'arrivée d'une campagne (AH27…) : pleine largeur, coupé net. */
+  .preco-hero { margin: 0 22px 18px; border-radius: 14px; overflow: hidden; }
+  .preco-hero video { display: block; width: 100%; max-height: 62svh; object-fit: cover; }
+  @media (max-width: 600px) { .preco-hero { margin: 0 12px 12px; }
+    .preco-hero video { max-height: 70svh; } }
   .preco-vitrine { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
     gap: 14px; margin: 0 22px 60px; }
   .vitrine-tuile { position: relative; height: 340px; border-radius: 14px; overflow: hidden; cursor: pointer;
@@ -1468,8 +1473,8 @@
 
     <div class="titre-section" id="titre-preco"><h2>PRÉCOMMANDES</h2><span>les collections à venir</span></div>
     <div class="preco-teaser avec-video" id="preco-accueil" onclick="ouvrirTeaserPreco()">
-      <video class="teaser-video" src="visuels/ah27.mp4?v=1793745627" poster="visuels/ah27-poster.jpg"
-        muted loop autoplay playsinline></video>
+      <video class="teaser-video" data-bureau="visuels/ah27.mp4?v=1793746080" data-mobile="visuels/ah27-mobile.mp4?v=1793746080"
+        poster="visuels/ah27-poster.jpg" data-poster-mobile="visuels/ah27-poster-mobile.jpg" muted loop autoplay playsinline></video>
       <div class="teaser-voile"></div>
       <div class="saison">Automne-Hiver 27</div>
       <h3>PRÉCOMMANDE <b>AH27</b></h3>
@@ -1690,6 +1695,7 @@
              placeholder="Rechercher dans toute la campagne : référence, nom, club, modèle, couleur — ex. psg, vomero, 394053-005"
              oninput="rechercherPreco(this.value)">
     </div>
+    <div class="preco-hero" id="preco-hero" hidden></div>
     <div class="preco-vitrine" id="preco-vitrine"></div>
     <div class="col-filtres" id="preco-filtres" style="padding: 0 22px 16px; display:flex; gap:8px; flex-wrap:wrap"></div>
     <div class="grille-col" id="preco-grille" style="margin: 0 22px 60px"></div>
@@ -1969,10 +1975,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1793745627"></script>
-<script src="imports.js?v=1793745627"></script>
-<script src="merch-shopify.js?v=1793745627"></script>
-<script src="moteur-merch.js?v=1793745627"></script>
+<script src="config.js?v=1793746080"></script>
+<script src="imports.js?v=1793746080"></script>
+<script src="merch-shopify.js?v=1793746080"></script>
+<script src="moteur-merch.js?v=1793746080"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2595,9 +2601,18 @@ function rendreAccueil() {
    campagne AH27 (ou pour le staff) ; « ouverture imminente » sinon. */
 const CAMPAGNE_ACCUEIL = "AH27";
 let TEASER_PRECO_CIBLE = null;
+function brancherVideoCampagne(video) {
+  // version mobile (9:16) sous 600 px, version bureau (16:9) sinon — choisie au rendu
+  if (!video || video.src) return;
+  const mobile = matchMedia("(max-width: 600px)").matches;
+  video.src = mobile ? video.dataset.mobile : video.dataset.bureau;
+  if (mobile && video.dataset.posterMobile) video.poster = video.dataset.posterMobile;
+}
+
 async function majTeaserPreco() {
   const statut = document.getElementById("statut-preco-accueil");
   if (!statut) return;
+  brancherVideoCampagne(document.querySelector(".teaser-video"));
   const campagnes = await chargerMesCampagnes().catch(() => []);
   const acces = estStaff || (campagnes || []).some(c => c.campagne === CAMPAGNE_ACCUEIL);
   // un magasin explicitement ouvert sur la campagne voit le slide même hors réseau
@@ -5681,7 +5696,29 @@ function affinerPrecoCategorie(categorie) { PRECO_CATEGORIE = categorie; rendreG
    fournies en premier et « Autre » en dernier. Cliquer une tuile filtre la grille et y
    descend ; un second clic revient à tout. Une photo de la catégorie, si un produit en a
    une, sert de fond — sinon la tuile reste typographique. */
+/* Vidéos d'arrivée par campagne (bureau 16:9 / mobile 9:16). Front seulement :
+   à passer en colonne de `campagnes` si ça devient courant. */
+const VIDEOS_CAMPAGNES = {
+  "AH27": { bureau: "visuels/ah27.mp4?v=1793746080", mobile: "visuels/ah27-mobile.mp4?v=1793746080",
+            poster: "visuels/ah27-poster.jpg", posterMobile: "visuels/ah27-poster-mobile.jpg" },
+};
+
+function rendreHeroPreco() {
+  const zone = document.getElementById("preco-hero");
+  if (!zone) return;
+  const vid = VIDEOS_CAMPAGNES[PRECO_COURANTE];
+  const montrer = vid && PRECO_VUE === "vitrine" && !PRECO_MARQUE && !String(PRECO_RECHERCHE || "").trim();
+  if (!montrer) { zone.innerHTML = ""; zone.hidden = true; return; }
+  if (!zone.hidden && zone.querySelector("video")) return; // déjà en place : ne pas relancer la lecture
+  zone.hidden = false;
+  const mobile = matchMedia("(max-width: 600px)").matches;
+  zone.innerHTML = `<video src="${mobile ? vid.mobile : vid.bureau}"
+    poster="${mobile ? (vid.posterMobile || vid.poster || "") : (vid.poster || "")}"
+    muted loop autoplay playsinline></video>`;
+}
+
 function rendreVitrinePreco() {
+  rendreHeroPreco();
   const zone = document.getElementById("preco-vitrine");
   if (!zone) return;
   if (precoMultiMarques()) return rendreVitrineMarques(zone);
