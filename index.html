@@ -268,11 +268,15 @@
   /* Sélection puis saisie en grille : le planner fournisseur, repris tel quel. */
   /* Vitrine de campagne : une tuile par catégorie fournisseur, dans l'esprit du planner
      Nike. Sans visuels fournisseur, les tuiles sont typographiques, comme l'accueil. */
-  /* Hero vidéo d'arrivée d'une campagne (AH27…) : pleine largeur, coupé net. */
-  .preco-hero { margin: 0 22px 18px; border-radius: 14px; overflow: hidden; }
-  .preco-hero video { display: block; width: 100%; max-height: 62svh; object-fit: cover; }
+  /* Hero vidéo d'arrivée d'une campagne (AH27…) : la vidéo ENTIÈRE, jamais recadrée
+     (demande du 03/11 : « pas coupé, on voit même pas ce que c'est »). La largeur est
+     bornée pour que le 16:9 ne devienne pas un mur ; le cadre noir absorbe le reste. */
+  .preco-hero { margin: 0 22px 18px; border-radius: 14px; overflow: hidden;
+    background: #0a0a0a; text-align: center; }
+  .preco-hero video { display: block; width: min(100%, 1100px); height: auto;
+    margin: 0 auto; }
   @media (max-width: 600px) { .preco-hero { margin: 0 12px 12px; }
-    .preco-hero video { max-height: 70svh; } }
+    .preco-hero video { width: 100%; } }
   .preco-vitrine { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
     gap: 14px; margin: 0 22px 60px; }
   .vitrine-tuile { position: relative; height: 340px; border-radius: 14px; overflow: hidden; cursor: pointer;
@@ -1685,7 +1689,7 @@
 
   <section class="vue page-claire" id="vue-precommande">
     <div class="col-tete">
-      <span class="fil" onclick="location.hash='#/precommandes'">&larr; PRÉCOMMANDES</span>
+      <span class="fil" id="preco-fil" onclick="location.hash='#/precommandes'">&larr; PRÉCOMMANDES</span>
       <h1 id="preco-titre"></h1>
       <div class="compte-produits" id="preco-sous-titre"></div>
       <div id="preco-paniers" style="margin-top:10px"></div>
@@ -1975,10 +1979,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1793746080"></script>
-<script src="imports.js?v=1793746080"></script>
-<script src="merch-shopify.js?v=1793746080"></script>
-<script src="moteur-merch.js?v=1793746080"></script>
+<script src="config.js?v=1793746774"></script>
+<script src="imports.js?v=1793746774"></script>
+<script src="merch-shopify.js?v=1793746774"></script>
+<script src="moteur-merch.js?v=1793746774"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -5459,6 +5463,12 @@ async function rendreCampagnesClient() {
     chargerMesCampagnes(),
     api("/rest/v1/rpc/calendrier_precommande", { corps: { p_societe: clientActif?.id ?? null } }).catch(() => []),
   ]);
+  // une seule campagne visible (cas AH27) : la page liste ne sert à rien,
+  // on entre directement dans la campagne — les marques y font la navigation
+  if ((campagnes || []).length === 1) {
+    location.replace("#/precommande/" + encodeURIComponent(campagnes[0].campagne));
+    return;
+  }
   const infos = {};
   (calendrier || []).forEach(c => infos[c.campagne] = c);
   zone.innerHTML = (campagnes || []).length
@@ -5526,6 +5536,13 @@ async function rendreCataloguePreco(campagne) {
     ]);
     PRECO_PRODUITS = produits;
     PRECO_INFOS = (campagnes || []).find(c => c.campagne === campagne) || {};
+    // sans page liste (une seule campagne), le fil ramène à l'accueil
+    const fil = document.getElementById("preco-fil");
+    if (fil) {
+      const unique = (campagnes || []).length <= 1;
+      fil.innerHTML = unique ? "&larr; ACCUEIL" : "&larr; PRÉCOMMANDES";
+      fil.onclick = () => location.hash = unique ? "#/" : "#/precommandes";
+    }
   } catch (e) {
     sous.textContent = "accès refusé à cette campagne";
     return;
