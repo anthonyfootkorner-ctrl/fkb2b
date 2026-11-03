@@ -233,6 +233,14 @@
   .statut-preco { display: inline-block; margin-top: 22px; font-size: 11px;
     letter-spacing: .18em; text-transform: uppercase; font-weight: 600;
     color: #f2751f; border: 1px solid #f2751f; border-radius: 999px; padding: 8px 20px; }
+  /* Slide vidéo de campagne (AH27) : la vidéo couvre le bloc, le texte reste lisible. */
+  .preco-teaser.avec-video { cursor: pointer; padding: 86px 22px 92px; }
+  .preco-teaser.avec-video .teaser-video { position: absolute; inset: 0; width: 100%;
+    height: 100%; object-fit: cover; z-index: 0; }
+  .preco-teaser.avec-video .teaser-voile { position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(rgba(5,5,5,.38), rgba(5,5,5,.66)); }
+  .preco-teaser.avec-video > *:not(.teaser-video):not(.teaser-voile) { position: relative; z-index: 2; }
+  .preco-teaser.avec-video:hover .statut-preco { background: #f2751f; color: #0a0a0a; }
 
   /* Recherche de magasin (back-office) : 241 comptes, on ne les retient pas par coeur. */
   .derniere-visite { font-size: 11.5px; color: var(--encre2); white-space: nowrap; }
@@ -1459,10 +1467,13 @@
     <div class="tuiles" id="tuiles-rayons"></div>
 
     <div class="titre-section" id="titre-preco"><h2>PRÉCOMMANDES</h2><span>les collections à venir</span></div>
-    <div class="preco-teaser" id="preco-accueil">
-      <div class="saison">Été 27</div>
-      <h3>NIKE <b>SU27</b></h3>
-      <span class="statut-preco">Coming soon</span>
+    <div class="preco-teaser avec-video" id="preco-accueil" onclick="ouvrirTeaserPreco()">
+      <video class="teaser-video" src="visuels/ah27.mp4?v=1793744606" poster="visuels/ah27-poster.jpg"
+        muted loop autoplay playsinline></video>
+      <div class="teaser-voile"></div>
+      <div class="saison">Automne-Hiver 27</div>
+      <h3>PRÉCOMMANDE <b>AH27</b></h3>
+      <span class="statut-preco" id="statut-preco-accueil">Ouverture imminente</span>
     </div>
 
     <footer>
@@ -1958,10 +1969,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1793613993"></script>
-<script src="imports.js?v=1793613993"></script>
-<script src="merch-shopify.js?v=1793613993"></script>
-<script src="moteur-merch.js?v=1793613993"></script>
+<script src="config.js?v=1793744606"></script>
+<script src="imports.js?v=1793744606"></script>
+<script src="merch-shopify.js?v=1793744606"></script>
+<script src="moteur-merch.js?v=1793744606"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2570,6 +2581,8 @@ function rendreAccueil() {
     if (el) el.style.display = droitPreco ? "" : "none";
   }
 
+  majTeaserPreco();
+
   const rayons = [...new Set(DATA.produits.map(p => p.famille).filter(Boolean))].slice(0, 8);
   document.getElementById("tuiles-rayons").innerHTML = rayons.map(r => {
     const p = DATA.produits.find(x => x.famille === r);
@@ -2580,6 +2593,20 @@ function rendreAccueil() {
     </div>`;
   }).join("");
 }
+
+/* Slide de campagne sur l'accueil : cliquable dès que le magasin a accès à la
+   campagne AH27 (ou pour le staff) ; « ouverture imminente » sinon. */
+const CAMPAGNE_ACCUEIL = "AH27";
+let TEASER_PRECO_CIBLE = null;
+async function majTeaserPreco() {
+  const statut = document.getElementById("statut-preco-accueil");
+  if (!statut) return;
+  const campagnes = await chargerMesCampagnes().catch(() => []);
+  const acces = estStaff || (campagnes || []).some(c => c.campagne === CAMPAGNE_ACCUEIL);
+  TEASER_PRECO_CIBLE = acces ? "#/precommande/" + encodeURIComponent(CAMPAGNE_ACCUEIL) : null;
+  statut.textContent = acces ? "Entrer dans la campagne →" : "Ouverture imminente";
+}
+function ouvrirTeaserPreco() { if (TEASER_PRECO_CIBLE) location.hash = TEASER_PRECO_CIBLE; }
 
 // Produit dont le visuel Shopify n'existe pas encore : on l'affiche quand même.
 function blocSansVisuel(p) {
