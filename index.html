@@ -1468,7 +1468,7 @@
 
     <div class="titre-section" id="titre-preco"><h2>PRÉCOMMANDES</h2><span>les collections à venir</span></div>
     <div class="preco-teaser avec-video" id="preco-accueil" onclick="ouvrirTeaserPreco()">
-      <video class="teaser-video" src="visuels/ah27.mp4?v=1793744606" poster="visuels/ah27-poster.jpg"
+      <video class="teaser-video" src="visuels/ah27.mp4?v=1793745000" poster="visuels/ah27-poster.jpg"
         muted loop autoplay playsinline></video>
       <div class="teaser-voile"></div>
       <div class="saison">Automne-Hiver 27</div>
@@ -1969,10 +1969,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1793744606"></script>
-<script src="imports.js?v=1793744606"></script>
-<script src="merch-shopify.js?v=1793744606"></script>
-<script src="moteur-merch.js?v=1793744606"></script>
+<script src="config.js?v=1793745000"></script>
+<script src="imports.js?v=1793745000"></script>
+<script src="merch-shopify.js?v=1793745000"></script>
+<script src="moteur-merch.js?v=1793745000"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2569,13 +2569,10 @@ function rendreAccueil() {
     heroImg.src = "hero.jpg";
   });
 
-  /* Annonce de campagne : les SP2000 n'ont droit qu'à la marque FK, une campagne Nike
-     ne les concerne pas. Le critère est la grille tarifaire et non le catalogue du jour :
-     le stock B2B ne contient pas de Nike en ce moment, ce qui masquerait l'annonce à
-     tout le monde. Quand la campagne existera en base, les accès magasin par magasin
-     (campagne_acces) remplaceront ce test. */
-  const GRILLES_SANS_MARQUES_EXTERNES = ["SP2000"];
-  const droitPreco = !GRILLES_SANS_MARQUES_EXTERNES.includes(clientActif?.famille_tarifaire || "");
+  /* Annonce de campagne : réservée au réseau Footkorner (succursales + franchises).
+     Un SP2000, un Intersport ou un indépendant ne voit RIEN de la section précommandes.
+     majTeaserPreco() réaffine ensuite avec les accès réels (campagne_acces). */
+  const droitPreco = estStaff || voitLesPrecommandes();
   for (const id of ["titre-preco", "preco-accueil"]) {
     const el = document.getElementById(id);
     if (el) el.style.display = droitPreco ? "" : "none";
@@ -2603,6 +2600,11 @@ async function majTeaserPreco() {
   if (!statut) return;
   const campagnes = await chargerMesCampagnes().catch(() => []);
   const acces = estStaff || (campagnes || []).some(c => c.campagne === CAMPAGNE_ACCUEIL);
+  // un magasin explicitement ouvert sur la campagne voit le slide même hors réseau
+  if (acces) for (const id of ["titre-preco", "preco-accueil"]) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "";
+  }
   TEASER_PRECO_CIBLE = acces ? "#/precommande/" + encodeURIComponent(CAMPAGNE_ACCUEIL) : null;
   statut.textContent = acces ? "Entrer dans la campagne →" : "Ouverture imminente";
 }
