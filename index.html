@@ -1499,7 +1499,7 @@
 
     <div class="titre-section" id="titre-preco"><h2>PRÉCOMMANDES</h2><span>les collections à venir</span></div>
     <div class="preco-teaser avec-video" id="preco-accueil" onclick="ouvrirTeaserPreco()">
-      <video class="teaser-video" data-bureau="visuels/ah27.mp4?v=1793791461" data-mobile="visuels/ah27-mobile.mp4?v=1793791461"
+      <video class="teaser-video" data-bureau="visuels/ah27.mp4?v=1793796600" data-mobile="visuels/ah27-mobile.mp4?v=1793796600"
         poster="visuels/ah27-poster.jpg" data-poster-mobile="visuels/ah27-poster-mobile.jpg" muted loop autoplay playsinline></video>
       <div class="teaser-voile"></div>
       <div class="saison">Automne-Hiver 27</div>
@@ -2002,10 +2002,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1793791461"></script>
-<script src="imports.js?v=1793791461"></script>
-<script src="merch-shopify.js?v=1793791461"></script>
-<script src="moteur-merch.js?v=1793791461"></script>
+<script src="config.js?v=1793796600"></script>
+<script src="imports.js?v=1793796600"></script>
+<script src="merch-shopify.js?v=1793796600"></script>
+<script src="moteur-merch.js?v=1793796600"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2587,7 +2587,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1793791461";
+    v.src = "hero.mp4?v=1793796600";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -5523,6 +5523,7 @@ let PRECO_COURANTE = null, PRECO_PRODUITS = [], PRECO_MARQUE = null, PRECO_RAYON
 // campagne multi-marques (implantation…) : la vitrine propose d'abord les marques, puis les familles de la marque
 const libelleFamille = f => { const t = String(f || "").trim(); return t ? t[0].toUpperCase() + t.slice(1).toLowerCase() : ""; };
 let PRECO_INFOS = {};   // la fiche de la campagne (visuel, date limite), pour la vitrine
+let PRECO_DOCUMENTS = [];  // catalogues téléchargeables de la campagne (marque sans fiches, ex. OAKLEY)
 let PRECO_VUE = "vitrine";   // « vitrine » : les gros blocs seuls ; « grille » : les produits
 /* Le fournisseur range chaussures et accessoires dans « Sportswear », « Running », « Jordan »…
    avec le textile. Pour l'acheteur, une chaussure est d'abord une chaussure et une casquette
@@ -5551,12 +5552,14 @@ async function rendreCataloguePreco(campagne) {
   sous.textContent = "Chargement…";
   document.getElementById("preco-grille").innerHTML = "";
   try {
-    const [produits, campagnes] = await Promise.all([
+    const [produits, campagnes, documents] = await Promise.all([
       api("/rest/v1/rpc/catalogue_precommande",
         { corps: { p_campagne: campagne, limite: 5000, p_societe: clientActif?.id ?? null } }),
       api("/rest/v1/rpc/mes_campagnes", { corps: { p_societe: clientActif?.id ?? null } }).catch(() => []),
+      api(`/rest/v1/campagne_documents?campagne=eq.${encodeURIComponent(campagne)}&order=ordre,libelle`).catch(() => []),
     ]);
     PRECO_PRODUITS = produits;
+    PRECO_DOCUMENTS = documents || [];
     PRECO_INFOS = (campagnes || []).find(c => c.campagne === campagne) || {};
     // sans page liste (une seule campagne), le fil ramène à l'accueil
     const fil = document.getElementById("preco-fil");
@@ -5723,7 +5726,7 @@ function affinerPrecoCategorie(categorie) { PRECO_CATEGORIE = categorie; rendreG
 /* Vidéos d'arrivée par campagne (bureau 16:9 / mobile 9:16). Front seulement :
    à passer en colonne de `campagnes` si ça devient courant. */
 const VIDEOS_CAMPAGNES = {
-  "AH27": { bureau: "visuels/ah27.mp4?v=1793791461", mobile: "visuels/ah27-mobile.mp4?v=1793791461",
+  "AH27": { bureau: "visuels/ah27.mp4?v=1793796600", mobile: "visuels/ah27-mobile.mp4?v=1793796600",
             poster: "visuels/ah27-poster.jpg", posterMobile: "visuels/ah27-poster-mobile.jpg" },
 };
 
@@ -5774,7 +5777,26 @@ function rendreVitrineMarques(zone) {
       <div class="voir">Voir toute la campagne <span>${PRECO_PRODUITS.length}</span></div>
     </div>`
     + marques.map(m => tuile(m, compte[m], (PRECO_PRODUITS.find(p => p.marque === m && p.photo) || {}).photo,
-                             `choisirMarqueVitrine(${arg(m)})`)).join("");
+                             `choisirMarqueVitrine(${arg(m)})`)).join("")
+    /* marques proposées seulement sur catalogue (pas de fiches) : une tuile qui télécharge le fichier */
+    + (PRECO_DOCUMENTS || []).map(d => `<div class="vitrine-tuile${d.image ? " photo" : ""}" onclick="telechargerDocumentPreco(${arg(d.chemin)})">
+      ${d.image ? `<img class="fond" loading="lazy" src="${echapperHTML(d.image)}" alt="">`
+                : `<div class="corps"><div class="nom">${echapperHTML(d.marque || d.libelle)}</div></div>`}
+      <div class="voir">⬇ ${echapperHTML(d.libelle)} <span>${d.taille_octets ? hebdoTaille(d.taille_octets) : "PDF"}</span></div></div>`).join("");
+}
+
+/* Le bucket « catalogues » est privé (mêmes droits que la campagne) : on signe l'URL au clic. */
+async function telechargerDocumentPreco(chemin) {
+  try {
+    const r = await api(`/storage/v1/object/sign/catalogues/${chemin.split("/").map(encodeURIComponent).join("/")}`,
+                        { corps: { expiresIn: 3600 } });
+    const a = document.createElement("a");
+    a.href = FKB2B.url + "/storage/v1" + r.signedURL + "&download=";
+    a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch (e) {
+    alert("Téléchargement impossible pour le moment : " + (e?.message || e));
+  }
 }
 
 function rendreVitrineCategories(zone) {
