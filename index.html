@@ -1499,7 +1499,7 @@
 
     <div class="titre-section" id="titre-preco"><h2>PRÉCOMMANDES</h2><span>les collections à venir</span></div>
     <div class="preco-teaser avec-video" id="preco-accueil" onclick="ouvrirTeaserPreco()">
-      <video class="teaser-video" data-bureau="visuels/ah27.mp4?v=1793798083" data-mobile="visuels/ah27-mobile.mp4?v=1793798083"
+      <video class="teaser-video" data-bureau="visuels/ah27.mp4?v=1793800589" data-mobile="visuels/ah27-mobile.mp4?v=1793800589"
         poster="visuels/ah27-poster.jpg" data-poster-mobile="visuels/ah27-poster-mobile.jpg" muted loop autoplay playsinline></video>
       <div class="teaser-voile"></div>
       <div class="saison">Automne-Hiver 27</div>
@@ -2002,10 +2002,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1793798083"></script>
-<script src="imports.js?v=1793798083"></script>
-<script src="merch-shopify.js?v=1793798083"></script>
-<script src="moteur-merch.js?v=1793798083"></script>
+<script src="config.js?v=1793800589"></script>
+<script src="imports.js?v=1793800589"></script>
+<script src="merch-shopify.js?v=1793800589"></script>
+<script src="moteur-merch.js?v=1793800589"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2587,7 +2587,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1793798083";
+    v.src = "hero.mp4?v=1793800589";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -5534,7 +5534,11 @@ const BLOCS_PAR_FAMILLE = { FOOTWEAR: "Footwear", ACCESSOIRES: "Accessoires" };
    (mêmes produits, même grille 6/8 → 13/15 ans) : un seul rayon enfant côté portail. */
 const RAYON_ALIAS = { YOUTH: "KIDS" };
 const rayonDe = p => RAYON_ALIAS[p.rayon] || p.rayon || "";
-const categorieDe = p => BLOCS_PAR_FAMILLE[(p.famille || "").toUpperCase()] || p.categorie || "";
+/* Pour ces marques, les blocs de la vitrine sont les MODÈLES (catégories fournisseur), même pour
+   les chaussures : demande d'Anthony du 04/11 (« briques par sous-familles » chez Saucony). */
+const MARQUES_BLOCS_MODELES = new Set(["SAUCONY"]);
+const categorieDe = p => (MARQUES_BLOCS_MODELES.has(p.marque) && p.categorie) ? p.categorie
+  : BLOCS_PAR_FAMILLE[(p.famille || "").toUpperCase()] || p.categorie || "";
 /* Le bloc d'un produit dans une campagne : la catégorie fournisseur pour une campagne mono-marque,
    « marque · famille » pour une campagne multi-marques (implantation), comme sa vitrine. */
 const MULTI_MARQUES = new WeakMap();
@@ -5639,6 +5643,9 @@ function rendreGrillePreco() {
      cadres photo au-dessus de la grille (rendreCadresPreco). */
   const catsDeMarque = new Set(duChamp.map(categorieDe).filter(Boolean)).size;
   let barre = puce(PRECO_MARQUE && catsDeMarque > 1 ? "← Catégories" : "← Marques", false, "retourVitrine()");
+  // le catalogue PDF de la marque se télécharge depuis sa grille (demande Anthony 04/11)
+  if (!q) for (const d of (PRECO_DOCUMENTS || []).filter(d => d.marque && d.marque === PRECO_MARQUE))
+    barre += puce(`⬇ ${d.libelle}`, false, `telechargerDocumentPreco(${arg(d.chemin)})`);
   if (q) {
     barre += `<button class="puce-claire actif" onclick="effacerRecherchePreco()">✕ Effacer la recherche « ${echapperHTML(PRECO_RECHERCHE.trim())} »</button>`;
   } else if (rayons.length > 1) {
@@ -5726,7 +5733,7 @@ function affinerPrecoCategorie(categorie) { PRECO_CATEGORIE = categorie; rendreG
 /* Vidéos d'arrivée par campagne (bureau 16:9 / mobile 9:16). Front seulement :
    à passer en colonne de `campagnes` si ça devient courant. */
 const VIDEOS_CAMPAGNES = {
-  "AH27": { bureau: "visuels/ah27.mp4?v=1793798083", mobile: "visuels/ah27-mobile.mp4?v=1793798083",
+  "AH27": { bureau: "visuels/ah27.mp4?v=1793800589", mobile: "visuels/ah27-mobile.mp4?v=1793800589",
             poster: "visuels/ah27-poster.jpg", posterMobile: "visuels/ah27-poster-mobile.jpg" },
 };
 
@@ -5778,8 +5785,9 @@ function rendreVitrineMarques(zone) {
     </div>`
     + marques.map(m => tuile(m, compte[m], (PRECO_PRODUITS.find(p => p.marque === m && p.photo) || {}).photo,
                              `choisirMarqueVitrine(${arg(m)})`)).join("")
-    /* marques proposées seulement sur catalogue (pas de fiches) : une tuile qui télécharge le fichier */
-    + (PRECO_DOCUMENTS || []).map(d => `<div class="vitrine-tuile${d.image ? " photo" : ""}" onclick="telechargerDocumentPreco(${arg(d.chemin)})">
+    /* marques proposées seulement sur catalogue (pas encore de produits) : une tuile qui télécharge
+       le fichier. Dès que la marque a des produits, son catalogue se télécharge depuis sa grille. */
+    + (PRECO_DOCUMENTS || []).filter(d => !(d.marque && compte[d.marque])).map(d => `<div class="vitrine-tuile${d.image ? " photo" : ""}" onclick="telechargerDocumentPreco(${arg(d.chemin)})">
       ${d.image ? `<img class="fond" loading="lazy" src="${echapperHTML(d.image)}" alt="">`
                 : `<div class="corps"><div class="nom">${echapperHTML(d.marque || d.libelle)}</div></div>`}
       <div class="voir">⬇ ${echapperHTML(d.libelle)} <span>${d.taille_octets ? hebdoTaille(d.taille_octets) : "PDF"}</span></div></div>`).join("");
@@ -5823,6 +5831,10 @@ function rendreVitrineCategories(zone) {
     <div class="vitrine-tuile" onclick="retourMarquesVitrine()" style="height:auto;min-height:0">
       <div class="corps" style="padding:14px"><div class="sous">← toutes les marques</div></div>
     </div>`
+    + (PRECO_DOCUMENTS || []).filter(d => d.marque === PRECO_MARQUE).map(d => `
+    <div class="vitrine-tuile" onclick="telechargerDocumentPreco(${arg(d.chemin)})" style="height:auto;min-height:0">
+      <div class="corps" style="padding:14px"><div class="sous">⬇ ${echapperHTML(d.libelle)} · ${d.taille_octets ? hebdoTaille(d.taille_octets) : "PDF"}</div></div>
+    </div>`).join("")
     + cats.map(c => {
       const ph = photoDe(c);
       return `<div class="vitrine-tuile${ph ? " photo" : ""}" onclick="choisirVitrine(${arg(c)})">
@@ -6106,9 +6118,39 @@ function memoriserPanierPreco() {
   catch (e) { /* stockage refusé : la sélection ne vivra que le temps de la visite */ }
 }
 
+/* Une précommande ne mélange pas les marques (règle Anthony 04/11) : la marque du panier
+   est celle de son premier produit, et tout ajout d'une autre marque propose un panier neuf.
+   Le serveur applique la même règle (enregistrer_precommande, fusionner_paniers). */
+function marquePanierPreco() {
+  for (const ref of PRECO_PANIER) {
+    const m = (produitConnu(ref) || {}).marque;
+    if (m) return m;
+  }
+  return null;
+}
+
+async function proposerPanierMarque(reference, marque, marquePanier) {
+  const p = panierActif();
+  if (!confirm(`Une précommande ne mélange pas les marques : le panier « ${p?.nom || ""} » contient du ${marquePanier}.`
+    + `\n\nCréer un panier ${marque} et y mettre cette référence ?`)) return;
+  try {
+    const nouveau = await api("/rest/v1/rpc/creer_panier",
+      { corps: { p_campagne: PRECO_COURANTE, p_societe: clientActif?.id ?? null, p_nom: `Panier ${marque}` } });
+    PRECO_PANIERS.push(nouveau);
+    await choisirPanierPreco(nouveau.id);
+    PRECO_PANIER.add(reference);
+    memoriserPanierPreco();
+    rendreGrillePreco();
+  } catch (e) { alert("Impossible de créer le panier : " + (e.donnees?.message || e.message)); }
+}
+
 function basculerPanierPreco(reference, ev) {
   ev?.stopPropagation();
   const ajout = !PRECO_PANIER.has(reference);
+  if (ajout) {
+    const m = (produitConnu(reference) || {}).marque, mp = marquePanierPreco();
+    if (m && mp && m !== mp) { proposerPanierMarque(reference, m, mp); return; }
+  }
   if (!ajout) {
     if (!confirmerRetraitPreco(reference)) return;
     // la saisie enregistrée part avec la référence ; si la base refuse, on la remet
