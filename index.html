@@ -300,6 +300,28 @@
   .vitrine-tuile.photo:not(.noir) img.fond { mix-blend-mode: multiply; }
   @media (max-width: 700px) { .preco-vitrine { margin: 0 12px 40px; grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .vitrine-tuile { height: 220px; } }
+  /* Bandeau de petits cadres (familles) au-dessus de la grille : la sélection se fait
+     à l'œil, photo du premier produit de la famille. Repliable pour voir tous les produits. */
+  .preco-cadres-zone { margin: 0 22px 18px; }
+  .preco-cadres-tete { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .preco-cadres-tete .titre-cadres { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--encre2); }
+  .preco-cadres { display: grid; grid-auto-flow: column; grid-auto-columns: 150px; gap: 10px;
+    overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
+  .cadre-famille { position: relative; height: 190px; border-radius: 12px; overflow: hidden; cursor: pointer;
+    background: var(--tuile, #f4f4f2); display: flex; flex-direction: column; scroll-snap-align: start;
+    transition: transform .15s ease, box-shadow .15s ease; }
+  .cadre-famille:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(0,0,0,.10); }
+  .cadre-famille img { flex: 1; min-height: 0; width: 100%; object-fit: cover; object-position: center top;
+    display: block; mix-blend-mode: multiply; }
+  .cadre-famille .corps { flex: 1; display: flex; align-items: center; justify-content: center; padding: 10px; text-align: center; }
+  .cadre-famille .corps .nom-cadre { font-weight: 700; font-size: 15px; line-height: 1.15; }
+  .cadre-famille .legende { background: #111; color: #fff; padding: 8px 10px; font-size: 12px; font-weight: 500;
+    display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .cadre-famille .legende span { opacity: .6; font-size: 11px; }
+  .cadre-famille.actif { outline: 3px solid var(--encre); outline-offset: -3px; }
+  .cadre-famille.actif .legende { background: #2e9e4f; }
+  @media (max-width: 700px) { .preco-cadres-zone { margin: 0 12px 14px; }
+    .preco-cadres { grid-auto-columns: 124px; } .cadre-famille { height: 160px; } }
   /* Merch préco : l'ordre des blocs de la page d'arrivée, à glisser comme les produits. */
   .merch-blocs { margin: 0 22px 18px; padding: 14px 16px 16px; background: #fff; border: 1px solid var(--hairline); border-radius: 14px; }
   .merch-blocs .tete { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
@@ -1477,7 +1499,7 @@
 
     <div class="titre-section" id="titre-preco"><h2>PRÉCOMMANDES</h2><span>les collections à venir</span></div>
     <div class="preco-teaser avec-video" id="preco-accueil" onclick="ouvrirTeaserPreco()">
-      <video class="teaser-video" data-bureau="visuels/ah27.mp4?v=1793746080" data-mobile="visuels/ah27-mobile.mp4?v=1793746080"
+      <video class="teaser-video" data-bureau="visuels/ah27.mp4?v=1793790385" data-mobile="visuels/ah27-mobile.mp4?v=1793790385"
         poster="visuels/ah27-poster.jpg" data-poster-mobile="visuels/ah27-poster-mobile.jpg" muted loop autoplay playsinline></video>
       <div class="teaser-voile"></div>
       <div class="saison">Automne-Hiver 27</div>
@@ -1702,6 +1724,7 @@
     <div class="preco-hero" id="preco-hero" hidden></div>
     <div class="preco-vitrine" id="preco-vitrine"></div>
     <div class="col-filtres" id="preco-filtres" style="padding: 0 22px 16px; display:flex; gap:8px; flex-wrap:wrap"></div>
+    <div class="preco-cadres-zone" id="preco-cadres" hidden></div>
     <div class="grille-col" id="preco-grille" style="margin: 0 22px 60px"></div>
     <div class="preco-barre" id="preco-barre" hidden></div>
   </section>
@@ -1979,10 +2002,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1793746774"></script>
-<script src="imports.js?v=1793746774"></script>
-<script src="merch-shopify.js?v=1793746774"></script>
-<script src="moteur-merch.js?v=1793746774"></script>
+<script src="config.js?v=1793790385"></script>
+<script src="imports.js?v=1793790385"></script>
+<script src="merch-shopify.js?v=1793790385"></script>
+<script src="moteur-merch.js?v=1793790385"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2564,7 +2587,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1793613993";
+    v.src = "hero.mp4?v=1793790385";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -5610,16 +5633,9 @@ function rendreGrillePreco() {
   const rayons = [...new Set(PRECO_PRODUITS.map(rayonDe).filter(Boolean))]
     .sort((a, b) => combien("rayon", b) - combien("rayon", a) || a.localeCompare(b));
   const marques = [...new Set(PRECO_PRODUITS.map(p => p.marque).filter(Boolean))].sort();
+  /* Les familles ne sont plus des pastilles texte : elles vivent dans le bandeau de
+     cadres photo au-dessus de la grille (rendreCadresPreco). */
   let barre = puce(precoMultiMarques() ? "← Marques" : "← Catégories", false, "retourVitrine()");
-  if (PRECO_MARQUE && precoMultiMarques()) {
-    const deLaMarque = PRECO_PRODUITS.filter(p => p.marque === PRECO_MARQUE);
-    const cf = {};
-    for (const p of deLaMarque) { const f = (p.famille || "").toUpperCase(); if (f) cf[f] = (cf[f] || 0) + 1; }
-    const familles = Object.keys(cf).sort((a, b) => cf[b] - cf[a] || a.localeCompare(b));
-    barre += `<span style="flex-basis:100%; height:0"></span>`
-      + puce(`Tout ${PRECO_MARQUE} (${deLaMarque.length})`, !PRECO_FAMILLE, "affinerPrecoFamille(null)")
-      + familles.map(f => puce(`${libelleFamille(f)} (${cf[f]})`, f === PRECO_FAMILLE, `affinerPrecoFamille(${arg(f)})`)).join("");
-  }
   if (q) {
     barre += `<button class="puce-claire actif" onclick="effacerRecherchePreco()">✕ Effacer la recherche « ${echapperHTML(PRECO_RECHERCHE.trim())} »</button>`;
   } else if (rayons.length > 1) {
@@ -5649,6 +5665,7 @@ function rendreGrillePreco() {
 
   rendreBarrePreco();
   rendreVitrinePreco();
+  rendreCadresPreco();
 
   /* Page d'arrivée : les gros blocs seuls, pas de produits en dessous. On ne voit la
      grille qu'après avoir choisi une catégorie (ou toute la campagne). */
@@ -5716,7 +5733,7 @@ function affinerPrecoCategorie(categorie) { PRECO_CATEGORIE = categorie; rendreG
 /* Vidéos d'arrivée par campagne (bureau 16:9 / mobile 9:16). Front seulement :
    à passer en colonne de `campagnes` si ça devient courant. */
 const VIDEOS_CAMPAGNES = {
-  "AH27": { bureau: "visuels/ah27.mp4?v=1793746080", mobile: "visuels/ah27-mobile.mp4?v=1793746080",
+  "AH27": { bureau: "visuels/ah27.mp4?v=1793790385", mobile: "visuels/ah27-mobile.mp4?v=1793790385",
             poster: "visuels/ah27-poster.jpg", posterMobile: "visuels/ah27-poster-mobile.jpg" },
 };
 
@@ -5825,6 +5842,63 @@ function choisirFamilleVitrine(famille) {
   window.scrollTo({ top: 0 });
 }
 function affinerPrecoFamille(famille) { PRECO_FAMILLE = famille || null; rendreGrillePreco(); }
+
+/* ---- bandeau de cadres « familles » au-dessus de la grille (demande d'Anthony 04/11) ----
+   De petits cadres cliquables, photo du premier produit de la famille dans l'ordre merch,
+   pour choisir sa famille à l'œil. L'utilisateur peut replier le bandeau (mémorisé sur le
+   poste) : replié, le filtre famille saute pour voir tous les produits. */
+let PRECO_CADRES_FERMES = false;
+try { PRECO_CADRES_FERMES = localStorage.getItem("preco-cadres-fermes") === "1"; } catch {}
+
+function basculerCadresPreco(fermer) {
+  PRECO_CADRES_FERMES = !!fermer;
+  try { localStorage.setItem("preco-cadres-fermes", fermer ? "1" : "0"); } catch {}
+  if (fermer) PRECO_FAMILLE = null;   // replié = tous les produits de la sélection
+  rendreGrillePreco();
+}
+
+function rendreCadresPreco() {
+  const zone = document.getElementById("preco-cadres");
+  if (!zone) return;
+  const base = PRECO_PRODUITS.filter(p =>
+    (!PRECO_MARQUE || p.marque === PRECO_MARQUE)
+    && (!PRECO_RAYON || rayonDe(p) === PRECO_RAYON)
+    && (!PRECO_CATEGORIE || categorieDe(p) === PRECO_CATEGORIE));
+  const compte = {};
+  for (const p of base) { const f = (p.famille || "").toUpperCase(); if (f) compte[f] = (compte[f] || 0) + 1; }
+  const familles = Object.keys(compte).sort((a, b) => compte[b] - compte[a] || a.localeCompare(b));
+  if (PRECO_VUE !== "grille" || String(PRECO_RECHERCHE || "").trim() || familles.length < 2) {
+    zone.innerHTML = ""; zone.hidden = true; return;
+  }
+  zone.hidden = false;
+  if (PRECO_CADRES_FERMES) {
+    zone.innerHTML = `<button class="puce-claire" onclick="basculerCadresPreco(false)">▦ Choisir par famille</button>`;
+    return;
+  }
+  // la photo de chaque famille : son premier produit illustré dans l'ordre merch de la sélection
+  const ctxMerch = contextePreco(PRECO_COURANTE, precoMultiMarques() ? null : PRECO_CATEGORIE);
+  const photos = {};
+  for (const p of ordonner(base, ctxMerch)) {
+    const f = (p.famille || "").toUpperCase();
+    if (f && p.photo && !(f in photos)) photos[f] = p.photo;
+  }
+  const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
+  const cadre = (libelle, n, photo, appel, actif) => `
+    <div class="cadre-famille${actif ? " actif" : ""}" onclick="${appel}">
+      ${photo ? `<img loading="lazy" src="${photo}" alt="">`
+              : `<div class="corps"><div class="nom-cadre">${echapperHTML(libelle)}</div></div>`}
+      <div class="legende">${echapperHTML(libelle)} <span>${n}</span></div>
+    </div>`;
+  zone.innerHTML = `
+    <div class="preco-cadres-tete">
+      <span class="titre-cadres">Choisir une famille</span>
+      <button class="puce-claire" style="margin-left:auto" onclick="basculerCadresPreco(true)">✕ Masquer · voir tous les produits</button>
+    </div>
+    <div class="preco-cadres">
+      ${cadre("Tout", base.length, null, "affinerPrecoFamille(null)", !PRECO_FAMILLE)}
+      ${familles.map(f => cadre(libelleFamille(f), compte[f], photos[f], `affinerPrecoFamille(${arg(f)})`, f === PRECO_FAMILLE)).join("")}
+    </div>`;
+}
 function retourFamillesVitrine() {
   PRECO_FAMILLE = null; PRECO_VUE = "vitrine";
   rendreGrillePreco();
