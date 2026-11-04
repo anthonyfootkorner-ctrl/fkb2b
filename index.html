@@ -1499,7 +1499,7 @@
 
     <div class="titre-section" id="titre-preco"><h2>PRÉCOMMANDES</h2><span>les collections à venir</span></div>
     <div class="preco-teaser avec-video" id="preco-accueil" onclick="ouvrirTeaserPreco()">
-      <video class="teaser-video" data-bureau="visuels/ah27.mp4?v=1793796600" data-mobile="visuels/ah27-mobile.mp4?v=1793796600"
+      <video class="teaser-video" data-bureau="visuels/ah27.mp4?v=1793798083" data-mobile="visuels/ah27-mobile.mp4?v=1793798083"
         poster="visuels/ah27-poster.jpg" data-poster-mobile="visuels/ah27-poster-mobile.jpg" muted loop autoplay playsinline></video>
       <div class="teaser-voile"></div>
       <div class="saison">Automne-Hiver 27</div>
@@ -2002,10 +2002,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1793796600"></script>
-<script src="imports.js?v=1793796600"></script>
-<script src="merch-shopify.js?v=1793796600"></script>
-<script src="moteur-merch.js?v=1793796600"></script>
+<script src="config.js?v=1793798083"></script>
+<script src="imports.js?v=1793798083"></script>
+<script src="merch-shopify.js?v=1793798083"></script>
+<script src="moteur-merch.js?v=1793798083"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2587,7 +2587,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1793796600";
+    v.src = "hero.mp4?v=1793798083";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -5554,7 +5554,7 @@ async function rendreCataloguePreco(campagne) {
   try {
     const [produits, campagnes, documents] = await Promise.all([
       api("/rest/v1/rpc/catalogue_precommande",
-        { corps: { p_campagne: campagne, limite: 5000, p_societe: clientActif?.id ?? null } }),
+        { corps: { p_campagne: campagne, limite: 12000, p_societe: clientActif?.id ?? null } }),
       api("/rest/v1/rpc/mes_campagnes", { corps: { p_societe: clientActif?.id ?? null } }).catch(() => []),
       api(`/rest/v1/campagne_documents?campagne=eq.${encodeURIComponent(campagne)}&order=ordre,libelle`).catch(() => []),
     ]);
@@ -5726,7 +5726,7 @@ function affinerPrecoCategorie(categorie) { PRECO_CATEGORIE = categorie; rendreG
 /* Vidéos d'arrivée par campagne (bureau 16:9 / mobile 9:16). Front seulement :
    à passer en colonne de `campagnes` si ça devient courant. */
 const VIDEOS_CAMPAGNES = {
-  "AH27": { bureau: "visuels/ah27.mp4?v=1793796600", mobile: "visuels/ah27-mobile.mp4?v=1793796600",
+  "AH27": { bureau: "visuels/ah27.mp4?v=1793798083", mobile: "visuels/ah27-mobile.mp4?v=1793798083",
             poster: "visuels/ah27-poster.jpg", posterMobile: "visuels/ah27-poster-mobile.jpg" },
 };
 
