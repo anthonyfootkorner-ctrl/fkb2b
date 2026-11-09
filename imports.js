@@ -979,7 +979,7 @@ function lignesReceptions(L) {
       marque: (l.CA3 || l["Nom tiers"] || "").trim().toUpperCase(), ean: (l["Article commandé"] || "").trim(),
       libelle: (l["Description article"] || "").trim(), quantite_commandee: 0, quantite_recue: 0,
       date_prevue: jour(l["Date prévue"]), cree_le: jour(l["Date de création"]), recu_le: null,
-      soldee: String(l["Soldé"] || "").trim().toUpperCase() === "O" };
+      soldee: ["O", "OUI", "Y", "YES"].includes(String(l["Soldé"] || "").trim().toUpperCase()) };   // le WMS écrit Y / N
     e.quantite_commandee += nombre(l["Qté commandée"]);
     e.quantite_recue += nombre(l["Qté réceptionnée"]);
     e.recu_le = e.recu_le || jour(l["Date de réception"]);
