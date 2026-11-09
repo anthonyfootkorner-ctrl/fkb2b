@@ -2002,10 +2002,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1794221650"></script>
-<script src="imports.js?v=1794221650"></script>
-<script src="merch-shopify.js?v=1794221650"></script>
-<script src="moteur-merch.js?v=1794221650"></script>
+<script src="config.js?v=1794235610"></script>
+<script src="imports.js?v=1794235610"></script>
+<script src="merch-shopify.js?v=1794235610"></script>
+<script src="moteur-merch.js?v=1794235610"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -11499,6 +11499,9 @@ function gardeFousVS(c) {
       Je confirme que ces écarts sont réels et je veux enregistrer quand même</label></div>`;
 }
 
+// le WMS écrit « Disponible a la vente » ou « Disponible à la vente » selon les exports (accent, encodage)
+const vsZoneDispo = z => /^disponible\s+\S{1,2}\s+la\s+vente$/i.test(String(z || "").trim());
+
 async function calculValeurStock() {
   const F = VS.fichiers;
   // fiches produits : prix d'achat, marque, saison, désignation par code-barres et par identifiant « #… »
@@ -11528,7 +11531,7 @@ async function calculValeurStock() {
   // 1. web : FT2 disponible
   { const t = F.ft2.table;
     // comme pour FTK : ni expédition, ni réception, ni chariot (l'export complet les contient, l'export court non)
-    for (const l of t.lignes) { if (t.get(l, "Zone") !== "Disponible a la vente") continue;
+    for (const l of t.lignes) { if (!vsZoneDispo(t.get(l, "Zone"))) continue;
       const q = vsNombre(t.get(l, "Qté disponible")); physiques += q; piecesFt2 += q;
       ajouter("WEB", info(t.get(l, "Référence"), null, t.get(l, "Complément 3"), t.get(l, "Libellé")), q); } }
   // 2. FTK : disponible (zone « Disponible a la vente ») et préparation, par code-barres
@@ -11541,7 +11544,7 @@ async function calculValeurStock() {
       repli.set(c, [t.get(l, "Complément 2"), t.get(l, "Complément 3"), t.get(l, "Libellé")]);
       const p = Math.min(vsNombre(t.get(l, "Qté totale")), vsNombre(t.get(l, "Qté réservée")) + vsNombre(t.get(l, "Qté allouée")));
       prep.set(c, (prep.get(c) || 0) + p); physiques += p;
-      if (zone === "Disponible a la vente") { const q = vsNombre(t.get(l, "Qté disponible")); dispo.set(c, (dispo.get(c) || 0) + q); physiques += q; }
+      if (vsZoneDispo(zone)) { const q = vsNombre(t.get(l, "Qté disponible")); dispo.set(c, (dispo.get(c) || 0) + q); physiques += q; }
     } }
   const infoFtk = c => info(c, ...(repli.get(c) || []));
   const prepInitiale = new Map(prep);   // le réservé + alloué FTK tel que lu, avant tout prélèvement
