@@ -1499,7 +1499,7 @@
 
     <div class="titre-section" id="titre-preco"><h2>PRÉCOMMANDES</h2><span>les collections à venir</span></div>
     <div class="preco-teaser avec-video" id="preco-accueil" onclick="ouvrirTeaserPreco()">
-      <video class="teaser-video" data-bureau="visuels/ah27.mp4?v=1793800589" data-mobile="visuels/ah27-mobile.mp4?v=1793800589"
+      <video class="teaser-video" data-bureau="visuels/ah27.mp4?v=1794221650" data-mobile="visuels/ah27-mobile.mp4?v=1794221650"
         poster="visuels/ah27-poster.jpg" data-poster-mobile="visuels/ah27-poster-mobile.jpg" muted loop autoplay playsinline></video>
       <div class="teaser-voile"></div>
       <div class="saison">Automne-Hiver 27</div>
@@ -2002,10 +2002,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1793800589"></script>
-<script src="imports.js?v=1793800589"></script>
-<script src="merch-shopify.js?v=1793800589"></script>
-<script src="moteur-merch.js?v=1793800589"></script>
+<script src="config.js?v=1794221650"></script>
+<script src="imports.js?v=1794221650"></script>
+<script src="merch-shopify.js?v=1794221650"></script>
+<script src="moteur-merch.js?v=1794221650"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2587,7 +2587,7 @@ function rendreAccueil() {
     if (!r.ok) throw 0;
     const v = document.createElement("video");
     v.className = "hero-video";
-    v.src = "hero.mp4?v=1793800589";
+    v.src = "hero.mp4?v=1794221650";
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
     const voile = document.createElement("div");
     voile.className = "hero-voile";
@@ -5733,7 +5733,7 @@ function affinerPrecoCategorie(categorie) { PRECO_CATEGORIE = categorie; rendreG
 /* Vidéos d'arrivée par campagne (bureau 16:9 / mobile 9:16). Front seulement :
    à passer en colonne de `campagnes` si ça devient courant. */
 const VIDEOS_CAMPAGNES = {
-  "AH27": { bureau: "visuels/ah27.mp4?v=1793800589", mobile: "visuels/ah27-mobile.mp4?v=1793800589",
+  "AH27": { bureau: "visuels/ah27.mp4?v=1794221650", mobile: "visuels/ah27-mobile.mp4?v=1794221650",
             poster: "visuels/ah27-poster.jpg", posterMobile: "visuels/ah27-poster-mobile.jpg" },
 };
 
@@ -10649,7 +10649,7 @@ function dessinerAlertesNL() {
 }
 async function validerAlerteNL(bl, garder) {
   const cles = NL.lignes.filter(l => l.bl === bl && l.alerte).map(l => l.cle);
-  if (!garder && !confirm(`Remettre ${bl} en non livrable ? Ses libérations sont annulées (la trace reste).`)) return;
+  if (!garder && !confirm(`Remettre ${bl} en non livrable ? Ses libérations sont annulées et les pièces sortent du stock B2B (la trace reste).`)) return;
   try { await api("/rest/v1/rpc/nl_valider_alerte", { corps: { p_cles: cles, p_garder: garder } }); await chargerNonLivrable();
         if (!garder && document.getElementById("vs-corps")) { await chargerValeurStock(); dessinerEcoulementVS(); } }
   catch (e) { alert(String(e.donnees?.message || e.message || e)); }
@@ -10805,7 +10805,8 @@ async function confirmerBasculeNL(btn) {
   btn.disabled = true;
   try {
     const r = await api("/rest/v1/rpc/nl_basculer", { corps: { p_fichier: a.fichier, p_rows: a.rows.map(x => ({ cle: x.cle, quantite: x.quantite })), p_simuler: false } });
-    zone.innerHTML = `<b>Libération enregistrée</b> : ${dashNb(r.pieces)} pièces, ${eur(Number(r.valeur_pa))} passent en « BL libéré » (dernier dépôt mis à jour).`;
+    zone.innerHTML = `<b>Libération enregistrée</b> : ${dashNb(r.pieces)} pièces, ${eur(Number(r.valeur_pa))} passent en « BL libéré » (dernier dépôt mis à jour).
+      <br><b>${dashNb(r.stock_b2b?.pieces || 0)} pièces ajoutées au stock B2B</b> (CENTRAL), commandables tout de suite${r.stock_b2b?.hors_catalogue ? ` · ${dashNb(r.stock_b2b.hors_catalogue)} tailles sans fiche produit non ajoutées` : ""}.`;
     NL.analyse = null; document.getElementById("nl-fichier").value = "";
     await chargerNonLivrable();
     if (document.getElementById("vs-corps")) { await chargerValeurStock(); dessinerEcoulementVS(); }
@@ -10813,7 +10814,7 @@ async function confirmerBasculeNL(btn) {
 }
 
 async function annulerBasculeNL(id) {
-  if (!confirm("Annuler cette libération ? Les pièces redeviennent non livrables (la trace est conservée).")) return;
+  if (!confirm("Annuler cette libération ? Les pièces redeviennent non livrables et sortent du stock B2B (la trace est conservée).")) return;
   try { await api("/rest/v1/rpc/nl_annuler_bascule", { corps: { p_id: id } }); await chargerNonLivrable();
         if (document.getElementById("vs-corps")) { await chargerValeurStock(); dessinerEcoulementVS(); } }
   catch (e) { alert(String(e.donnees?.message || e.message || e)); }
@@ -10919,7 +10920,7 @@ async function rendreValeurStock() {
     <div class="vs-panneau" id="vs-nl" style="margin-top:16px">
       <div class="vs-titre">Non livrable — BL libérés</div>
       <div class="vs-sous">Pour garder des références, déposez l'export des BL non facturables filtré sur les lignes à garder :
-        elles passent aussitôt en « BL libéré » dans le dernier dépôt, et la libération reste tracée.</div>
+        elles passent aussitôt en « BL libéré » dans le dernier dépôt et entrent dans le stock B2B commandable. La libération reste tracée.</div>
       <div class="dash-ligne vs-gerer" style="margin-top:10px">
         <input type="file" id="nl-fichier" accept=".xls,.csv,.txt">
         <button class="vs-bouton discret" onclick="analyserFichierNL('bascule')">Lignes à libérer</button>
