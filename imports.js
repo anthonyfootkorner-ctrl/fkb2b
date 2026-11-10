@@ -926,16 +926,12 @@ async function executerStockPreparation(analyse, surProgres) {
   // seuls les types de BL présents dans CE fichier sont remplacés (le 15/10, l'export « non facturable »
   // déposé juste après l'export « Réservation » l'avait effacé) ; les lignes d'avant ce découpage (type vide) aussi
   const types = [...new Set(toutes.map(r => r.type_bl))];
-  const liste = types.map(t => `"${t.replace(/"/g, '\\"')}"`).join(",");
   surProgres(`remplacement des BL « ${types.join(" », « ")} »… (${pieces(toutes) - pieces(rows)} pièces pour des clients hors dashboard ignorées)`);
-  await api(`/rest/v1/stock_transit?statut=eq.preparation&or=${encodeURIComponent(`(type_bl.is.null,type_bl.in.(${liste}))`)}`, { methode: "DELETE" });
-  let total = 0;
-  for (let i = 0; i < rows.length; i += 2000) {
-    const lot = rows.slice(i, i + 2000);
-    await api("/rest/v1/stock_transit", { corps: lot });
-    total += lot.length;
-    surProgres(`en préparation : ${total}/${rows.length} lignes…`);
-  }
+  // Effacement et écriture dans la même transaction, côté serveur : un BL qui a changé de type dans Fastmag
+  // (« non facturable » → « Réservation ») est remplacé lui aussi, et un échec n'efface plus rien.
+  const bilan = await api("/rest/v1/rpc/stock_preparation_remplacer", { corps: { p_rows: rows, p_types: types } });
+  const total = Number(bilan?.ecrites) || rows.length;
+  surProgres(`en préparation : ${total} lignes écrites`);
   await apiFonction("journal", { entree: {
     fichier: analyse.fichier, modele: "stock_preparation", empreinte: analyse.empreinte,
     lignes_lues: analyse.lues, crees: total, maj: 0, inchanges: 0,
