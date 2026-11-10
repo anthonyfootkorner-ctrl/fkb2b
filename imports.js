@@ -750,6 +750,23 @@ async function executerComptes(analyse, surProgres) {
   return crees;
 }
 
+/* Les exports Fastmag (ventes, stock boutiques, objectifs) peuvent couvrir tout le réseau, franchises
+   comprises : on ne garde que les magasins déclarés dans le dashboard (table magasins), sinon les calculs
+   « réseau » (ROS, retards, remises) changent sans qu'on l'ait décidé. Ajouter un magasin = l'ajouter à la table. */
+async function magasinsConnus() {
+  const liste = await api("/rest/v1/magasins?select=code");
+  const codes = new Set((liste || []).map(m => String(m.code || "").trim().toUpperCase()).filter(Boolean));
+  if (!codes.size) throw new Error("liste des magasins illisible : import arrêté pour ne rien perdre");
+  return codes;
+}
+function garderMagasinsConnus(rows, codes, surProgres) {
+  const autres = new Set(), gardees = rows.filter(r => {
+    const m = String(r.magasin || "").trim().toUpperCase();
+    if (codes.has(m)) return true; autres.add(m); return false; });
+  if (autres.size) surProgres(`${rows.length - gardees.length} lignes de ${autres.size} magasins hors dashboard ignorées (${[...autres].sort().slice(0, 8).join(", ")}${autres.size > 8 ? "…" : ""})`);
+  return gardees;
+}
+
 async function executerImport(analyse, surProgres) {
   // Le stock B2B passe par ses propres fonctions : il ne doit toucher que ses lignes
   // (le stock Duhamel reste en base pour le merch) et il solde les commandes en attente.
@@ -764,6 +781,10 @@ async function executerImport(analyse, surProgres) {
   if (analyse.modele === "comptes") return executerComptes(analyse, surProgres);
 
   const plans = mapperVersTables(analyse);
+  if (analyse.modele === "ventes") {
+    const codes = await magasinsConnus();
+    for (const plan of plans) if (plan.table === "ventes") plan.rows = garderMagasinsConnus(plan.rows, codes, surProgres);
+  }
   let total = 0;
   for (const plan of plans) {
     if (plan.vider) {
@@ -843,7 +864,7 @@ async function executerObjectifs(analyse, surProgres) {
     if (e.objectif === null && e.pieces === null && e.tickets === null && e.tickets_n1 === null) continue;
     parCle.set(`${magasin}|${jour}`, e);
   }
-  const rows = [...parCle.values()];
+  const rows = garderMagasinsConnus([...parCle.values()], await magasinsConnus(), surProgres);
   if (!rows.length) throw new Error("aucun objectif exploitable dans ce fichier");
   const jours = [...new Set(rows.map(r => r.jour))].sort();
   const magasins = [...new Set(rows.map(r => r.magasin))];
@@ -1020,8 +1041,8 @@ async function executerStockMagasins(analyse, surProgres) {
   }
   // le fichier porte plusieurs lignes par taille (prix d'achat différents) et des
   // quantités négatives : on somme d'abord, on ne garde que ce qui reste en rayon
-  const rows = [...parCle.values()].filter(r => r.quantite > 0).map(({ valeur, ...r }) => ({
-    ...r, prix_achat: valeur > 0 ? Math.round(100 * valeur / r.quantite) / 100 : null }));
+  const rows = garderMagasinsConnus([...parCle.values()].filter(r => r.quantite > 0).map(({ valeur, ...r }) => ({
+    ...r, prix_achat: valeur > 0 ? Math.round(100 * valeur / r.quantite) / 100 : null })), await magasinsConnus(), surProgres);
   if (!rows.length) throw new Error("aucune ligne de stock boutique exploitable (CENTRAL et WEB sont ignorés)");
   surProgres(`remplacement de la photo précédente… (${ignorees} ligne${ignorees > 1 ? "s" : ""} CENTRAL/WEB ignorée${ignorees > 1 ? "s" : ""})`);
   // écriture directe : la table n'est ouverte en écriture qu'aux comptes qui importent (peut_importer)
