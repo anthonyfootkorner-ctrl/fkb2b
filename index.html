@@ -2002,10 +2002,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1794330416"></script>
-<script src="imports.js?v=1794330416"></script>
-<script src="merch-shopify.js?v=1794330416"></script>
-<script src="moteur-merch.js?v=1794330416"></script>
+<script src="config.js?v=1794591212"></script>
+<script src="imports.js?v=1794591212"></script>
+<script src="merch-shopify.js?v=1794591212"></script>
+<script src="moteur-merch.js?v=1794591212"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -5537,8 +5537,11 @@ const rayonDe = p => RAYON_ALIAS[p.rayon] || p.rayon || "";
 /* Pour ces marques, les blocs de la vitrine sont les MODÈLES (catégories fournisseur), même pour
    les chaussures : demande d'Anthony du 04/11 (« briques par sous-familles » chez Saucony). */
 const MARQUES_BLOCS_MODELES = new Set(["SAUCONY"]);
+/* Sans catégorie fournisseur (campagne d'implantation servie sur stock, marque sans planner),
+   le bloc est la famille Fastmag : sinon ces produits n'avaient aucun bloc et restaient
+   introuvables depuis la vitrine (IMPLANT CAYENNE 2 : 819 des 862 ADIDAS). */
 const categorieDe = p => (MARQUES_BLOCS_MODELES.has(p.marque) && p.categorie) ? p.categorie
-  : BLOCS_PAR_FAMILLE[(p.famille || "").toUpperCase()] || p.categorie || "";
+  : BLOCS_PAR_FAMILLE[(p.famille || "").toUpperCase()] || p.categorie || libelleFamille(p.famille);
 /* Le bloc d'un produit dans une campagne : la catégorie fournisseur pour une campagne mono-marque,
    « marque · famille » pour une campagne multi-marques (implantation), comme sa vitrine. */
 const MULTI_MARQUES = new WeakMap();
@@ -5728,8 +5731,9 @@ function rubanTaillesPreco(p) {
 }
 
 function affinerPreco(marque) { PRECO_MARQUE = marque; rendreGrillePreco(); }
-function affinerPrecoRayon(rayon) { PRECO_RAYON = rayon; PRECO_CATEGORIE = null; rendreGrillePreco(); }
-function affinerPrecoCategorie(categorie) { PRECO_CATEGORIE = categorie; rendreGrillePreco(); }
+// choisir un rayon ou une catégorie montre toujours les produits, même depuis la vitrine
+function affinerPrecoRayon(rayon) { PRECO_RAYON = rayon; PRECO_CATEGORIE = null; PRECO_VUE = "grille"; rendreGrillePreco(); }
+function affinerPrecoCategorie(categorie) { PRECO_CATEGORIE = categorie; PRECO_VUE = "grille"; rendreGrillePreco(); }
 /* Vidéos d'arrivée par campagne (bureau 16:9 / mobile 9:16). Front seulement :
    à passer en colonne de `campagnes` si ça devient courant. */
 const VIDEOS_CAMPAGNES = {
