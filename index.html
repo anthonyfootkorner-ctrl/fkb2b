@@ -349,6 +349,19 @@
     justify-content: center; transition: background 120ms ease, color 120ms ease; }
   .preco-plus:hover { background: var(--encre); color: #fff; }
   .preco-plus.dedans { background: #2e9e4f; border-color: #2e9e4f; color: #fff; }
+  /* Assortiment obligatoire (ex. Saucony AH27) : pastille orange sur la carte, la fiche, la grille */
+  .pastille-oblig { display: inline-block; background: #e8611a; color: #fff; font-size: 9.5px; font-weight: 800;
+    letter-spacing: .06em; text-transform: uppercase; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+  .carte .media .pastille-oblig { position: absolute; top: 12px; left: 10px; z-index: 2; }
+  .pp-ref .pastille-oblig { font-size: 8.5px; padding: 1px 6px; margin-right: 6px; vertical-align: 1px; }
+  .oblig-alerte { border: 1px solid #f0c7a8; background: #fff6ef; border-radius: 10px; padding: 14px 16px; margin: 16px 0; font-size: 13px; }
+  .oblig-alerte .titre { color: #b4470c; font-weight: 800; }
+  .oblig-liste { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 12px; }
+  .oblig-item { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #f0d9c6; border-radius: 8px;
+    padding: 5px 10px 5px 5px; font-size: 11.5px; line-height: 1.3; cursor: pointer; }
+  .oblig-item:hover { border-color: #e8611a; }
+  .oblig-item img, .oblig-item .vide { width: 42px; height: 42px; object-fit: contain; background: #f4f4f2; border-radius: 6px; flex: none; }
+  .oblig-alerte .valid-engagement { margin: 10px 0 0; }
   .carte .media { position: relative; }
 
   .vol-vignette { position: fixed; z-index: 100; pointer-events: none; border-radius: 10px;
@@ -2002,10 +2015,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1794594522"></script>
-<script src="imports.js?v=1794594522"></script>
-<script src="merch-shopify.js?v=1794594522"></script>
-<script src="moteur-merch.js?v=1794594522"></script>
+<script src="config.js?v=1794829309"></script>
+<script src="imports.js?v=1794829309"></script>
+<script src="merch-shopify.js?v=1794829309"></script>
+<script src="moteur-merch.js?v=1794829309"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -5524,6 +5537,41 @@ let PRECO_COURANTE = null, PRECO_PRODUITS = [], PRECO_MARQUE = null, PRECO_RAYON
 const libelleFamille = f => { const t = String(f || "").trim(); return t ? t[0].toUpperCase() + t.slice(1).toLowerCase() : ""; };
 let PRECO_INFOS = {};   // la fiche de la campagne (visuel, date limite), pour la vitrine
 let PRECO_DOCUMENTS = [];  // catalogues téléchargeables de la campagne (marque sans fiches, ex. OAKLEY)
+/* Assortiment obligatoire (table precommande_obligatoires, demande d'Anthony 16/11 pour Saucony AH27) :
+   pastille sur la carte, la fiche et la grille, en tête de leur catégorie, et une alerte à confirmer
+   au panier et à la validation quand le panier ne les contient pas. Non bloquant. */
+let PRECO_OBLIGATOIRES = new Map();   // référence → { ordre, note }
+const estObligatoirePreco = ref => PRECO_OBLIGATOIRES.has(ref);
+const pastilleObligatoire = () => `<span class="pastille-oblig" title="Référence de l'assortiment obligatoire">Assortiment obligatoire</span>`;
+/* Les obligatoires attendus dans un panier : ceux de sa marque quand la campagne a un panier par
+   marque (un panier NIKE ne réclame pas les Saucony), toute la campagne sinon ; seulement ce que
+   ce magasin voit (produit avec tarif dans sa grille). */
+function obligatoiresAttendusPreco(marque) {
+  if (!PRECO_OBLIGATOIRES.size) return [];
+  if (panierParMarque() && !marque) return [];
+  return PRECO_PRODUITS.filter(p => PRECO_OBLIGATOIRES.has(p.reference) && (!marque || p.marque === marque))
+    .sort((a, b) => (PRECO_OBLIGATOIRES.get(a.reference).ordre || 0) - (PRECO_OBLIGATOIRES.get(b.reference).ordre || 0));
+}
+function vignettesObligatoiresPreco(liste) {
+  return `<div class="oblig-liste">${liste.map(p => `<span class="oblig-item" title="Voir la fiche"
+      onclick="ouvrirSaisiePreco(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">
+      ${p.photo ? `<img loading="lazy" src="${p.photo}" alt="">` : `<span class="vide"></span>`}
+      <span><b>${echapperHTML(p.designation || p.reference)}</b><br>${echapperHTML(p.reference)}${
+        p.couleur ? " · " + echapperHTML(p.couleur) : ""}</span></span>`).join("")}</div>`;
+}
+/* « Les ajouter » : met dans la sélection les obligatoires qui n'y sont pas, puis ouvre la grille. */
+function ajouterObligatoiresPreco() {
+  const marque = marquePanierPreco();
+  for (const p of obligatoiresAttendusPreco(marque)) PRECO_PANIER.add(p.reference);
+  memoriserPanierPreco();
+  const cible = `#/preco-panier/${encodeURIComponent(PRECO_COURANTE)}`;
+  if (location.hash === cible) rendrePanierPreco(PRECO_COURANTE); else location.hash = cible;
+}
+function majBoutonValidPreco() {
+  const b = document.getElementById("valid-bouton"); if (!b) return;
+  const o = document.getElementById("valid-oblig");
+  b.disabled = !document.getElementById("valid-coche")?.checked || (o ? !o.checked : false);
+}
 let PRECO_VUE = "vitrine";   // « vitrine » : les gros blocs seuls ; « grille » : les produits
 /* Le fournisseur range chaussures et accessoires dans « Sportswear », « Running », « Jordan »…
    avec le textile. Pour l'acheteur, une chaussure est d'abord une chaussure et une casquette
@@ -5559,14 +5607,16 @@ async function rendreCataloguePreco(campagne) {
   sous.textContent = "Chargement…";
   document.getElementById("preco-grille").innerHTML = "";
   try {
-    const [produits, campagnes, documents] = await Promise.all([
+    const [produits, campagnes, documents, obligatoires] = await Promise.all([
       api("/rest/v1/rpc/catalogue_precommande",
         { corps: { p_campagne: campagne, limite: 12000, p_societe: clientActif?.id ?? null } }),
       api("/rest/v1/rpc/mes_campagnes", { corps: { p_societe: clientActif?.id ?? null } }).catch(() => []),
       api(`/rest/v1/campagne_documents?campagne=eq.${encodeURIComponent(campagne)}&order=ordre,libelle`).catch(() => []),
+      api(`/rest/v1/precommande_obligatoires?campagne=eq.${encodeURIComponent(campagne)}&select=reference,ordre,note`).catch(() => []),
     ]);
     PRECO_PRODUITS = produits;
     PRECO_DOCUMENTS = documents || [];
+    PRECO_OBLIGATOIRES = new Map((obligatoires || []).map(o => [o.reference, o]));
     PRECO_INFOS = (campagnes || []).find(c => c.campagne === campagne) || {};
     // sans page liste (une seule campagne), le fil ramène à l'accueil
     const fil = document.getElementById("preco-fil");
@@ -5618,7 +5668,8 @@ function rendreGrillePreco() {
       : (!PRECO_MARQUE || p.marque === PRECO_MARQUE)
         && (!PRECO_RAYON || rayonDe(p) === PRECO_RAYON)
         && (!PRECO_CATEGORIE || categorieDe(p) === PRECO_CATEGORIE)
-        && (!PRECO_FAMILLE || (p.famille || "").toUpperCase() === PRECO_FAMILLE));
+        && (!PRECO_FAMILLE || (p.famille || "").toUpperCase() === PRECO_FAMILLE))
+    .sort((a, b) => estObligatoirePreco(b.reference) - estObligatoirePreco(a.reference));
   document.getElementById("preco-sous-titre").textContent = q
     ? `${produits.length} résultat${produits.length > 1 ? "s" : ""} pour « ${PRECO_RECHERCHE.trim()} » sur ${PRECO_PRODUITS.length} références`
     : `${produits.length} référence${produits.length > 1 ? "s" : ""} proposée${produits.length > 1 ? "s" : ""}`
@@ -5699,6 +5750,7 @@ function rendreGrillePreco() {
                 title="${PRECO_PANIER.has(p.reference) ? "retirer de ma sélection" : "ajouter à ma sélection"}"
                 onclick="basculerPanierPreco(${JSON.stringify(p.reference).replaceAll('"', "&quot;")}, event)"
         >${PRECO_PANIER.has(p.reference) ? "✓" : "+"}</button>
+        ${estObligatoirePreco(p.reference) ? pastilleObligatoire() : ""}
         ${p.photo ? `<div class="visuel"><img loading="lazy" src="${p.photo}" alt=""></div>`
                   : blocSansVisuel(p)}
       </div>
@@ -6297,9 +6349,11 @@ async function rendrePanierPreco(campagne) {
     .sort((x, y) => rangRayon(x) - rangRayon(y) || x.localeCompare(y));
 
   let l = -1;
+  const manqueSel = obligatoiresAttendusPreco(marquePanierPreco()).filter(p => !PRECO_PANIER.has(p.reference));
   const sections = rayons.map(rayon => {
     const groupe = parRayon[rayon]
       .sort((x, y) => categorieDe(x).localeCompare(categorieDe(y))
+        || estObligatoirePreco(y.reference) - estObligatoirePreco(x.reference)
         || (x.designation || "").localeCompare(y.designation || "") || x.reference.localeCompare(y.reference));
     const colonnes = [...new Set(groupe.flatMap(p => (p.tailles || [])
         .filter(t => (t.offres || []).length).map(t => t.taille)))]
@@ -6316,7 +6370,7 @@ async function rendrePanierPreco(campagne) {
               <span>
                 <div class="pp-nom" title="${echapperHTML(p.designation || p.reference)}">${
                   echapperHTML(p.designation || p.reference)}</div>
-                <div class="pp-ref">${echapperHTML(p.reference)}${categorieDe(p) ? " · " + echapperHTML(categorieDe(p)) : ""} · ${eur(prixMini(p))} HT${pvcDe(p) ? ` · ${lignePVC(p, true)}` : ""}</div>
+                <div class="pp-ref">${estObligatoirePreco(p.reference) ? pastilleObligatoire() : ""}${echapperHTML(p.reference)}${categorieDe(p) ? " · " + echapperHTML(categorieDe(p)) : ""} · ${eur(prixMini(p))} HT${pvcDe(p) ? ` · ${lignePVC(p, true)}` : ""}</div>
               </span>
               <button class="pp-retirer" title="retirer de ma sélection"
                       onclick="retirerDuPanierPreco(${JSON.stringify(p.reference).replaceAll('"', "&quot;")})">✕</button>
@@ -6374,6 +6428,12 @@ async function rendrePanierPreco(campagne) {
       ${barreExcelPreco(verrou)}
     </div>
     <div id="preco-fusion"></div>
+    ${!verrou && manqueSel.length ? `<div class="oblig-alerte">
+      <span class="titre">⚠ Assortiment obligatoire : ${manqueSel.length} référence${manqueSel.length > 1 ? "s" : ""}
+        ${manqueSel.length > 1 ? "ne sont" : "n'est"} pas dans ce panier.</span>
+      ${vignettesObligatoiresPreco(manqueSel)}
+      <button class="btn-noir" style="margin-left:0" onclick="ajouterObligatoiresPreco()">AJOUTER ${manqueSel.length > 1 ? "CES RÉFÉRENCES" : "CETTE RÉFÉRENCE"} À MA GRILLE</button>
+    </div>` : ""}
     ${verrou ? `<div class="pp-verrou">
       <span class="ico">✓</span>
       <div><b>Panier « ${echapperHTML(pa?.nom || "")} » — précommande n° ${envoi.numero} ${envoi.statut === "integree" ? "intégrée en Fastmag" : "validée par Footkorner"}</b>
@@ -7092,6 +7152,9 @@ async function rendreValidationPreco(campagne) {
   const societe = clientActif?.nom ? `${clientActif.id_fastmag ? clientActif.id_fastmag + ") " : ""}${clientActif.nom}` : "votre magasin";
   const verrou = precoVerrouillee(envoi);
   const pa = panierActif();
+  // assortiment obligatoire : ce qui manque (ou est à 0) dans ce qui sera transmis
+  const marqueValid = panierParMarque() ? (lignes.map(l => produit(l.reference)?.marque).find(Boolean) || null) : null;
+  const manquants = lignes.length ? obligatoiresAttendusPreco(marqueValid).filter(p => !refs.has(p.reference)) : [];
 
   vue.innerHTML = `
     <div class="col-tete">
@@ -7143,8 +7206,18 @@ async function rendreValidationPreco(campagne) {
         Footkorner vous informera de toute modification avant la livraison. Les quantités transmises engagent votre magasin
         sur ce qui sera effectivement livré.
       </div>
+      ${manquants.length ? `<div class="oblig-alerte">
+        <span class="titre">⚠ Attention : ${manquants.length > 1 ? `ces ${manquants.length} références obligatoires` : "cette référence obligatoire"}
+          de l'assortiment ${manquants.length > 1 ? "sont manquantes" : "est manquante"} dans votre précommande.</span>
+        ${vignettesObligatoiresPreco(manquants)}
+        <button class="btn-noir" style="margin-left:0" onclick="ajouterObligatoiresPreco()">LES AJOUTER À MA GRILLE</button>
+        <label class="valid-engagement">
+          <input type="checkbox" id="valid-oblig" onchange="majBoutonValidPreco()">
+          <span>Je transmets ma précommande <b>sans ${manquants.length > 1 ? "ces références obligatoires" : "cette référence obligatoire"}</b>, en connaissance de cause.</span>
+        </label>
+      </div>` : ""}
       <label class="valid-engagement">
-        <input type="checkbox" id="valid-coche" onchange="document.getElementById('valid-bouton').disabled = !this.checked">
+        <input type="checkbox" id="valid-coche" onchange="majBoutonValidPreco()">
         <span>Je confirme cette précommande <b>ferme</b> pour ${echapperHTML(societe)}${pa ? `, panier « ${echapperHTML(pa.nom)} »` : ""} —
           <b>${pieces} pièce${pieces > 1 ? "s" : ""}</b> sur ${refs.size} référence${refs.size > 1 ? "s" : ""},
           <b>${eur(net)} HT${remise > 0 ? " net" : ""}</b>, livrées aux dates ci-dessus — et j'accepte les conditions ci-dessus.</span>
@@ -7356,6 +7429,8 @@ async function allerPagePourMagasin(societeId, panierId, page, campagne = PRECO_
 async function transmettrePreco() {
   const bouton = document.getElementById("valid-bouton"), etat = document.getElementById("valid-etat");
   if (!document.getElementById("valid-coche")?.checked) return;
+  const cocheOblig = document.getElementById("valid-oblig");
+  if (cocheOblig && !cocheOblig.checked) return;
   bouton.disabled = true; etat.textContent = "transmission…";
   try {
     const r = await api("/rest/v1/rpc/transmettre_precommande",
@@ -8626,7 +8701,7 @@ async function rendreProduitPreco(campagne, reference) {
       <div class="prod-visuel">${p.photo ? `<img src="${p.photo}" alt="">` : blocSansVisuel(p)}</div>
       <div class="prod-infos">
         <span class="fil" onclick="location.hash='${retour}'">&larr; ${echapperHTML(campagne)}</span>
-        <div class="marque">${echapperHTML(p.marque || "")}</div>
+        <div class="marque">${echapperHTML(p.marque || "")}${estObligatoirePreco(p.reference) ? ` ${pastilleObligatoire()}` : ""}</div>
         <h1>${echapperHTML(p.designation || p.reference)}</h1>
         <div class="refline">${echapperHTML(p.reference)}${p.couleur ? " · " + echapperHTML(p.couleur) : ""}${
           p.coloris ? " · " + echapperHTML(p.coloris) : ""} · Saison ${echapperHTML(p.saison || "—")}</div>
