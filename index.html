@@ -2015,10 +2015,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1794829309"></script>
-<script src="imports.js?v=1794829309"></script>
-<script src="merch-shopify.js?v=1794829309"></script>
-<script src="moteur-merch.js?v=1794829309"></script>
+<script src="config.js?v=1794852711"></script>
+<script src="imports.js?v=1794852711"></script>
+<script src="merch-shopify.js?v=1794852711"></script>
+<script src="moteur-merch.js?v=1794852711"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -8641,7 +8641,7 @@ async function appliquerImportPreco() {
 
 const jourCourt = (d) => d
   ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })
-  : "à la date de la campagne";
+  : "date à venir";
 const cleSaisie = (ref, taille, livraison) => `${ref}|${taille}|${livraison || ""}`;
 
 async function chargerSaisiePreco(campagne) {
@@ -8650,6 +8650,10 @@ async function chargerSaisiePreco(campagne) {
     api("/rest/v1/rpc/mes_paniers", { corps: { p_campagne: campagne, p_societe: clientActif?.id ?? null } }).catch(() => []),
   ]);
   PRECO_LIVRAISONS = (fenetres || []).map(f => f.livraison);
+  /* Une offre sans date (PUMA AH27 en attente de sa date fournisseur) n'avait aucune ligne dans la
+     grille : les lignes ne suivent que les dates de la campagne. On ajoute une ligne « date à venir ». */
+  if (PRECO_LIVRAISONS.length && PRECO_PRODUITS.some(p => (p.tailles || []).some(t => (t.offres || []).some(o => !o.livraison))))
+    PRECO_LIVRAISONS.push("");
   PRECO_PANIERS = paniers || [];
   if (!PRECO_PANIERS.length) {   // premier passage : un panier par défaut
     try {
