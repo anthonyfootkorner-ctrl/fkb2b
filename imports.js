@@ -123,7 +123,7 @@ const MODELES_IMPORT = {
     /* Export détaillé des ventes envoyé par le planificateur Fastmag (« Analyse_lignes ») :
        une ligne par article vendu, avec les colonnes LIGNE_* et VENTE_*. Le fichier porte
        aussi des données clients : elles ne sont jamais lues ni envoyées. */
-    libelle: "Ventes détaillées (export Fastmag du planificateur)",
+    libelle: "Ventes détaillées (export Fastmag du planificateur) — ventes + détail des remises par ticket",
     sep: [";", "\t"], encodage: ["windows-1252", "utf-8"],
     signature: ["LIGNE_BarCode", "LIGNE_Taille", "LIGNE_Quantite", "VENTE_date", "VENTE_nature"],
   },
@@ -753,6 +753,52 @@ async function executerComptes(analyse, surProgres) {
 /* Les exports Fastmag (ventes, stock boutiques, objectifs) peuvent couvrir tout le réseau, franchises
    comprises : on ne garde que les magasins déclarés dans le dashboard (table magasins), sinon les calculs
    « réseau » (ROS, retards, remises) changent sans qu'on l'ait décidé. Ajouter un magasin = l'ajouter à la table. */
+/* Détail des ventes ligne à ligne (même export que ventes_web_fastmag) : numéro de vente, heure, vendeur,
+   remise — pour le suivi des remises. Les colonnes CLIENT_* et l'identifiant client ne sont jamais lus.
+   Mêmes filtres que l'agrégat : VENTE et AVOIR, ni frais de port, ni familles « ~ ». */
+function lignesDetailVentes(L) {
+  const nombre = v => { const n = parseFloat(String(v ?? "").replace(/\s/g, "").replace(",", ".")); return Number.isFinite(n) ? n : null; };
+  const morceaux = L.map(l => (l.VENTE_date || "").trim().split("/")).filter(p => p.length === 3);
+  const americain = morceaux.some(p => +p[1] > 12) ? true : morceaux.some(p => +p[0] > 12) ? false : true;
+  const rows = [];
+  for (const l of L) {
+    const nature = (l.VENTE_nature || "").trim().toUpperCase();
+    if (nature !== "VENTE" && nature !== "AVOIR") continue;
+    const reference = (l.LIGNE_BarCode || "").trim();
+    if (!reference || reference === "FP" || reference === "SHIPPING" || (l.LIGNE_Famille || "").trim().startsWith("~")) continue;
+    const p = (l.VENTE_date || "").trim().split("/");
+    if (p.length !== 3 || p[2].length !== 4) continue;
+    const [mois, jourDuMois] = americain ? [p[0], p[1]] : [p[1], p[0]];
+    const magasin = (l.LIGNE_CodeMag || l.VENTE_codemag || "").trim().toUpperCase();
+    const ligne_id = parseInt(l.LIGNE_ligne, 10), vente = parseInt(l.VENTE_vente || l.LIGNE_vente, 10);
+    if (!magasin || !Number.isFinite(ligne_id) || !Number.isFinite(vente)) continue;
+    const heure = (l.VENTE_heure || "").trim();
+    rows.push({ ligne_id, vente, magasin,
+      jour: `${p[2]}-${String(mois).padStart(2, "0")}-${String(jourDuMois).padStart(2, "0")}`,
+      heure: /^\d{1,2}:\d{2}(:\d{2})?$/.test(heure) ? heure : "", nature,
+      vendeur: (l.VENTE_Vendeur || "").trim(), reference, taille: (l.LIGNE_Taille || "").trim(),
+      designation: (l.LIGNE_Designation || "").trim(), famille: (l.LIGNE_Famille || "").trim(),
+      rayon: (l.LIGNE_Rayon || "").trim(), saison: (l.LIGNE_Saison || "").trim(),
+      quantite: Math.trunc(nombre(l.LIGNE_Quantite) || 0), prix_fiche: nombre(l.LIGNE_PrixVente), prix: nombre(l.LIGNE_Prix),
+      remise_pct: nombre(l.LIGNE_Remise), total_ttc: nombre(l.LIGNE_Total) || 0, prix_achat: nombre(l.LIGNE_PrixAchat),
+      motif: (l.LIGNE_Motif || "").trim() });
+  }
+  return rows;
+}
+async function executerVentesLignes(analyse, surProgres) {
+  const rows = garderMagasinsConnus(lignesDetailVentes(analyse.lignes), await magasinsConnus(), () => {});
+  if (!rows.length) return 0;
+  const jours = rows.map(r => r.jour).sort(), magasins = [...new Set(rows.map(r => r.magasin))];
+  let total = 0;
+  for (let i = 0; i < rows.length; i += 2000) {
+    await api("/rest/v1/rpc/ventes_lignes_lot", { corps: { p_rows: rows.slice(i, i + 2000), p_premier: i === 0,
+      p_du: jours[0], p_au: jours[jours.length - 1], p_magasins: magasins } });
+    total = Math.min(i + 2000, rows.length);
+    surProgres(`détail des ventes (remises) : ${total}/${rows.length} lignes…`);
+  }
+  return total;
+}
+
 async function magasinsConnus() {
   const liste = await api("/rest/v1/magasins?select=code");
   const codes = new Set((liste || []).map(m => String(m.code || "").trim().toUpperCase()).filter(Boolean));
@@ -781,7 +827,7 @@ async function executerImport(analyse, surProgres) {
   if (analyse.modele === "comptes") return executerComptes(analyse, surProgres);
 
   const plans = mapperVersTables(analyse);
-  if (analyse.modele === "ventes") {
+  if (analyse.modele === "ventes" || analyse.modele === "ventes_web_fastmag") {
     const codes = await magasinsConnus();
     for (const plan of plans) if (plan.table === "ventes") plan.rows = garderMagasinsConnus(plan.rows, codes, surProgres);
   }
@@ -809,6 +855,7 @@ async function executerImport(analyse, surProgres) {
       }
     }
   }
+  if (analyse.modele === "ventes_web_fastmag") await executerVentesLignes(analyse, surProgres);
   await apiFonction("journal", { entree: {
     fichier: analyse.fichier, modele: analyse.modele, empreinte: analyse.empreinte,
     lignes_lues: analyse.lues, crees: total, maj: 0, inchanges: 0,
