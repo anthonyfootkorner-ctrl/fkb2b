@@ -1532,11 +1532,15 @@
     .pil-ligne { grid-template-columns: 120px 1fr 54px; } .pil-pos, .pil-bornes { grid-template-columns: 1fr; gap: 4px; } .pil-pos .rang { text-align: left; }
   }
 
+  /* Polices de la page Pilotage, hébergées sur le site (aucun appel externe) : Archivo et IBM Plex, licence libre SIL OFL. */
+  @font-face { font-family: "Archivo"; font-style: normal; font-weight: 500 900; font-stretch: 62% 125%; font-display: swap; src: url("polices/archivo.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400 600; font-display: swap; src: url("polices/plex-sans.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("polices/plex-mono-500.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
   /* ---- Pilotage secteur : direction artistique « Suivi hebdo » (fond noir, orange vif, titres condensés) ---- */
   #vue-pilotage { --pil-bg: #0B0B0C; --pil-surface: #1F2023; --pil-surface2: #2B2D31; --pil-encre: #FFFFFF; --pil-doux: #A3A6AD; --pil-trait: #34363B;
     --pil-accent: #FF5A00; --pil-vert: #4CC38A; --pil-rouge: #FF6B6B; --pil-ambre: #F2A93B;
     --pil-titre: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif; --pil-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
-    background: var(--pil-bg); color: var(--pil-encre); color-scheme: dark; }
+    background: var(--pil-bg); color: var(--pil-encre); color-scheme: dark; font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; }
   #vue-pilotage .col-tete h1, #vue-pilotage .pil-tete h1 { font-family: var(--pil-titre); font-stretch: 70%; font-weight: 900; font-size: clamp(38px, 6vw, 64px);
     line-height: .9; letter-spacing: 0; text-transform: uppercase; margin: 0; color: var(--pil-encre); }
   #vue-pilotage .pil-tete h1 em { font-style: normal; color: var(--pil-accent); }
