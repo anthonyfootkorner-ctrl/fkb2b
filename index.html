@@ -1664,6 +1664,14 @@
   .pil-fiche .encore.haut .ai { color: var(--pil-vert); } .pil-fiche .encore.bas .ai { color: var(--pil-rouge); }
   .pil-fiche.pt .encore { font-size: 9.5px; padding: 3px 6px; }
   @media (max-width: 900px) { .pil-fiche.r1 { grid-column: span 60; grid-row: auto; } .pil-fiche, .pil-fiche.pt { grid-column: span 30; } .pil-fiche.r1 .photo { flex: 0 0 auto; aspect-ratio: 4 / 5; min-height: 0; } }
+  #vue-pilotage .pil-dates { display: inline-flex; align-items: center; gap: 6px; color: var(--pil-doux); font-size: 13px; border: 1px solid var(--pil-trait); border-radius: 20px; padding: 3px 10px; background: var(--pil-surface); }
+  #vue-pilotage .pil-dates.on { border-color: var(--pil-accent); color: var(--pil-encre); }
+  #vue-pilotage .pil-dates input { background: transparent; border: 0; color: var(--pil-encre); font: 500 13px var(--pil-mono); color-scheme: dark; padding: 2px 0; }
+  #vue-pilotage .pil-dates input:focus-visible { outline: 2px solid var(--pil-accent); outline-offset: 2px; border-radius: 4px; }
+  #vue-pilotage .pil-etiquette.accent { background: rgba(255, 90, 0, .16); color: var(--pil-accent); border: 1px solid rgba(255, 90, 0, .5); }
+  #vue-pilotage .pil-etiquette.bleu { background: rgba(57, 135, 229, .16); color: #7fb3f2; border: 1px solid #3987e5; }
+  #vue-pilotage .pil-legende { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin-top: 10px; font-size: 12.5px; color: var(--pil-doux); }
+  #vue-pilotage .pil-legende i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
   /* anneau + classement */
   .pil-rk { display: grid; grid-template-columns: 170px 1fr; gap: 20px; align-items: center; margin-top: 8px; }
   .pil-rk .anneau { width: 100%; max-width: 170px; justify-self: center; }
@@ -12223,8 +12231,8 @@ async function lancerCalculReporting() {
    alertes à trancher (prix anormalement bas, articles offerts sous 100 € de ticket), comparaison au réseau.
    Tout le calcul et les droits sont dans les fonctions SQL pilotage_* ; ici on choisit le périmètre et on affiche.
    Les ventes détaillées arrivent seules chaque jour (Fastmag → SFTP → relève automatique). */
-let PIL = { onglet: "remises", choisis: [], periode: "35j", etat: "attente", dims: "marques", donnees: null, chargement: 0,
-            top: null, topTri: "pieces", topVue: "tout", topVoir: 50, topCat: null, parts: null, partsDim: "marques", partsTout: false, stocks: null, stocksDim: "marques", stocksTout: false, stocksDormVoir: 20,
+let PIL = { onglet: "remises", choisis: [], periode: "mois", etat: "attente", dims: "marques", donnees: null, chargement: 0,
+            top: null, topTri: "pieces", topVue: "tout", topVoir: 50, topCat: null, parts: null, partsDim: "marques", partsTout: false, stocks: null, stocksDim: "marques", stocksTout: false, stocksDormVoir: 20, arrivages: null, arrVoir: 30, arrFiltre: "tout", du: null, au: null,
             lignes: null, voirTout: { bas: false, offert: false }, erreur: null };
 const PIL_PERIODES = [["s-1", "Semaine dernière"], ["mois", "Mois en cours"], ["mois-1", "Mois précédent"], ["35j", "35 derniers jours"]];
 const PIL_APERCU = 15;
@@ -12236,6 +12244,9 @@ const pilPart = (a, b) => Number(b) > 0 ? 100 * a / b : null;
 const pilJour = j => { const p = String(j || "").split("-"); return p.length === 3 ? `${p[2]}/${p[1]}` : ""; };
 const pilOrdinal = n => n === 1 ? "1er" : n + "e";
 function pilDates(periode) {
+  // dates au choix : bornes saisies par l'utilisateur (remises dans l'ordre, jamais dans le futur)
+  if (periode === "perso" && PIL.du && PIL.au) return PIL.du <= PIL.au ? { du: PIL.du, au: PIL.au } : { du: PIL.au, au: PIL.du };
+  if (periode === "perso") return dashDates("mois");
   if (periode !== "mois-1") return dashDates(periode);
   const d = new Date(), jour = x => x.toISOString().slice(0, 10);
   return { du: jour(new Date(Date.UTC(d.getFullYear(), d.getMonth() - 1, 1))), au: jour(new Date(Date.UTC(d.getFullYear(), d.getMonth(), 0))) };
@@ -12287,7 +12298,8 @@ function dessinerPilFiltres() {
     <div class="dash-ligne">
       <span class="compte-produits" style="margin:0">Période :</span>
       ${PIL_PERIODES.map(([cle, lib]) => `<button class="puce-claire dash-chip${PIL.periode === cle ? " on" : ""}" onclick="pilPeriode('${cle}')">${lib}</button>`).join("")}
-      <span class="compte-produits" style="margin:0">du ${new Date(du).toLocaleDateString("fr-FR")} au ${new Date(au).toLocaleDateString("fr-FR")}</span>
+      <span class="pil-dates${PIL.periode === "perso" ? " on" : ""}" title="Choisir des dates">du <input type="date" id="pil-du" value="${du}" max="${new Date().toISOString().slice(0, 10)}" onchange="pilDatesPerso()">
+        au <input type="date" id="pil-au" value="${au}" max="${new Date().toISOString().slice(0, 10)}" onchange="pilDatesPerso()"></span>
       <button class="puce-claire" onclick="chargerPilotage()">↻ Actualiser</button>
       <button class="puce-claire forte" onclick="exporterPilotage()">Exporter en Excel</button>
     </div>`;
@@ -12295,12 +12307,18 @@ function dessinerPilFiltres() {
 function pilChoisir(liste) { PIL.choisis = liste.slice(); PIL.lignes = null; dessinerPilFiltres(); chargerPilotage(); }
 function pilChoisirGroupe(g) { pilChoisir(pilMagasins().filter(m => m.groupe === g).map(m => m.code)); }
 function pilBasculer(code) { pilChoisir(PIL.choisis.includes(code) ? PIL.choisis.filter(c => c !== code) : PIL.choisis.concat(code)); }
+function pilDatesPerso() {
+  const du = document.getElementById("pil-du")?.value, au = document.getElementById("pil-au")?.value;
+  if (!du || !au) return;
+  PIL.du = du; PIL.au = au; PIL.periode = "perso"; PIL.lignes = null; dessinerPilFiltres(); chargerPilotage();
+}
 function pilPeriode(p) { PIL.periode = p; PIL.lignes = null; dessinerPilFiltres(); chargerPilotage(); }
 
 async function chargerPilotage() {
   if (PIL.onglet === "top") return chargerPilTop();
   if (PIL.onglet === "parts") return chargerPilParts();
   if (PIL.onglet === "stocks") return chargerPilStocks();
+  if (PIL.onglet === "arrivages") return chargerPilArrivages();
   const corps = document.getElementById("pil-corps");
   if (!corps) return;
   const { du, au } = pilDates(PIL.periode), jeton = ++PIL.chargement;
@@ -12534,6 +12552,7 @@ function exporterPilotage() {
   if (PIL.onglet === "top") return exporterPilTop();
   if (PIL.onglet === "parts") return exporterPilParts();
   if (PIL.onglet === "stocks") return exporterPilStocks();
+  if (PIL.onglet === "arrivages") return exporterPilArrivages();
   const d = PIL.donnees;
   if (!d || !Number(d.selection?.pieces)) { alert("Rien à exporter sur cette période."); return; }
   const { du, au } = pilDates(PIL.periode);
@@ -12559,8 +12578,8 @@ function exporterPilotage() {
 /* ---- Pilotage secteur · onglet Top produits ----
    Ce qui se vend le mieux dans les succursales choisies : classement en pièces, en CA ou en ROS, avec le stock,
    la couverture et le stock central, pour repérer ce qu'il faut réassortir. Calcul : pilotage_top_produits. */
-const PIL_ONGLETS = [["remises", "Remises"], ["top", "Top produits"], ["parts", "Parts de marché"], ["stocks", "Stocks"]];
-const PIL_ONGLETS_PRETS = new Set(["remises", "top", "parts", "stocks"]);
+const PIL_ONGLETS = [["remises", "Remises"], ["top", "Top produits"], ["parts", "Parts de marché"], ["stocks", "Stocks"], ["arrivages", "Arrivages"]];
+const PIL_ONGLETS_PRETS = new Set(["remises", "top", "parts", "stocks", "arrivages"]);
 function dessinerPilOnglets() {
   const nav = document.getElementById("pil-onglets");
   if (!nav) return;
@@ -13018,6 +13037,147 @@ function exporterPilStocks() {
     { nom: "Stock dormant", gras: [1], figer: 1, largeurs: [18, 34, 16, 12, 14, 14, 14],
       lignes: [["Référence", "Désignation", "Marque", "Saison", "Pièces dormantes", "Valeur", "Magasins concernés"],
         ...(d.dormants || []).map(p => [p.reference, p.designation || "", p.marque || "", p.saison || "", p.pieces, p.valeur, Number(p.nmag) || 0])] }]);
+}
+
+/* ---- Pilotage secteur · onglet Arrivages ----
+   Ce qui va arriver : en route vers les succursales choisies (parti du central ou en préparation), et attendu au central
+   (commandes fournisseurs). Calcul : pilotage_arrivages. */
+async function chargerPilArrivages() {
+  const corps = document.getElementById("pil-corps");
+  if (!corps) return;
+  const { du, au } = pilDates(PIL.periode), jeton = ++PIL.chargement;
+  corps.innerHTML = `<div class="pil-vide">Chargement…</div>`;
+  let d;
+  try { d = await api("/rest/v1/rpc/pilotage_arrivages", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au } }); }
+  catch (e) {
+    if (jeton !== PIL.chargement) return;
+    corps.innerHTML = `<div class="pil-vide">Chargement impossible : ${echapperHTML((e.donnees?.message || e.message || "").slice(0, 200))}</div>`;
+    return;
+  }
+  if (jeton !== PIL.chargement) return;
+  for (const p of d?.produits || []) {
+    for (const k of ["transit", "preparation", "bloque", "stock", "vendu", "nmag"]) p[k] = Number(p[k]) || 0;
+    p.aVenir = p.transit + p.preparation;
+    p.nouveau = p.stock <= 0 && p.vendu <= 0;          // ni en stock ni vendu sur la période : une implantation
+  }
+  PIL.arrivages = d; PIL.arrVoir = 30; PIL.arrFiltre = "tout";
+  dessinerPilArrivages();
+}
+
+const pilDateCourte = j => j ? new Date(j).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "—";
+
+function dessinerPilArrivages() {
+  const corps = document.getElementById("pil-corps"), d = PIL.arrivages;
+  if (!corps || !d) return;
+  const t = d.total || {}, c = d.central?.total || {}, mags = d.magasins || [], seul = pilSeul();
+  const aVenir = (Number(t.transit) || 0) + (Number(t.preparation) || 0);
+  const nouveaux = (d.produits || []).filter(p => p.nouveau && p.aVenir > 0);
+  const carte = (val, lib, note, cle) => `<div class="pil-kpi${cle ? " cle" : ""}"><div class="val">${val}</div><div class="lib">${lib}</div><div class="note">${note}</div></div>`;
+  const maxi = Math.max(1, ...mags.map(m => Number(m.transit) + Number(m.preparation)));
+  const fraicheur = j => j ? new Date(j).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "date inconnue";
+  corps.innerHTML = `
+    <section class="pil-kpis">
+      ${carte(pilNb(aVenir), "Pièces à venir en magasin", `pour <b>${pilNb(t.magasins)}</b> magasin${Number(t.magasins) > 1 ? "s" : ""} · ${pilNb(t.refs)} références`, true)}
+      ${carte(pilNb(t.transit), "En transit", `parties du central · <b>${pilNb(t.bl_transit)}</b> BL`)}
+      ${carte(pilNb(t.preparation), "En préparation", `réservées au central · <b>${pilNb(t.bl_preparation)}</b> BL`)}
+      ${carte(pilNb(nouveaux.length), "Nouveautés", `références ni en stock ni vendues : <b>${pilNb(nouveaux.reduce((s, p) => s + p.aVenir, 0))}</b> pièces`)}
+      ${carte(pilNb(c.pieces), "Attendu au central", `<b>${pilNb(c.receptions)}</b> réceptions fournisseurs · ${pilNb(c.refs)} références`)}
+    </section>
+    ${aVenir ? `<section class="pil-carte">
+      <h2>En route vers ${seul ? echapperHTML(mags[0]?.nom || "ce magasin") : "vos magasins"}</h2>
+      <div class="pil-aide"><b>En transit</b> : la marchandise a quitté le central. <b>En préparation</b> : elle est réservée pour le magasin, pas encore partie.
+        Données du ${fraicheur(d.maj_transit)}. Cliquez sur un magasin pour ne voir que ses arrivages.</div>
+      <div class="pil-defile"><table class="pil-table"><thead><tr><th>Magasin</th><th class="num">À venir</th><th></th><th class="num">En transit</th><th class="num">En préparation</th>
+        <th class="num">BL</th><th class="num">Références</th><th class="num">Dernier départ</th>${Number(t.bloque) ? `<th class="num">Réservé non livrable</th>` : ""}</tr></thead>
+        <tbody>${mags.map(m => `<tr class="${m.code === seul ? "choisi" : ""}" style="cursor:pointer" onclick="pilChoisir(['${echapperHTML(m.code)}'])">
+          <td>${echapperHTML(m.nom)}</td><td class="num"><b>${pilNb(Number(m.transit) + Number(m.preparation))}</b></td>
+          <td style="width:24%"><div class="pil-piste" style="height:10px;display:flex;gap:2px">
+            <div style="height:10px;border-radius:0 4px 4px 0;background:var(--pil-accent);width:${100 * m.transit / maxi}%"></div>
+            <div style="height:10px;border-radius:0 4px 4px 0;background:#3987e5;width:${100 * m.preparation / maxi}%"></div></div></td>
+          <td class="num">${pilNb(m.transit)}</td><td class="num">${pilNb(m.preparation)}</td><td class="num">${pilNb(m.bls)}</td><td class="num">${pilNb(m.refs)}</td>
+          <td class="num">${pilDateCourte(m.prochain)}</td>${Number(t.bloque) ? `<td class="num">${Number(m.bloque) ? pilNb(m.bloque) : "—"}</td>` : ""}</tr>`).join("")}</tbody></table></div>
+      <div class="pil-legende"><span><i style="background:var(--pil-accent)"></i>En transit</span><span><i style="background:#3987e5"></i>En préparation</span>
+        ${seul ? `<a class="pil-voir" style="margin:0 0 0 auto" onclick="pilChoisir([])">Revenir à tous mes magasins</a>` : ""}</div>
+    </section>
+    <section class="pil-carte" id="pil-arr-produits"></section>
+    <section class="pil-carte" id="pil-arr-bls"></section>`
+    : `<section class="pil-carte"><h2>En route vers vos magasins</h2><div class="pil-vide">Rien en transit ni en préparation pour ce périmètre. Données du ${fraicheur(d.maj_transit)}.</div></section>`}
+    <section class="pil-carte forte" id="pil-arr-central"></section>`;
+  dessinerPilArrProduits(); dessinerPilArrBls(); dessinerPilArrCentral();
+}
+
+function dessinerPilArrProduits() {
+  const zone = document.getElementById("pil-arr-produits"), d = PIL.arrivages;
+  if (!zone || !d) return;
+  const tous = (d.produits || []).filter(p => p.aVenir > 0);
+  const L = tous.filter(p => PIL.arrFiltre === "tout" || (PIL.arrFiltre === "nouveau" ? p.nouveau : PIL.arrFiltre === "transit" ? p.transit > 0 : !p.nouveau));
+  const montre = L.slice(0, PIL.arrVoir), sem = Math.max(1, (new Date(d.au) - new Date(d.du)) / 6048e5);
+  zone.innerHTML = `<h2>Les produits à venir <span class="pil-compte clair">${tous.length} références</span></h2>
+    <div class="pil-aide"><b>Nouveauté</b> : le produit n'est ni en stock ni vendu dans ${pilSeul() ? "ce magasin" : "ces magasins"} sur la période — c'est une implantation.
+      <b>Réassort</b> : il y est déjà. La colonne « Vendu » couvre la période choisie en haut.</div>
+    <div class="pil-bascule">${[["tout", "Tout"], ["nouveau", "Nouveautés"], ["reassort", "Réassorts"], ["transit", "Déjà partis"]].map(([k, lib]) =>
+      `<button class="${PIL.arrFiltre === k ? "on" : ""}" onclick="PIL.arrFiltre = '${k}'; PIL.arrVoir = 30; dessinerPilArrProduits()">${lib}</button>`).join("")}</div>
+    ${L.length ? `<div class="pil-defile"><table class="pil-table"><thead><tr><th></th><th>Produit</th><th>Marque</th><th>Rayon</th><th></th><th class="num">À venir</th>
+        <th class="num">En transit</th><th class="num">En préparation</th><th class="num">Magasins servis</th><th class="num">Stock actuel</th><th class="num">Vendu</th><th class="num">Couverture actuelle</th></tr></thead>
+      <tbody>${montre.map(p => { const couv = p.stock > 0 && p.vendu > 0 ? p.stock / (p.vendu / sem) : null; return `<tr><td class="pil-photo">${pilVignette(p)}</td>
+        <td>${echapperHTML(p.designation || "")}<br><span class="pil-ref">${echapperHTML(p.reference)}</span></td><td>${echapperHTML(p.marque || "")}</td><td>${echapperHTML(pilCat(p.categorie))}</td>
+        <td>${p.nouveau ? `<span class="pil-etiquette accent">nouveauté</span>` : ""}</td>
+        <td class="num"><b>${pilNb(p.aVenir)}</b></td><td class="num">${p.transit ? pilNb(p.transit) : "—"}</td><td class="num">${p.preparation ? pilNb(p.preparation) : "—"}</td>
+        <td class="num">${pilNb(p.nmag)}</td><td class="num">${pilNb(p.stock)}</td><td class="num">${pilNb(p.vendu)}</td>
+        <td class="num">${p.stock <= 0 && p.vendu > 0 ? `<span class="pil-etiquette rouge">rupture</span>` : couv == null ? "—" : couv < 2 ? `<span class="pil-etiquette rouge">${pilSem(couv)}</span>` : pilSem(couv)}</td></tr>`; }).join("")}</tbody></table></div>
+      ${L.length > PIL.arrVoir ? `<a class="pil-voir" onclick="PIL.arrVoir += 100; dessinerPilArrProduits()">Voir 100 de plus (${L.length} références) →</a>` : ""}`
+      : `<div class="pil-vide">Aucun produit dans cette liste.</div>`}`;
+}
+
+function dessinerPilArrBls() {
+  const zone = document.getElementById("pil-arr-bls"), d = PIL.arrivages;
+  if (!zone || !d) return;
+  const L = (d.bls || []).filter(b => b.etat !== "bloque"), montre = PIL.arrBlsTout ? L : L.slice(0, 12);
+  zone.innerHTML = `<h2>Les bons de livraison <span class="pil-compte clair">${L.length}</span></h2>
+    <div class="pil-aide">Un BL par envoi du central, du plus récent au plus ancien.</div>
+    <div class="pil-defile"><table class="pil-table"><thead><tr><th>N° BL</th><th>Magasin</th><th>État</th><th class="num">Date</th><th class="num">Pièces</th><th class="num">Références</th></tr></thead>
+      <tbody>${montre.map(b => `<tr><td>${echapperHTML(String(b.bl || "—"))}</td><td>${echapperHTML(b.magasin)}</td>
+        <td>${b.etat === "transit" ? `<span class="pil-etiquette accent">en transit</span>` : `<span class="pil-etiquette bleu">en préparation</span>`}</td>
+        <td class="num">${pilDateCourte(b.expedie_le)}</td><td class="num"><b>${pilNb(b.pieces)}</b></td><td class="num">${pilNb(b.refs)}</td></tr>`).join("")}</tbody></table></div>
+    ${L.length > 12 ? `<a class="pil-voir" onclick="PIL.arrBlsTout = !PIL.arrBlsTout; dessinerPilArrBls()">${PIL.arrBlsTout ? "Réduire la liste" : `Voir les ${L.length} BL →`}</a>` : ""}`;
+}
+
+function dessinerPilArrCentral() {
+  const zone = document.getElementById("pil-arr-central"), d = PIL.arrivages;
+  if (!zone || !d) return;
+  const c = d.central || {}, R = c.receptions || [], P = c.produits || [], montre = PIL.arrCentralTout ? P : P.slice(0, 15);
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  zone.innerHTML = `<h2>Attendu au central <span class="pil-compte">${pilNb(c.total?.pieces)} pièces</span></h2>
+    <div class="pil-aide">Les commandes fournisseurs pas encore réceptionnées : ce qui alimentera les prochains réassorts. C'est commun à tous les magasins.
+      Une date dépassée signale une livraison en retard${d.maj_central ? ` (données du ${new Date(d.maj_central).toLocaleDateString("fr-FR")})` : ""}.</div>
+    ${R.length ? `<div class="pil-grille deux" style="align-items:start">
+      <div><h3>Par réception</h3><div class="pil-defile"><table class="pil-table"><thead><tr><th>N°</th><th>Fournisseur</th><th class="num">Date prévue</th><th class="num">Pièces</th><th class="num">Références</th></tr></thead>
+        <tbody>${R.map(r => `<tr><td>${echapperHTML(String(r.numero))}</td><td>${pilLogo(r.marque || r.fournisseur || "", "pil-logo-mini")}${echapperHTML(r.fournisseur || r.marque || "")}</td>
+          <td class="num">${r.date_prevue && r.date_prevue < aujourdhui ? `<span class="pil-etiquette orange">${pilDateCourte(r.date_prevue)}</span>` : pilDateCourte(r.date_prevue)}</td>
+          <td class="num"><b>${pilNb(r.pieces)}</b></td><td class="num">${pilNb(r.refs)}</td></tr>`).join("")}</tbody></table></div></div>
+      <div><h3>Par produit</h3><div class="pil-defile"><table class="pil-table"><thead><tr><th></th><th>Produit</th><th>Marque</th><th class="num">Date prévue</th><th class="num">Pièces attendues</th></tr></thead>
+        <tbody>${montre.map(p => `<tr><td class="pil-photo">${pilVignette(p)}</td><td>${echapperHTML(p.designation || "")}<br><span class="pil-ref">${echapperHTML(p.reference)}</span></td>
+          <td>${echapperHTML(p.marque || "")}</td><td class="num">${pilDateCourte(p.date_prevue)}</td><td class="num"><b>${pilNb(p.pieces)}</b></td></tr>`).join("")}</tbody></table></div>
+        ${P.length > 15 ? `<a class="pil-voir" onclick="PIL.arrCentralTout = !PIL.arrCentralTout; dessinerPilArrCentral()">${PIL.arrCentralTout ? "Réduire la liste" : `Voir les ${P.length} produits →`}</a>` : ""}</div>
+    </div>` : `<div class="pil-vide">Aucune réception fournisseur en attente.</div>`}`;
+}
+
+function exporterPilArrivages() {
+  const d = PIL.arrivages;
+  if (!d) { alert("Rien à exporter."); return; }
+  telechargerXlsx(`PILOTAGE_ARRIVAGES_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`, [
+    { nom: "Par magasin", gras: [1], figer: 1, largeurs: [28, 12, 12, 14, 8, 12, 14, 18],
+      lignes: [["Magasin", "À venir", "En transit", "En préparation", "BL", "Références", "Dernier départ", "Réservé non livrable"],
+        ...(d.magasins || []).map(m => [m.nom, Number(m.transit) + Number(m.preparation), Number(m.transit), Number(m.preparation), Number(m.bls), Number(m.refs), m.prochain || "", Number(m.bloque) || 0])] },
+    { nom: "Produits à venir", gras: [1], figer: 1, largeurs: [18, 34, 16, 14, 12, 10, 12, 14, 14, 12, 10],
+      lignes: [["Référence", "Désignation", "Marque", "Rayon", "Nouveauté", "À venir", "En transit", "En préparation", "Magasins servis", "Stock actuel", "Vendu"],
+        ...(d.produits || []).filter(p => p.aVenir > 0).map(p => [p.reference, p.designation || "", p.marque || "", pilCat(p.categorie), p.nouveau ? "oui" : "", p.aVenir, p.transit, p.preparation, p.nmag, p.stock, p.vendu])] },
+    { nom: "BL", gras: [1], figer: 1, largeurs: [14, 26, 16, 12, 10, 12],
+      lignes: [["N° BL", "Magasin", "État", "Date", "Pièces", "Références"],
+        ...(d.bls || []).map(b => [b.bl || "", b.magasin, b.etat === "transit" ? "En transit" : b.etat === "bloque" ? "Réservé non livrable" : "En préparation", b.expedie_le || "", Number(b.pieces), Number(b.refs)])] },
+    { nom: "Attendu au central", gras: [1], figer: 1, largeurs: [18, 34, 16, 14, 14],
+      lignes: [["Référence", "Désignation", "Marque", "Date prévue", "Pièces attendues"],
+        ...(d.central?.produits || []).map(p => [p.reference, p.designation || "", p.marque || "", p.date_prevue || "", Number(p.pieces)])] }]);
 }
 
 async function rendreReporting() {
