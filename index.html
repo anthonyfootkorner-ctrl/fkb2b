@@ -1513,6 +1513,20 @@
   .pil-bornes { display: grid; grid-template-columns: 220px 1fr 170px; gap: 14px; font-size: 11px; color: #8a8a8a; border-bottom: 1px solid #e6e6e6; padding-bottom: 6px; }
   .pil-bornes div:nth-child(2) { display: flex; justify-content: space-between; }
   .pil-vide { color: #8a8a8a; font-size: 13px; padding: 8px 0; }
+  .pil-photo { width: 44px; }
+  .pil-photo img, .pil-photo .vide { display: block; width: 40px; height: 40px; object-fit: contain; background: #f6f6f5; border-radius: 6px; }
+  .pil-ref { color: #8a8a8a; font-size: 11.5px; }
+  .pil-etiquette { display: inline-block; border-radius: 20px; padding: 1px 8px; font-size: 11.5px; font-weight: 700; }
+  .pil-etiquette.rouge { background: #fdecec; color: #a81f1f; border: 1px solid #c62828; }
+  .pil-etiquette.orange { background: #fff3e0; color: #9a5300; border: 1px solid #d98a1f; }
+  .pil-groupes { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px 26px; margin-top: 6px; }
+  .pil-groupe h3 { margin: 6px 0 8px; padding-bottom: 6px; border-bottom: 1px solid #111; }
+  .pil-top5 { display: grid; grid-template-columns: 44px 1fr 90px 64px; gap: 8px; align-items: center; padding: 4px 0; font-size: 13px; }
+  .pil-top5 .nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.25; }
+  .pil-top5 .barre { height: 10px; }
+  .pil-top5 .barre i { display: block; height: 10px; background: #d95f12; border-radius: 0 4px 4px 0; }
+  .pil-top5 .val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
   @media (max-width: 900px) {
     .pil-kpis { grid-template-columns: repeat(2, 1fr); } .pil-grille { grid-template-columns: 1fr; }
     .pil-ligne { grid-template-columns: 120px 1fr 54px; } .pil-pos, .pil-bornes { grid-template-columns: 1fr; gap: 4px; } .pil-pos .rang { text-align: left; }
@@ -12053,7 +12067,8 @@ async function lancerCalculReporting() {
    alertes à trancher (prix anormalement bas, articles offerts sous 100 € de ticket), comparaison au réseau.
    Tout le calcul et les droits sont dans les fonctions SQL pilotage_* ; ici on choisit le périmètre et on affiche.
    Les ventes détaillées arrivent seules chaque jour (Fastmag → SFTP → relève automatique). */
-let PIL = { choisis: [], periode: "35j", etat: "attente", dims: "marques", donnees: null, chargement: 0,
+let PIL = { onglet: "remises", choisis: [], periode: "35j", etat: "attente", dims: "marques", donnees: null, chargement: 0,
+            top: null, topTri: "pieces", topVue: "tout", topVoir: 50,
             lignes: null, voirTout: { bas: false, offert: false }, erreur: null };
 const PIL_PERIODES = [["s-1", "Semaine dernière"], ["mois", "Mois en cours"], ["mois-1", "Mois précédent"], ["35j", "35 derniers jours"]];
 const PIL_APERCU = 15;
@@ -12091,15 +12106,11 @@ async function rendrePilotage() {
       <div class="compte-produits">Vos succursales, comparées entre elles et à l'ensemble des succursales. Les ventes arrivent seules chaque jour depuis Fastmag.</div>
     </div>
     <div class="pil">
-      <nav class="pil-onglets">
-        <a class="on">Remises</a>
-        <a class="bientot">Top produits<small>bientôt</small></a>
-        <a class="bientot">Parts de marché<small>bientôt</small></a>
-        <a class="bientot">Stocks<small>bientôt</small></a>
-      </nav>
+      <nav class="pil-onglets" id="pil-onglets"></nav>
       <div class="pil-filtres dash-filtres" id="pil-filtres"></div>
       <div id="pil-corps"><div class="pil-vide">Chargement…</div></div>
     </div>`;
+  dessinerPilOnglets();
   dessinerPilFiltres();
   await chargerPilotage();
 }
@@ -12130,6 +12141,7 @@ function pilBasculer(code) { pilChoisir(PIL.choisis.includes(code) ? PIL.choisis
 function pilPeriode(p) { PIL.periode = p; PIL.lignes = null; dessinerPilFiltres(); chargerPilotage(); }
 
 async function chargerPilotage() {
+  if (PIL.onglet === "top") return chargerPilTop();
   const corps = document.getElementById("pil-corps");
   if (!corps) return;
   const { du, au } = pilDates(PIL.periode), jeton = ++PIL.chargement;
@@ -12360,6 +12372,7 @@ function dessinerPilDetail() {
 }
 
 function exporterPilotage() {
+  if (PIL.onglet === "top") return exporterPilTop();
   const d = PIL.donnees;
   if (!d || !Number(d.selection?.pieces)) { alert("Rien à exporter sur cette période."); return; }
   const { du, au } = pilDates(PIL.periode);
@@ -12380,6 +12393,157 @@ function exporterPilotage() {
       ...PIL.lignes.map(l => [l.jour, String(l.heure || "").slice(0, 5), l.vente, l.vendeur || "", l.reference, l.designation || "", l.taille || "", l.saison || "", l.quantite,
         Number(l.prix_fiche) || 0, Number(l.paye) || 0, Number(l.remise_pct) || 0, Number(l.remise_eur) || 0])] });
   telechargerXlsx(`PILOTAGE_REMISES_${du.replace(/-/g, "")}_${au.replace(/-/g, "")}.xlsx`, feuilles);
+}
+
+/* ---- Pilotage secteur · onglet Top produits ----
+   Ce qui se vend le mieux dans les succursales choisies : classement en pièces, en CA ou en ROS, avec le stock,
+   la couverture et le stock central, pour repérer ce qu'il faut réassortir. Calcul : pilotage_top_produits. */
+const PIL_ONGLETS = [["remises", "Remises"], ["top", "Top produits"], ["parts", "Parts de marché"], ["stocks", "Stocks"]];
+const PIL_ONGLETS_PRETS = new Set(["remises", "top"]);
+function dessinerPilOnglets() {
+  const nav = document.getElementById("pil-onglets");
+  if (!nav) return;
+  nav.innerHTML = PIL_ONGLETS.map(([k, lib]) => PIL_ONGLETS_PRETS.has(k)
+    ? `<a class="${PIL.onglet === k ? "on" : ""}" onclick="pilOnglet('${k}')">${lib}</a>`
+    : `<a class="bientot">${lib}<small>bientôt</small></a>`).join("");
+}
+function pilOnglet(k) { if (PIL.onglet === k) return; PIL.onglet = k; dessinerPilOnglets(); chargerPilotage(); }
+
+async function chargerPilTop() {
+  const corps = document.getElementById("pil-corps");
+  if (!corps) return;
+  const { du, au } = pilDates(PIL.periode), jeton = ++PIL.chargement;
+  corps.innerHTML = `<div class="pil-vide">Chargement…</div>`;
+  let d;
+  try { d = await api("/rest/v1/rpc/pilotage_top_produits", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au } }); }
+  catch (e) {
+    if (jeton !== PIL.chargement) return;
+    corps.innerHTML = `<div class="pil-vide">Chargement impossible : ${echapperHTML((e.donnees?.message || e.message || "").slice(0, 200))}</div>`;
+    return;
+  }
+  if (jeton !== PIL.chargement) return;
+  const sem = Number(d?.semaines) || 1;
+  for (const p of d?.produits || []) {
+    p.pieces = Number(p.pieces) || 0; p.ca = Number(p.ca) || 0; p.stock = Number(p.stock) || 0; p.central = Number(p.central) || 0;
+    p.ros = Number(p.ros) || 0; p.ros_reseau = Number(p.ros_reseau) || 0;
+    p.couv = p.stock <= 0 ? 0 : p.pieces > 0 ? p.stock / (p.pieces / sem) : null;            // en semaines, au rythme de la période
+    p.tendance = Number(p.pieces_avant) > 0 ? 100 * (p.pieces - p.pieces_avant) / p.pieces_avant : null;
+  }
+  PIL.top = d; PIL.topVoir = 50;
+  dessinerPilTop();
+}
+
+const pilCat = c => (DASH_CATS.find(([k]) => k === c) || [, c || "Autre"])[1];
+const pilVignette = p => p.photo
+  ? `<img loading="lazy" src="${echapperHTML(p.photo + (p.photo.includes("cdn.shopify.com") ? (p.photo.includes("?") ? "&" : "?") + "width=96" : ""))}" alt="">`
+  : `<span class="vide"></span>`;
+function pilCouverture(p) {
+  if (p.stock <= 0) return `<span class="pil-etiquette rouge">rupture</span>`;
+  if (p.couv == null) return "—";
+  const t = p.couv < 1 ? "< 1 sem." : p.couv.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " sem.";
+  return p.couv < 2 ? `<span class="pil-etiquette rouge">${t}</span>` : p.couv < 4 ? `<span class="pil-etiquette orange">${t}</span>` : t;
+}
+const pilMesureTop = p => PIL.topTri === "ca" ? p.ca : PIL.topTri === "ros" ? p.ros : p.pieces;
+const pilFmtTop = v => PIL.topTri === "ca" ? pilEur(v) : PIL.topTri === "ros" ? v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : pilNb(v);
+// le ROS d'un produit vendu 2 fois dans un seul magasin n'a pas de sens : on demande un minimum de pièces
+function pilTopTries() {
+  const P = (PIL.top?.produits || []).filter(p => PIL.topTri !== "ros" || p.pieces >= 5);
+  return [...P].sort((a, b) => pilMesureTop(b) - pilMesureTop(a) || b.pieces - a.pieces);
+}
+
+function dessinerPilTop() {
+  const corps = document.getElementById("pil-corps"), d = PIL.top;
+  if (!corps || !d) return;
+  const P = d.produits || [], tot = d.total || {}, res = d.total_reseau || {};
+  if (!P.length) { corps.innerHTML = `<div class="pil-vide" style="padding:26px 0">Aucune vente sur cette période pour ce périmètre.</div>`; return; }
+  const partiel = Number(d.nb_selection) < Number(d.nb_reseau);
+  const parPieces = [...P].sort((a, b) => b.pieces - a.pieces);
+  const top10 = parPieces.slice(0, 10).reduce((s, p) => s + p.pieces, 0), top50 = parPieces.slice(0, 50);
+  const ruptures = top50.filter(p => p.stock <= 0).length, tendus = top50.filter(p => p.stock > 0 && p.couv != null && p.couv < 2).length;
+  const aReassortir = parPieces.slice(0, 100).filter(p => p.central > 0 && (p.stock <= 0 || (p.couv != null && p.couv < 2))).slice(0, 12);
+  const carte = (val, lib, note, cle) => `<div class="pil-kpi${cle ? " cle" : ""}"><div class="val">${val}</div><div class="lib">${lib}</div><div class="note">${note}</div></div>`;
+  corps.innerHTML = `
+    <section class="pil-kpis">
+      ${carte(pilNb(tot.pieces), "Pièces vendues", partiel ? `<b>${pilPct(pilPart(tot.pieces, res.pieces))}</b> des ventes des succursales` : `en ${Number(d.semaines).toLocaleString("fr-FR")} semaines`, true)}
+      ${carte(pilEur(tot.ca), "CA TTC", partiel ? `<b>${pilPct(pilPart(tot.ca, res.ca))}</b> du CA des succursales` : "ventes moins retours")}
+      ${carte(pilNb(tot.refs), "Références vendues", "au moins une pièce sur la période")}
+      ${carte(pilPct(pilPart(top10, tot.pieces)), "Poids du top 10", `${pilNb(top10)} pièces sur ${pilNb(tot.pieces)}`)}
+      ${carte(`${ruptures + tendus}`, "Top 50 sous tension", `<b>${ruptures}</b> en rupture · <b>${tendus}</b> à moins de 2 semaines`)}
+    </section>
+    <section class="pil-carte forte">
+      <h2>À réassortir <span class="pil-compte">${aReassortir.length}</span></h2>
+      <div class="pil-aide">Parmi les 100 meilleures ventes : en rupture ou à moins de 2 semaines de stock dans ${partiel ? "ces magasins" : "les succursales"}, alors que le central en a encore.</div>
+      ${aReassortir.length ? `<div class="pil-defile"><table class="pil-table"><thead><tr><th></th><th>Produit</th><th>Marque</th><th class="num">Pièces vendues</th><th class="num">ROS</th>
+          <th class="num">Stock magasins</th><th class="num">Couverture</th><th class="num">Stock central</th></tr></thead>
+        <tbody>${aReassortir.map(p => `<tr><td class="pil-photo">${pilVignette(p)}</td><td>${echapperHTML(p.designation || "")}<br><span class="pil-ref">${echapperHTML(p.reference)}</span></td>
+          <td>${echapperHTML(p.marque || "")}</td><td class="num">${pilNb(p.pieces)}</td><td class="num">${p.ros.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</td>
+          <td class="num">${pilNb(p.stock)}</td><td class="num">${pilCouverture(p)}</td><td class="num"><b>${pilNb(p.central)}</b></td></tr>`).join("")}</tbody></table></div>`
+        : `<div class="pil-vide">Rien à signaler : les meilleures ventes ont du stock, ou le central n'en a plus.</div>`}
+    </section>
+    <section class="pil-carte">
+      <h2>Classement</h2>
+      <div class="pil-aide">ROS = pièces vendues par semaine et par magasin qui a le produit (en stock ou vendu sur la période). La couverture dit combien de semaines le stock tient au rythme actuel.</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div class="pil-bascule">${[["pieces", "En pièces"], ["ca", "En CA"], ["ros", "En ROS"]].map(([k, lib]) =>
+          `<button class="${PIL.topTri === k ? "on" : ""}" onclick="PIL.topTri = '${k}'; dessinerPilTopListe()">${lib}</button>`).join("")}</div>
+        <div class="pil-bascule">${[["tout", "Tout"], ["rayon", "Par rayon"], ["marque", "Par marque"]].map(([k, lib]) =>
+          `<button class="${PIL.topVue === k ? "on" : ""}" onclick="PIL.topVue = '${k}'; dessinerPilTopListe()">${lib}</button>`).join("")}</div>
+      </div>
+      <div id="pil-top-liste"></div>
+    </section>`;
+  dessinerPilTopListe();
+}
+
+function dessinerPilTopListe() {
+  const zone = document.getElementById("pil-top-liste"), d = PIL.top;
+  if (!zone || !d) return;
+  // les boutons de tri et de vue sont dans le même bloc : on les remet à jour sans tout redessiner
+  zone.parentElement.querySelectorAll(".pil-bascule button").forEach(b => {
+    const m = (b.getAttribute("onclick") || "").match(/PIL\.(topTri|topVue) = '(\w+)'/);
+    if (m) b.classList.toggle("on", PIL[m[1]] === m[2]);
+  });
+  const P = pilTopTries(), partiel = Number(d.nb_selection) < Number(d.nb_reseau);
+  if (PIL.topVue === "tout") {
+    const montre = P.slice(0, PIL.topVoir);
+    zone.innerHTML = `<div class="pil-defile"><table class="pil-table"><thead><tr><th class="num">#</th><th></th><th>Produit</th><th>Marque</th><th>Rayon</th>
+        <th class="num">Pièces</th><th class="num">Évol.</th><th class="num">CA TTC</th><th class="num">Remise</th><th class="num">ROS</th>
+        ${partiel ? `<th class="num">ROS succ.</th>` : ""}<th class="num">Mag. vendeurs</th><th class="num">Stock</th><th class="num">Couverture</th><th class="num">Central</th></tr></thead>
+      <tbody>${montre.map((p, i) => `<tr><td class="num">${i + 1}</td><td class="pil-photo">${pilVignette(p)}</td>
+        <td>${echapperHTML(p.designation || "")}<br><span class="pil-ref">${echapperHTML(p.reference)}</span></td><td>${echapperHTML(p.marque || "")}</td><td>${echapperHTML(pilCat(p.categorie))}</td>
+        <td class="num"><b>${pilNb(p.pieces)}</b></td>
+        <td class="num">${p.tendance == null ? "—" : (p.tendance >= 0 ? "+" : "−") + Math.abs(Math.round(p.tendance)) + " %"}</td>
+        <td class="num">${pilEur(p.ca)}</td><td class="num">${p.remise == null ? "—" : pilPct(Number(p.remise))}</td>
+        <td class="num">${p.ros.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        ${partiel ? `<td class="num" style="color:#777">${p.ros_reseau.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` : ""}
+        <td class="num">${pilNb(p.nmag)}</td><td class="num">${pilNb(p.stock)}</td><td class="num">${pilCouverture(p)}</td><td class="num">${pilNb(p.central)}</td></tr>`).join("")}</tbody></table></div>
+      ${P.length > PIL.topVoir ? `<a class="pil-voir" onclick="PIL.topVoir += 100; dessinerPilTopListe()">Voir 100 de plus (${P.length} références classées) →</a>` : ""}
+      <div class="pil-aide" style="margin:8px 0 0">Évol. = pièces vendues par rapport à la période précédente de même durée.${PIL.topTri === "ros" ? " Classement en ROS : références vendues à 5 pièces au moins." : ""}</div>`;
+    return;
+  }
+  const cle = PIL.topVue === "rayon" ? p => pilCat(p.categorie) : p => p.marque || "(sans marque)";
+  const groupes = new Map();
+  for (const p of P) { const k = cle(p); (groupes.get(k) || groupes.set(k, []).get(k)).push(p); }
+  const somme = L => PIL.topTri === "ros" ? L.reduce((s, p) => s + p.pieces, 0) : L.reduce((s, p) => s + pilMesureTop(p), 0);
+  const tries = [...groupes.entries()].sort((a, b) => somme(b[1]) - somme(a[1])).slice(0, PIL.topVue === "marque" ? 12 : 20);
+  zone.innerHTML = `<div class="pil-groupes">${tries.map(([nom, L]) => {
+    const cinq = L.slice(0, 5), maxi = Math.max(...cinq.map(pilMesureTop), 0.01);
+    return `<div class="pil-groupe"><h3>${echapperHTML(nom)} <span class="pil-compte clair">${L.length} réf. · ${pilNb(L.reduce((s, p) => s + p.pieces, 0))} p.</span></h3>
+      ${cinq.map(p => `<div class="pil-top5" title="${echapperHTML(p.reference)} — stock ${pilNb(p.stock)} · central ${pilNb(p.central)}">
+        <span class="pil-photo">${pilVignette(p)}</span>
+        <span class="nom">${echapperHTML(p.designation || p.reference)}<br><span class="pil-ref">${echapperHTML(p.reference)}${p.stock <= 0 ? " · <b style=\"color:#c62828\">rupture</b>" : ""}</span></span>
+        <span class="barre"><i style="width:${Math.max(3, 100 * pilMesureTop(p) / maxi)}%"></i></span>
+        <span class="val">${pilFmtTop(pilMesureTop(p))}</span></div>`).join("")}</div>`; }).join("")}</div>`;
+}
+
+function exporterPilTop() {
+  const d = PIL.top;
+  if (!d?.produits?.length) { alert("Rien à exporter sur cette période."); return; }
+  const { du, au } = pilDates(PIL.periode), P = pilTopTries();
+  telechargerXlsx(`PILOTAGE_TOP_PRODUITS_${du.replace(/-/g, "")}_${au.replace(/-/g, "")}.xlsx`, [{
+    nom: "Top produits", gras: [1], figer: 1, largeurs: [6, 18, 34, 16, 14, 10, 12, 12, 10, 8, 12, 12, 10, 14, 12],
+    lignes: [["Rang", "Référence", "Désignation", "Marque", "Rayon", "Pièces", "Pièces période précédente", "CA TTC", "Remise %", "ROS", "ROS succursales", "Magasins vendeurs", "Stock magasins", "Couverture (semaines)", "Stock central"],
+      ...P.map((p, i) => [i + 1, p.reference, p.designation || "", p.marque || "", pilCat(p.categorie), p.pieces, Number(p.pieces_avant) || 0, p.ca, p.remise == null ? "" : Number(p.remise),
+        p.ros, p.ros_reseau, Number(p.nmag) || 0, p.stock, p.couv == null ? "" : Math.round(p.couv * 10) / 10, p.central])] }]);
 }
 
 async function rendreReporting() {
