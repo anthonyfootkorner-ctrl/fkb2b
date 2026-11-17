@@ -1623,6 +1623,11 @@
   #vue-pilotage .pil-groupe h3 { border-bottom-color: var(--pil-trait); }
   #vue-pilotage .pil-delta.haut { color: var(--pil-vert); } #vue-pilotage .pil-delta.bas { color: var(--pil-rouge); }
   /* Top produits : podium en cartes (reprise du « Top ventes » du Suivi hebdo) */
+  #vue-pilotage .pil-cherche { display: flex; gap: 8px; align-items: center; margin: 0 0 12px; flex-wrap: wrap; }
+  #vue-pilotage .pil-cherche input { flex: 1 1 280px; min-width: 0; background: var(--pil-surface); border: 1px solid var(--pil-trait); border-radius: 8px; color: var(--pil-encre);
+    font: 500 15px "IBM Plex Sans", sans-serif; padding: 11px 14px; }
+  #vue-pilotage .pil-cherche input::placeholder { color: var(--pil-doux); }
+  #vue-pilotage .pil-cherche input:focus-visible { outline: 2px solid var(--pil-accent); outline-offset: 1px; border-color: var(--pil-accent); }
   #vue-pilotage .pil-rayons { margin: 0 0 4px; }
   #vue-pilotage .pil-rayons a { font-size: 14px; padding: 11px 12px; }
   #vue-pilotage .pil-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 14px 0 16px; color: var(--pil-doux); font-size: 14px; }
@@ -1683,14 +1688,15 @@
   .pil-rk li:hover { background: var(--pil-surface2); }
   .pil-rk li.top { border-color: rgba(255, 90, 0, .55); background: linear-gradient(180deg, rgba(255, 90, 0, .16), rgba(255, 90, 0, .04)); box-shadow: 0 8px 28px -12px rgba(255, 90, 0, .45); }
   .pil-rk .rl { display: grid; grid-template-columns: 18px auto minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+  .pil-rk .rl:has(.logo) { grid-template-columns: 18px 68px minmax(0, 1fr) auto; }
   .pil-rk .n { font: 800 14px var(--pil-mono); color: var(--pil-doux); text-align: center; }
   .pil-rk li.top .n { color: var(--pil-accent); }
-  .pil-rk .logo { width: 34px; height: 34px; border-radius: 9px; background: #fff; color: #0B0B0C; display: grid; place-items: center; font: 800 12px var(--pil-titre); font-stretch: 80%; letter-spacing: 0; }
+  .pil-rk .logo { width: 68px; height: 34px; border-radius: 9px; background: #fff; color: #0B0B0C; display: grid; place-items: center; font: 800 12px var(--pil-titre); font-stretch: 80%; letter-spacing: 0; }
   .pil-rk .logo.aucun { background: transparent; }
-  .pil-rk .logo img { max-width: 26px; max-height: 22px; object-fit: contain; display: block; }
-  .pil-logo-mini { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: #fff; color: #0B0B0C; margin-right: 10px; vertical-align: middle;
+  .pil-rk .logo img { max-width: 56px; max-height: 24px; object-fit: contain; display: block; }
+  .pil-logo-mini { display: inline-grid; place-items: center; width: 52px; height: 26px; border-radius: 7px; background: #fff; color: #0B0B0C; margin-right: 10px; vertical-align: middle;
     font: 800 10px var(--pil-titre); letter-spacing: 0; overflow: hidden; }
-  .pil-logo-mini img { max-width: 20px; max-height: 17px; object-fit: contain; display: block; }
+  .pil-logo-mini img { max-width: 42px; max-height: 18px; object-fit: contain; display: block; }
   .pil-rk .nm { font: 700 16px var(--pil-titre); font-stretch: 85%; text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pil-rk .pc { font: 800 20px var(--pil-titre); font-stretch: 85%; font-variant-numeric: tabular-nums; }
   .pil-rk li.top .pc { color: var(--pil-accent); }
@@ -12234,7 +12240,7 @@ async function lancerCalculReporting() {
    Tout le calcul et les droits sont dans les fonctions SQL pilotage_* ; ici on choisit le périmètre et on affiche.
    Les ventes détaillées arrivent seules chaque jour (Fastmag → SFTP → relève automatique). */
 let PIL = { onglet: "remises", choisis: [], periode: "mois", etat: "attente", dims: "marques", donnees: null, chargement: 0,
-            top: null, topTri: "pieces", topVue: "tout", topVoir: 50, topCat: null, parts: null, partsDim: "marques", partsTout: false, stocks: null, stocksDim: "marques", stocksTout: false, stocksDormVoir: 20, arrivages: null, arrVoir: 30, arrFiltre: "tout", du: null, au: null,
+            top: null, topTri: "pieces", topVue: "tout", topVoir: 50, topCat: null, topRecherche: "", parts: null, partsDim: "marques", partsTout: false, stocks: null, stocksDim: "marques", stocksTout: false, stocksDormVoir: 20, arrivages: null, arrVoir: 30, arrFiltre: "tout", du: null, au: null,
             lignes: null, voirTout: { bas: false, offert: false }, erreur: null };
 const PIL_PERIODES = [["s-1", "Semaine dernière"], ["mois", "Mois en cours"], ["mois-1", "Mois précédent"], ["35j", "35 derniers jours"]];
 const PIL_APERCU = 15;
@@ -12597,7 +12603,8 @@ async function chargerPilTop() {
   const { du, au } = pilDates(PIL.periode), jeton = ++PIL.chargement;
   corps.innerHTML = `<div class="pil-vide">Chargement…</div>`;
   let d;
-  try { d = await api("/rest/v1/rpc/pilotage_top_produits", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au } }); }
+  try { d = await api("/rest/v1/rpc/pilotage_top_produits", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au,
+                                                                        p_recherche: PIL.topRecherche.trim().length >= 2 ? PIL.topRecherche.trim() : null } }); }
   catch (e) {
     if (jeton !== PIL.chargement) return;
     corps.innerHTML = `<div class="pil-vide">Chargement impossible : ${echapperHTML((e.donnees?.message || e.message || "").slice(0, 200))}</div>`;
@@ -12639,7 +12646,7 @@ const pilMesureTop = p => PIL.topTri === "ca" ? p.ca : PIL.topTri === "ros" ? p.
 const pilFmtTop = v => PIL.topTri === "ca" ? pilEur(v) : PIL.topTri === "ros" ? v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : pilNb(v);
 // le ROS d'un produit vendu 2 fois dans un seul magasin n'a pas de sens : on demande un minimum de pièces
 function pilTopTries() {
-  const P = (PIL.top?.produits || []).filter(p => (PIL.topTri !== "ros" || p.pieces >= 5) && (!PIL.topCat || pilCat(p.categorie) === PIL.topCat));
+  const P = (PIL.top?.produits || []).filter(p => PIL.topRecherche || ((PIL.topTri !== "ros" || p.pieces >= 5) && (!PIL.topCat || pilCat(p.categorie) === PIL.topCat)));
   return [...P].sort((a, b) => pilMesureTop(b) - pilMesureTop(a) || b.pieces - a.pieces);
 }
 
@@ -12647,7 +12654,7 @@ function dessinerPilTop() {
   const corps = document.getElementById("pil-corps"), d = PIL.top;
   if (!corps || !d) return;
   const P = d.produits || [], tot = d.total || {}, res = d.total_reseau || {};
-  if (!P.length) { corps.innerHTML = `<div class="pil-vide" style="padding:26px 0">Aucune vente sur cette période pour ce périmètre.</div>`; return; }
+  if (!P.length && !PIL.topRecherche) { corps.innerHTML = `<div class="pil-vide" style="padding:26px 0">Aucune vente sur cette période pour ce périmètre.</div>`; return; }
   const partiel = Number(d.nb_selection) < Number(d.nb_reseau);
   const parPieces = [...P].sort((a, b) => b.pieces - a.pieces);
   const top10 = parPieces.slice(0, 10).reduce((s, p) => s + p.pieces, 0), top50 = parPieces.slice(0, 50);
@@ -12679,7 +12686,7 @@ function dessinerPilTop() {
         : `<div class="pil-vide">Rien à signaler : les meilleures ventes ont du stock dans tous les magasins qui les vendent, ou le central n'en a plus.</div>`}
     </section>
     <section class="pil-carte">
-      <h2>Classement complet</h2>
+      <h2>${PIL.topRecherche ? "Résultats" : "Classement complet"}</h2>
       <div class="pil-aide">Même rayon et même tri que les cartes ci-dessus. ROS = pièces vendues par semaine et par magasin qui a le produit (en stock ou vendu sur la période). La couverture dit combien de semaines tiennent le stock et les pièces à venir (en transit ou en préparation) au rythme actuel.</div>
       <div style="display:flex;gap:12px;flex-wrap:wrap">
         <div class="pil-bascule">${[["tout", "Tout"], ["rayon", "Par rayon"], ["marque", "Par marque"]].map(([k, lib]) =>
@@ -12687,7 +12694,13 @@ function dessinerPilTop() {
       </div>
       <div id="pil-top-liste"></div>
     </section>`;
+  // en recherche, on ne montre que les produits trouvés : ni podium, ni liste « à réassortir »
+  if (PIL.topRecherche) corps.querySelector(".pil-carte.forte")?.remove();
   dessinerPilTopCartes(); dessinerPilTopListe();
+}
+function pilTopChercher(texte) {
+  PIL.topRecherche = String(texte ?? "").trim(); PIL.topCat = null; PIL.topVue = "tout"; PIL.topVoir = 50;
+  chargerPilTop();
 }
 
 /* Le podium en cartes, comme le « Top ventes » du Suivi hebdo : le n° 1 en grand, puis 4 cartes, puis 5 petites.
@@ -12716,7 +12729,18 @@ function dessinerPilTopCartes() {
         <div class="bas"><span class="ref">${echapperHTML(p.reference)}</span>
           <span class="stock">${p.dispo <= 0 ? `<span class="pil-etiquette rouge">rupture</span>` : `stock ${pilNb(p.stock)}${p.aVenir > 0 ? ` +${pilNb(p.aVenir)}` : ""} · ${pilCouverture(p)}`}</span></div>
       </div></article>`;
-  zone.innerHTML = `
+  const champ = `<form class="pil-cherche" onsubmit="event.preventDefault(); pilTopChercher(this.q.value)">
+      <input type="search" name="q" value="${echapperHTML(PIL.topRecherche)}" placeholder="Rechercher une référence ou un nom de produit…" aria-label="Rechercher un produit" autocomplete="off">
+      <button type="submit" class="puce-claire forte">Rechercher</button>
+      ${PIL.topRecherche ? `<button type="button" class="puce-claire" onclick="pilTopChercher('')">Effacer</button>` : ""}</form>`;
+  if (PIL.topRecherche) {
+    const n = (d.produits || []).length;
+    zone.innerHTML = `${champ}<div class="pil-meta"><span class="pil-tag">Recherche</span>
+      <span><b style="color:var(--pil-encre)">${n} produit${n > 1 ? "s" : ""}</b> pour « ${echapperHTML(PIL.topRecherche)} »${n >= 300 ? " (300 premiers)" : ""}, ventes du ${new Date(d.du).toLocaleDateString("fr-FR")} au ${new Date(d.au).toLocaleDateString("fr-FR")}.
+        Les produits sans vente sur la période apparaissent aussi, avec leur stock.</span></div>`;
+    return;
+  }
+  zone.innerHTML = `${champ}
     <nav class="pil-onglets pil-rayons">${[[null, "Tous les rayons"], ...presents.map(l => [l, l])].map(([k, lib]) =>
       `<a class="${(PIL.topCat || null) === k ? "on" : ""}" onclick="PIL.topCat = ${k ? `'${echapperHTML(k)}'` : "null"}; PIL.topVoir = 50; dessinerPilTopCartes(); dessinerPilTopListe()">${echapperHTML(lib)}</a>`).join("")}</nav>
     <div class="pil-meta"><span class="pil-tag">Top 10</span>
