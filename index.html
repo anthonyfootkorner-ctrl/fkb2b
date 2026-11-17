@@ -1668,6 +1668,7 @@
   #vue-pilotage .pil-dates.on { border-color: var(--pil-accent); color: var(--pil-encre); }
   #vue-pilotage .pil-dates input { background: transparent; border: 0; color: var(--pil-encre); font: 500 13px var(--pil-mono); color-scheme: dark; padding: 2px 0; }
   #vue-pilotage .pil-dates input:focus-visible { outline: 2px solid var(--pil-accent); outline-offset: 2px; border-radius: 4px; }
+  #vue-pilotage .pil-etiquette.vert { background: rgba(76, 195, 138, .16); color: var(--pil-vert); border: 1px solid var(--pil-vert); }
   #vue-pilotage .pil-etiquette.accent { background: rgba(255, 90, 0, .16); color: var(--pil-accent); border: 1px solid rgba(255, 90, 0, .5); }
   #vue-pilotage .pil-etiquette.bleu { background: rgba(57, 135, 229, .16); color: #7fb3f2; border: 1px solid #3987e5; }
   #vue-pilotage .pil-legende { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin-top: 10px; font-size: 12.5px; color: var(--pil-doux); }
@@ -12941,7 +12942,11 @@ async function chargerPilStocks() {
   };
   mesures(t); mesures(d.reseau || {});
   for (const dim of ["magasins", "marques", "rayons", "saisons"]) for (const x of d?.[dim] || []) { mesures(x); if (dim === "rayons") x.nom = pilCat(x.nom); }
-  for (const p of d?.dormants || []) { p.pieces = Number(p.pieces) || 0; p.valeur = Number(p.valeur) || 0; }
+  for (const p of d?.dormants || []) {
+    for (const k of ["pieces", "valeur", "nmag", "vendu_reseau", "mag_detenteurs", "mag_vendeurs", "ros_reseau"]) p[k] = Number(p[k]) || 0;
+    // le produit dort ici : se vend-il dans les autres succursales ? (au moins 3 magasins vendeurs et un vrai rythme)
+    p.ailleurs = p.mag_vendeurs >= 3 && p.ros_reseau >= 0.3 ? "vend" : p.vendu_reseau <= 0 ? "partout" : "peu";
+  }
   PIL.stocks = d; PIL.stocksDormVoir = 20;
   dessinerPilStocks();
 }
@@ -13011,15 +13016,24 @@ function dessinerPilStocksDetail() {
 function dessinerPilStocksDormants() {
   const zone = document.getElementById("pil-stocks-dormants"), d = PIL.stocks;
   if (!zone || !d) return;
-  const L = d.dormants || [], montre = L.slice(0, PIL.stocksDormVoir);
+  const f = PIL.stocksDormFiltre || "tout";
+  const L = (d.dormants || []).filter(p => f === "tout" || p.ailleurs === f), montre = L.slice(0, PIL.stocksDormVoir);
   zone.innerHTML = `<h2>Stock dormant <span class="pil-compte">${pilEur(d.total?.dormant_v)}</span></h2>
     <div class="pil-aide">Les produits qui immobilisent le plus de valeur sans se vendre : en stock dans un magasin qui n'en a écoulé aucune pièce
-      du ${new Date(d.du).toLocaleDateString("fr-FR")} au ${new Date(d.au).toLocaleDateString("fr-FR")}. À animer, à transférer vers un magasin qui le vend, ou à solder.</div>
+      du ${new Date(d.du).toLocaleDateString("fr-FR")} au ${new Date(d.au).toLocaleDateString("fr-FR")}.
+      Le <b>ROS des succursales</b> est celui de tous les magasins qui ont le produit (pièces vendues par semaine et par magasin détenteur) :
+      s'il est correct, le produit <b>se vend ailleurs</b> et mérite un transfert ; s'il est nul, il <b>dort partout</b> et il faut l'animer ou le solder.</div>
+    <div class="pil-bascule">${[["tout", "Tout"], ["vend", "Se vend ailleurs"], ["partout", "Dort partout"]].map(([k, lib]) =>
+      `<button class="${(PIL.stocksDormFiltre || "tout") === k ? "on" : ""}" onclick="PIL.stocksDormFiltre = '${k}'; PIL.stocksDormVoir = 20; dessinerPilStocksDormants()">${lib}</button>`).join("")}</div>
     ${L.length ? `<div class="pil-defile"><table class="pil-table"><thead><tr><th></th><th>Produit</th><th>Marque</th><th>Saison</th>
-        <th class="num">Pièces dormantes</th><th class="num">Valeur</th><th class="num">Magasins concernés</th></tr></thead>
+        <th class="num">Pièces dormantes</th><th class="num">Valeur</th><th class="num">Magasins où ça dort</th>
+        <th class="num">ROS des succursales</th><th class="num">Magasins qui le vendent</th><th class="num">Vendu ailleurs</th><th>Verdict</th></tr></thead>
       <tbody>${montre.map(p => `<tr><td class="pil-photo">${pilVignette(p)}</td><td>${echapperHTML(p.designation || "")}<br><span class="pil-ref">${echapperHTML(p.reference)}</span></td>
         <td>${echapperHTML(p.marque || "")}</td><td>${echapperHTML(p.saison || "")}</td><td class="num">${pilNb(p.pieces)}</td>
-        <td class="num"><b>${pilEur(p.valeur)}</b></td><td class="num">${pilNb(p.nmag)}</td></tr>`).join("")}</tbody></table></div>
+        <td class="num"><b>${pilEur(p.valeur)}</b></td><td class="num">${pilNb(p.nmag)}</td>
+        <td class="num"><b>${p.ros_reseau.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></td>
+        <td class="num">${pilNb(p.mag_vendeurs)} sur ${pilNb(p.mag_detenteurs)}</td><td class="num">${pilNb(p.vendu_reseau)}</td>
+        <td>${p.ailleurs === "vend" ? `<span class="pil-etiquette vert">se vend ailleurs</span>` : p.ailleurs === "partout" ? `<span class="pil-etiquette rouge">dort partout</span>` : `<span class="pil-ref">peu vendu</span>`}</td></tr>`).join("")}</tbody></table></div>
       ${L.length > PIL.stocksDormVoir ? `<a class="pil-voir" onclick="PIL.stocksDormVoir += 50; dessinerPilStocksDormants()">Voir 50 de plus (${L.length} produits listés) →</a>` : ""}`
       : `<div class="pil-vide">Aucun stock dormant sur la période.</div>`}`;
 }
@@ -13034,9 +13048,10 @@ function exporterPilStocks() {
   telechargerXlsx(`PILOTAGE_STOCKS_${du.replace(/-/g, "")}_${au.replace(/-/g, "")}.xlsx`, [
     feuille("Par magasin", "Magasin", (d.magasins || []).filter(m => m.code)), feuille("Par marque", "Marque", d.marques || []),
     feuille("Par rayon", "Rayon", d.rayons || []), feuille("Par saison", "Saison", d.saisons || []),
-    { nom: "Stock dormant", gras: [1], figer: 1, largeurs: [18, 34, 16, 12, 14, 14, 14],
-      lignes: [["Référence", "Désignation", "Marque", "Saison", "Pièces dormantes", "Valeur", "Magasins concernés"],
-        ...(d.dormants || []).map(p => [p.reference, p.designation || "", p.marque || "", p.saison || "", p.pieces, p.valeur, Number(p.nmag) || 0])] }]);
+    { nom: "Stock dormant", gras: [1], figer: 1, largeurs: [18, 34, 16, 12, 14, 14, 16, 16, 18, 16, 20, 16],
+      lignes: [["Référence", "Désignation", "Marque", "Saison", "Pièces dormantes", "Valeur", "Magasins où ça dort", "ROS des succursales", "Magasins qui le vendent", "Magasins qui l'ont", "Vendu dans les succursales", "Verdict"],
+        ...(d.dormants || []).map(p => [p.reference, p.designation || "", p.marque || "", p.saison || "", p.pieces, p.valeur, p.nmag, p.ros_reseau, p.mag_vendeurs, p.mag_detenteurs, p.vendu_reseau,
+          p.ailleurs === "vend" ? "Se vend ailleurs" : p.ailleurs === "partout" ? "Dort partout" : "Peu vendu"])] }]);
 }
 
 /* ---- Pilotage secteur · onglet Arrivages ----
