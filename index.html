@@ -12069,7 +12069,8 @@ function pilDates(periode) {
   const d = new Date(), jour = x => x.toISOString().slice(0, 10);
   return { du: jour(new Date(Date.UTC(d.getFullYear(), d.getMonth() - 1, 1))), au: jour(new Date(Date.UTC(d.getFullYear(), d.getMonth(), 0))) };
 }
-const pilMagasins = () => DASH.magasins.filter(m => m.code !== "WEB");
+// uniquement les succursales : ni le web, ni les franchises, y compris dans les comparatifs (le « réseau » = les succursales)
+const pilMagasins = () => DASH.magasins.filter(m => m.groupe === "SUCC");
 const pilSeul = () => PIL.choisis.length === 1 ? PIL.choisis[0] : (pilMagasins().length === 1 ? pilMagasins()[0].code : null);
 
 async function rendrePilotage() {
@@ -12080,14 +12081,14 @@ async function rendrePilotage() {
     if (souci) { vue.innerHTML = `<div class="col-tete"><h1>PILOTAGE SECTEUR</h1><div class="compte-produits">${souci}</div></div>`; return; }
   }
   if (!pilMagasins().length) {
-    vue.innerHTML = `<div class="col-tete"><h1>PILOTAGE SECTEUR</h1><div class="compte-produits">Cette page suit les magasins physiques : aucun ne vous est ouvert.</div></div>`;
+    vue.innerHTML = `<div class="col-tete"><h1>PILOTAGE SECTEUR</h1><div class="compte-produits">Cette page suit les succursales : aucune ne vous est ouverte.</div></div>`;
     return;
   }
   PIL.choisis = PIL.choisis.filter(c => pilMagasins().some(m => m.code === c));
   vue.innerHTML = `
     <div class="col-tete" style="padding-bottom:10px">
       <h1>PILOTAGE SECTEUR</h1>
-      <div class="compte-produits">Vos magasins, comparés entre eux et au réseau. Les ventes arrivent seules chaque jour depuis Fastmag.</div>
+      <div class="compte-produits">Vos succursales, comparées entre elles et à l'ensemble des succursales. Les ventes arrivent seules chaque jour depuis Fastmag.</div>
     </div>
     <div class="pil">
       <nav class="pil-onglets">
@@ -12112,7 +12113,6 @@ function dessinerPilFiltres() {
     ${mags.length > 1 ? `<div class="dash-ligne">
       <span class="compte-produits" style="margin:0">Magasins :</span>
       <button class="puce-claire dash-chip${PIL.choisis.length ? "" : " on"}" onclick="pilChoisir([])">Tous · ${mags.length}</button>
-      ${groupes.length > 1 ? groupes.map(g => `<button class="puce-claire dash-chip" onclick="pilChoisirGroupe('${echapperHTML(g)}')">${echapperHTML(g)}</button>`).join("") : ""}
       <span class="tb-sep"></span>
       ${mags.map(m => `<button class="puce-claire dash-chip${PIL.choisis.includes(m.code) ? " on" : ""}" onclick="pilBasculer('${echapperHTML(m.code)}')">${echapperHTML(m.nom || m.code)}</button>`).join("")}
     </div>` : `<div class="dash-ligne"><span class="compte-produits" style="margin:0">Magasin : <b>${echapperHTML(mags[0].nom || mags[0].code)}</b></span></div>`}
@@ -12173,15 +12173,15 @@ function dessinerPilotage() {
   const txSel = pilTaux(sel), txRes = pilTaux(res);
   const rang = cle => moi ? [...mags].sort((a, b) => (b[cle] ?? -1) - (a[cle] ?? -1)).findIndex(x => x === moi) + 1 : null;
   const ecart = (v, ref) => v == null || ref == null ? "" : `${v - ref >= 0 ? "+" : "−"}${Math.abs(v - ref).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} pt`;
-  const cmp = (v, ref, cle) => toutLeReseau ? "" : `réseau <b>${pilPct(ref)}</b> · ${ecart(v, ref)}${moi ? ` · <b>${pilOrdinal(rang(cle))}</b> sur ${mags.length}` : ""}`;
+  const cmp = (v, ref, cle) => toutLeReseau ? "" : `succursales <b>${pilPct(ref)}</b> · ${ecart(v, ref)}${moi ? ` · <b>${pilOrdinal(rang(cle))}</b> sur ${mags.length}` : ""}`;
   const p20 = pilPart(sel.p_fort, sel.pieces), t20 = pilPart(sel.tk_fort, sel.tk);
   const carte = (val, lib, note, cle) => `<div class="pil-kpi${cle ? " cle" : ""}"><div class="val">${val}</div><div class="lib">${lib}</div><div class="note">${note}</div></div>`;
   const seuil = Number(d.seuil) || 20;
   corps.innerHTML = `
     <section class="pil-kpis">
       ${carte(pilPct(txSel), "Taux de remise", cmp(txSel, txRes, "tx") || "prix payé contre prix de vente de base", true)}
-      ${carte(pilEur(sel.base - sel.ca), "Montant remisé", toutLeReseau ? "hors articles offerts dès 100 € de ticket" : `<b>${pilPct(pilPart(sel.base - sel.ca, res.base - res.ca))}</b> de la remise du réseau`)}
-      ${carte(pilEur(sel.ca), "CA TTC", toutLeReseau ? `${pilNb(sel.pieces)} pièces vendues` : `<b>${pilPct(pilPart(sel.ca, res.ca))}</b> du CA du réseau${moi ? ` · ${pilOrdinal(rang("ca"))} sur ${mags.length}` : ""}`)}
+      ${carte(pilEur(sel.base - sel.ca), "Montant remisé", toutLeReseau ? "hors articles offerts dès 100 € de ticket" : `<b>${pilPct(pilPart(sel.base - sel.ca, res.base - res.ca))}</b> de la remise des succursales`)}
+      ${carte(pilEur(sel.ca), "CA TTC", toutLeReseau ? `${pilNb(sel.pieces)} pièces vendues` : `<b>${pilPct(pilPart(sel.ca, res.ca))}</b> du CA des succursales${moi ? ` · ${pilOrdinal(rang("ca"))} sur ${mags.length}` : ""}`)}
       ${carte(pilPct(p20), `Pièces à −${seuil} % et plus`, cmp(p20, pilPart(res.p_fort, res.pieces), "p20") || `${pilNb(sel.p_fort)} pièces sur ${pilNb(sel.pieces)}`)}
       ${carte(pilPct(t20), `Tickets avec une remise ≥ ${seuil} %`, cmp(t20, pilPart(res.tk_fort, res.tk), "t20") || `${pilNb(sel.tk_fort)} tickets sur ${pilNb(sel.tk)}`)}
     </section>
@@ -12190,8 +12190,8 @@ function dessinerPilotage() {
     <section class="pil-grille">
       <div class="pil-carte">
         <h2>Remise par magasin</h2>
-        <div class="pil-aide">Écart entre le prix de vente de base et le prix payé, du plus fort au plus faible. Le trait pointillé est la moyenne du réseau
-          (${pilPct(txRes)}). Cliquez sur un magasin pour le comparer au réseau.</div>
+        <div class="pil-aide">Écart entre le prix de vente de base et le prix payé, du plus fort au plus faible. Le trait pointillé est la moyenne des succursales
+          (${pilPct(txRes)}). Cliquez sur un magasin pour le comparer aux autres succursales.</div>
         ${pilBarresMagasins(mags, txRes, seul)}
       </div>
       <div>
@@ -12245,14 +12245,14 @@ function pilBlocPosition(moi, mags, res) {
     const r = [...mags].sort((a, b) => (b[cle] ?? -1) - (a[cle] ?? -1)).findIndex(x => x === moi) + 1;
     return `<div class="pil-pos"><div class="lib2">${lib}<small>${aide}</small></div>
       <div class="pil-rail">${mags.filter(m => m !== moi && m[cle] != null).map(m => `<i style="left:${pos(m[cle])}%" title="${echapperHTML(m.nom || "Autre magasin")} : ${fmt(m[cle])}"></i>`).join("")}
-        <span class="moy" style="left:${pos(Math.min(Math.max(moy, min), max))}%" title="Moyenne du réseau : ${fmt(moy)}"></span>
+        <span class="moy" style="left:${pos(Math.min(Math.max(moy, min), max))}%" title="Moyenne des succursales : ${fmt(moy)}"></span>
         <span class="moi" style="left:${pos(moi[cle])}%" title="${echapperHTML(moi.nom)} : ${fmt(moi[cle])}"></span></div>
-      <div class="rang"><b>${fmt(moi[cle])}</b> · ${pilOrdinal(r)} sur ${mags.length}<br><span style="color:#8a8a8a;font-size:12px">réseau : ${fmt(moy)}</span></div></div>
+      <div class="rang"><b>${fmt(moi[cle])}</b> · ${pilOrdinal(r)} sur ${mags.length}<br><span style="color:#8a8a8a;font-size:12px">succursales : ${fmt(moy)}</span></div></div>
       <div class="pil-bornes"><div></div><div><span>${fmt(min)}</span><span>${fmt(max)}</span></div><div></div></div>`;
   };
   return `<section class="pil-carte">
-    <h2>Où se situe ${echapperHTML(moi.nom)} dans le réseau</h2>
-    <div class="pil-aide">Le point orange est le magasin, les points gris sont les ${mags.length - 1} autres, le trait pointillé est la moyenne du réseau.
+    <h2>Où se situe ${echapperHTML(moi.nom)} parmi les succursales</h2>
+    <div class="pil-aide">Le point orange est le magasin, les points gris sont les ${mags.length - 1} autres succursales, le trait pointillé est leur moyenne.
       Le rang va de la valeur la plus forte (1er) à la plus faible (${pilOrdinal(mags.length)}).
       <a style="text-decoration:underline;cursor:pointer" onclick="pilChoisir([])">Revenir à tous mes magasins</a></div>
     ${lignes.map(rail).join("")}</section>`;
