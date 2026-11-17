@@ -12427,7 +12427,9 @@ async function chargerPilTop() {
     p.pieces = Number(p.pieces) || 0; p.ca = Number(p.ca) || 0; p.stock = Number(p.stock) || 0; p.central = Number(p.central) || 0;
     p.ros = Number(p.ros) || 0; p.ros_reseau = Number(p.ros_reseau) || 0;
     p.couv = p.stock <= 0 ? 0 : p.pieces > 0 ? p.stock / (p.pieces / sem) : null;            // en semaines, au rythme de la période
-    p.tendance = Number(p.pieces_avant) > 0 ? 100 * (p.pieces - p.pieces_avant) / p.pieces_avant : null;
+    // une évolution n'a de sens que si la période précédente comptait déjà quelques ventes (sinon « +38 300 % »)
+    p.tendance = Number(p.pieces_avant) >= 10 ? 100 * (p.pieces - p.pieces_avant) / p.pieces_avant : null;
+    p.nouveau = Number(p.pieces_avant) < 10 && p.pieces >= 20;
   }
   PIL.top = d; PIL.topVoir = 50;
   dessinerPilTop();
@@ -12511,13 +12513,13 @@ function dessinerPilTopListe() {
       <tbody>${montre.map((p, i) => `<tr><td class="num">${i + 1}</td><td class="pil-photo">${pilVignette(p)}</td>
         <td>${echapperHTML(p.designation || "")}<br><span class="pil-ref">${echapperHTML(p.reference)}</span></td><td>${echapperHTML(p.marque || "")}</td><td>${echapperHTML(pilCat(p.categorie))}</td>
         <td class="num"><b>${pilNb(p.pieces)}</b></td>
-        <td class="num">${p.tendance == null ? "—" : (p.tendance >= 0 ? "+" : "−") + Math.abs(Math.round(p.tendance)) + " %"}</td>
+        <td class="num">${p.tendance == null ? (p.nouveau ? "nouveau" : "—") : (p.tendance >= 0 ? "+" : "−") + Math.abs(Math.round(p.tendance)) + " %"}</td>
         <td class="num">${pilEur(p.ca)}</td><td class="num">${p.remise == null ? "—" : pilPct(Number(p.remise))}</td>
         <td class="num">${p.ros.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
         ${partiel ? `<td class="num" style="color:#777">${p.ros_reseau.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` : ""}
         <td class="num">${pilNb(p.nmag)}</td><td class="num">${pilNb(p.stock)}</td><td class="num">${pilCouverture(p)}</td><td class="num">${pilNb(p.central)}</td></tr>`).join("")}</tbody></table></div>
       ${P.length > PIL.topVoir ? `<a class="pil-voir" onclick="PIL.topVoir += 100; dessinerPilTopListe()">Voir 100 de plus (${P.length} références classées) →</a>` : ""}
-      <div class="pil-aide" style="margin:8px 0 0">Évol. = pièces vendues par rapport à la période précédente de même durée.${PIL.topTri === "ros" ? " Classement en ROS : références vendues à 5 pièces au moins." : ""}</div>`;
+      <div class="pil-aide" style="margin:8px 0 0">Évol. = pièces vendues par rapport à la période précédente de même durée (« nouveau » : presque rien vendu avant). Stock et couverture : stock d'aujourd'hui.${PIL.topTri === "ros" ? " Classement en ROS : références vendues à 5 pièces au moins." : ""}</div>`;
     return;
   }
   const cle = PIL.topVue === "rayon" ? p => pilCat(p.categorie) : p => p.marque || "(sans marque)";
