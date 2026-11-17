@@ -12433,6 +12433,8 @@ async function chargerPilTop() {
     // une évolution n'a de sens que si la période précédente comptait déjà quelques ventes (sinon « +38 300 % »)
     p.tendance = Number(p.pieces_avant) >= 10 ? 100 * (p.pieces - p.pieces_avant) / p.pieces_avant : null;
     p.nouveau = Number(p.pieces_avant) < 10 && p.pieces >= 20;
+    // tension magasin par magasin : la somme des stocks masquait une rupture locale
+    p.magRupture = Number(p.mag_rupture) || 0; p.magTendu = Number(p.mag_tendu) || 0;
   }
   PIL.top = d; PIL.topVoir = 50;
   dessinerPilTop();
@@ -12449,6 +12451,8 @@ function pilCouverture(p) {
   return p.couv < 2 ? `<span class="pil-etiquette rouge">${t}</span>` : p.couv < 4 ? `<span class="pil-etiquette orange">${t}</span>` : t;
 }
 const pilAVenir = p => p.aVenir > 0 ? `<span title="${pilNb(p.transit)} en transit · ${pilNb(p.preparation)} en préparation">+${pilNb(p.aVenir)}</span>` : "—";
+const pilNomsMagasins = codes => { const L = (codes || []).map(c => DASH.magasins.find(m => m.code === c)?.nom || c);
+  return L.length > 4 ? L.slice(0, 4).join(", ") + ` +${L.length - 4}` : L.join(", "); };
 const pilMesureTop = p => PIL.topTri === "ca" ? p.ca : PIL.topTri === "ros" ? p.ros : p.pieces;
 const pilFmtTop = v => PIL.topTri === "ca" ? pilEur(v) : PIL.topTri === "ros" ? v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : pilNb(v);
 // le ROS d'un produit vendu 2 fois dans un seul magasin n'a pas de sens : on demande un minimum de pièces
@@ -12465,8 +12469,9 @@ function dessinerPilTop() {
   const partiel = Number(d.nb_selection) < Number(d.nb_reseau);
   const parPieces = [...P].sort((a, b) => b.pieces - a.pieces);
   const top10 = parPieces.slice(0, 10).reduce((s, p) => s + p.pieces, 0), top50 = parPieces.slice(0, 50);
-  const ruptures = top50.filter(p => p.dispo <= 0).length, tendus = top50.filter(p => p.dispo > 0 && p.couv != null && p.couv < 2).length;
-  const aReassortir = parPieces.slice(0, 100).filter(p => p.central > 0 && (p.dispo <= 0 || (p.couv != null && p.couv < 2))).slice(0, 12);
+  const ruptures = top50.filter(p => p.magRupture > 0).length, tendus = top50.filter(p => !p.magRupture && p.magTendu > 0).length;
+  const aReassortir = parPieces.slice(0, 100).filter(p => p.central > 0 && (p.magRupture > 0 || p.magTendu > 0))
+    .sort((a, b) => b.magRupture - a.magRupture || b.magTendu - a.magTendu || b.pieces - a.pieces);
   const carte = (val, lib, note, cle) => `<div class="pil-kpi${cle ? " cle" : ""}"><div class="val">${val}</div><div class="lib">${lib}</div><div class="note">${note}</div></div>`;
   corps.innerHTML = `
     <section class="pil-kpis">
@@ -12474,17 +12479,21 @@ function dessinerPilTop() {
       ${carte(pilEur(tot.ca), "CA TTC", partiel ? `<b>${pilPct(pilPart(tot.ca, res.ca))}</b> du CA des succursales` : "ventes moins retours")}
       ${carte(pilNb(tot.refs), "Références vendues", "au moins une pièce sur la période")}
       ${carte(pilPct(pilPart(top10, tot.pieces)), "Poids du top 10", `${pilNb(top10)} pièces sur ${pilNb(tot.pieces)}`)}
-      ${carte(`${ruptures + tendus}`, "Top 50 sous tension", `<b>${ruptures}</b> en rupture · <b>${tendus}</b> à moins de 2 semaines`)}
+      ${carte(`${ruptures + tendus}`, "Top 50 sous tension", `<b>${ruptures}</b> en rupture dans un magasin au moins · <b>${tendus}</b> à moins de 2 semaines`)}
     </section>
     <section class="pil-carte forte">
       <h2>À réassortir <span class="pil-compte">${aReassortir.length}</span></h2>
-      <div class="pil-aide">Parmi les 100 meilleures ventes : en rupture ou à moins de 2 semaines de stock dans ${partiel ? "ces magasins" : "les succursales"}, <b>en comptant ce qui est déjà en route ou en préparation</b>, alors que le central en a encore.</div>
-      ${aReassortir.length ? `<div class="pil-defile"><table class="pil-table"><thead><tr><th></th><th>Produit</th><th>Marque</th><th class="num">Pièces vendues</th><th class="num">ROS</th>
-          <th class="num">Stock magasins</th><th class="num">À venir</th><th class="num">Couverture</th><th class="num">Stock central</th></tr></thead>
-        <tbody>${aReassortir.map(p => `<tr><td class="pil-photo">${pilVignette(p)}</td><td>${echapperHTML(p.designation || "")}<br><span class="pil-ref">${echapperHTML(p.reference)}</span></td>
-          <td>${echapperHTML(p.marque || "")}</td><td class="num">${pilNb(p.pieces)}</td><td class="num">${p.ros.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</td>
-          <td class="num">${pilNb(p.stock)}</td><td class="num">${pilAVenir(p)}</td><td class="num">${pilCouverture(p)}</td><td class="num"><b>${pilNb(p.central)}</b></td></tr>`).join("")}</tbody></table></div>`
-        : `<div class="pil-vide">Rien à signaler : les meilleures ventes ont du stock, ou le central n'en a plus.</div>`}
+      <div class="pil-aide">Parmi les 100 meilleures ventes : produits en rupture ou à moins de 2 semaines de stock <b>dans au moins un magasin qui les vend</b>,
+        en comptant ce qui est déjà en route ou en préparation, alors que le central en a encore. Chaque magasin est jugé sur son propre stock et son propre rythme de vente.</div>
+      ${aReassortir.length ? `<div class="pil-defile"><table class="pil-table"><thead><tr><th></th><th>Produit</th><th>Marque</th><th class="num">Pièces vendues</th>
+          <th>Magasins en rupture</th><th>À moins de 2 sem.</th><th class="num">Stock magasins</th><th class="num">À venir</th><th class="num">Stock central</th></tr></thead>
+        <tbody>${(PIL.topReassortTout ? aReassortir : aReassortir.slice(0, 12)).map(p => `<tr><td class="pil-photo">${pilVignette(p)}</td><td>${echapperHTML(p.designation || "")}<br><span class="pil-ref">${echapperHTML(p.reference)}</span></td>
+          <td>${echapperHTML(p.marque || "")}</td><td class="num">${pilNb(p.pieces)}</td>
+          <td>${p.magRupture ? `<span class="pil-etiquette rouge">${p.magRupture} sur ${pilNb(p.nmag)}</span> <span class="pil-ref">${echapperHTML(pilNomsMagasins(p.mags_rupture))}</span>` : "—"}</td>
+          <td>${p.magTendu ? `<span class="pil-etiquette orange">${p.magTendu}</span> <span class="pil-ref">${echapperHTML(pilNomsMagasins(p.mags_tendus))}</span>` : "—"}</td>
+          <td class="num">${pilNb(p.stock)}</td><td class="num">${pilAVenir(p)}</td><td class="num"><b>${pilNb(p.central)}</b></td></tr>`).join("")}</tbody></table></div>
+        ${aReassortir.length > 12 ? `<a class="pil-voir" onclick="PIL.topReassortTout = !PIL.topReassortTout; dessinerPilTop()">${PIL.topReassortTout ? "Réduire la liste" : `Voir les ${aReassortir.length} produits →`}</a>` : ""}`
+        : `<div class="pil-vide">Rien à signaler : les meilleures ventes ont du stock dans tous les magasins qui les vendent, ou le central n'en a plus.</div>`}
     </section>
     <section class="pil-carte">
       <h2>Classement</h2>
@@ -12546,10 +12555,10 @@ function exporterPilTop() {
   if (!d?.produits?.length) { alert("Rien à exporter sur cette période."); return; }
   const { du, au } = pilDates(PIL.periode), P = pilTopTries();
   telechargerXlsx(`PILOTAGE_TOP_PRODUITS_${du.replace(/-/g, "")}_${au.replace(/-/g, "")}.xlsx`, [{
-    nom: "Top produits", gras: [1], figer: 1, largeurs: [6, 18, 34, 16, 14, 10, 12, 12, 10, 8, 12, 12, 10, 10, 12, 14, 12],
-    lignes: [["Rang", "Référence", "Désignation", "Marque", "Rayon", "Pièces", "Pièces période précédente", "CA TTC", "Remise %", "ROS", "ROS succursales", "Magasins vendeurs", "Stock magasins", "En transit", "En préparation", "Couverture (semaines)", "Stock central"],
+    nom: "Top produits", gras: [1], figer: 1, largeurs: [6, 18, 34, 16, 14, 10, 12, 12, 10, 8, 12, 12, 10, 10, 12, 14, 12, 12, 14, 40],
+    lignes: [["Rang", "Référence", "Désignation", "Marque", "Rayon", "Pièces", "Pièces période précédente", "CA TTC", "Remise %", "ROS", "ROS succursales", "Magasins vendeurs", "Stock magasins", "En transit", "En préparation", "Couverture (semaines)", "Stock central", "Magasins en rupture", "Magasins à moins de 2 sem.", "Détail ruptures"],
       ...P.map((p, i) => [i + 1, p.reference, p.designation || "", p.marque || "", pilCat(p.categorie), p.pieces, Number(p.pieces_avant) || 0, p.ca, p.remise == null ? "" : Number(p.remise),
-        p.ros, p.ros_reseau, Number(p.nmag) || 0, p.stock, Number(p.transit) || 0, Number(p.preparation) || 0, p.couv == null ? "" : Math.round(p.couv * 10) / 10, p.central])] }]);
+        p.ros, p.ros_reseau, Number(p.nmag) || 0, p.stock, Number(p.transit) || 0, Number(p.preparation) || 0, p.couv == null ? "" : Math.round(p.couv * 10) / 10, p.central, p.magRupture, p.magTendu, (p.mags_rupture || []).join(", ")])] }]);
 }
 
 async function rendreReporting() {
