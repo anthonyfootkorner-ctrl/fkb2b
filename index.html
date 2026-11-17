@@ -1590,6 +1590,8 @@
   #vue-pilotage .pil-table th { font-family: var(--pil-mono); font-size: 11px; letter-spacing: .1em; color: var(--pil-doux); font-weight: 500; border-bottom: 1px solid var(--pil-trait); }
   #vue-pilotage .pil-table td { border-bottom: 1px solid var(--pil-surface2); }
   #vue-pilotage .pil-table tbody tr:hover td { background: var(--pil-surface2); }
+  #vue-pilotage .pil-table tr.choisi td { background: var(--pil-surface2); }
+  #vue-pilotage .pil-table tr.choisi td:first-child { box-shadow: inset 4px 0 0 var(--pil-accent); }
   #vue-pilotage .pil-table tr.ok td { background: rgba(76, 195, 138, .14); }
   #vue-pilotage .pil-table tr.ko td { background: rgba(255, 107, 107, .15); }
   #vue-pilotage .pil-table tr.ok td:first-child { box-shadow: inset 4px 0 0 var(--pil-vert); }
@@ -12180,7 +12182,7 @@ async function lancerCalculReporting() {
    Tout le calcul et les droits sont dans les fonctions SQL pilotage_* ; ici on choisit le périmètre et on affiche.
    Les ventes détaillées arrivent seules chaque jour (Fastmag → SFTP → relève automatique). */
 let PIL = { onglet: "remises", choisis: [], periode: "35j", etat: "attente", dims: "marques", donnees: null, chargement: 0,
-            top: null, topTri: "pieces", topVue: "tout", topVoir: 50, parts: null, partsDim: "marques", partsTout: false,
+            top: null, topTri: "pieces", topVue: "tout", topVoir: 50, parts: null, partsDim: "marques", partsTout: false, stocks: null, stocksDim: "marques", stocksTout: false, stocksDormVoir: 20,
             lignes: null, voirTout: { bas: false, offert: false }, erreur: null };
 const PIL_PERIODES = [["s-1", "Semaine dernière"], ["mois", "Mois en cours"], ["mois-1", "Mois précédent"], ["35j", "35 derniers jours"]];
 const PIL_APERCU = 15;
@@ -12256,6 +12258,7 @@ function pilPeriode(p) { PIL.periode = p; PIL.lignes = null; dessinerPilFiltres(
 async function chargerPilotage() {
   if (PIL.onglet === "top") return chargerPilTop();
   if (PIL.onglet === "parts") return chargerPilParts();
+  if (PIL.onglet === "stocks") return chargerPilStocks();
   const corps = document.getElementById("pil-corps");
   if (!corps) return;
   const { du, au } = pilDates(PIL.periode), jeton = ++PIL.chargement;
@@ -12488,6 +12491,7 @@ function dessinerPilDetail() {
 function exporterPilotage() {
   if (PIL.onglet === "top") return exporterPilTop();
   if (PIL.onglet === "parts") return exporterPilParts();
+  if (PIL.onglet === "stocks") return exporterPilStocks();
   const d = PIL.donnees;
   if (!d || !Number(d.selection?.pieces)) { alert("Rien à exporter sur cette période."); return; }
   const { du, au } = pilDates(PIL.periode);
@@ -12514,7 +12518,7 @@ function exporterPilotage() {
    Ce qui se vend le mieux dans les succursales choisies : classement en pièces, en CA ou en ROS, avec le stock,
    la couverture et le stock central, pour repérer ce qu'il faut réassortir. Calcul : pilotage_top_produits. */
 const PIL_ONGLETS = [["remises", "Remises"], ["top", "Top produits"], ["parts", "Parts de marché"], ["stocks", "Stocks"]];
-const PIL_ONGLETS_PRETS = new Set(["remises", "top", "parts"]);
+const PIL_ONGLETS_PRETS = new Set(["remises", "top", "parts", "stocks"]);
 function dessinerPilOnglets() {
   const nav = document.getElementById("pil-onglets");
   if (!nav) return;
@@ -12813,6 +12817,130 @@ function exporterPilParts() {
       ...[...L].sort((a, b) => b.ca - a.ca).map(x => [x.nom, x.pieces, x.ca, arr(x.part), arr(x.partRes), arr(x.partN1), x.marge, arr(x.partMarge), arr(x.tauxMarge)])] });
   telechargerXlsx(`PILOTAGE_PARTS_DE_MARCHE_${du.replace(/-/g, "")}_${au.replace(/-/g, "")}.xlsx`,
     [feuille("Par marque", "Marque", d.marques || []), feuille("Par rayon", "Rayon", d.rayons || []), feuille("Par famille", "Famille", d.familles || [])]);
+}
+
+/* ---- Pilotage secteur · onglet Stocks ----
+   Stock des succursales choisies : pièces, valeur au prix d'achat, couverture, stock dormant, anciennes saisons,
+   par magasin, par marque, par rayon et par saison. Calcul : pilotage_stocks (stock = photo du dernier import). */
+async function chargerPilStocks() {
+  const corps = document.getElementById("pil-corps");
+  if (!corps) return;
+  const { du, au } = pilDates(PIL.periode), jeton = ++PIL.chargement;
+  corps.innerHTML = `<div class="pil-vide">Chargement…</div>`;
+  let d;
+  try { d = await api("/rest/v1/rpc/pilotage_stocks", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au } }); }
+  catch (e) {
+    if (jeton !== PIL.chargement) return;
+    corps.innerHTML = `<div class="pil-vide">Chargement impossible : ${echapperHTML((e.donnees?.message || e.message || "").slice(0, 200))}</div>`;
+    return;
+  }
+  if (jeton !== PIL.chargement) return;
+  const sem = Number(d?.semaines) || 1, t = d?.total || {};
+  const mesures = x => {
+    for (const k of ["pieces", "valeur", "vendu", "dormant_p", "dormant_v", "ancien_v", "refs"]) x[k] = Number(x[k]) || 0;
+    x.couv = x.vendu > 0 ? x.pieces / (x.vendu / sem) : null;                     // semaines de stock au rythme de la période
+    x.pctDormant = pilPart(x.dormant_v, x.valeur); x.pctAncien = pilPart(x.ancien_v, x.valeur);
+    x.part = pilPart(x.valeur, Number(t.valeur));
+    return x;
+  };
+  mesures(t); mesures(d.reseau || {});
+  for (const dim of ["magasins", "marques", "rayons", "saisons"]) for (const x of d?.[dim] || []) { mesures(x); if (dim === "rayons") x.nom = pilCat(x.nom); }
+  for (const p of d?.dormants || []) { p.pieces = Number(p.pieces) || 0; p.valeur = Number(p.valeur) || 0; }
+  PIL.stocks = d; PIL.stocksDormVoir = 20;
+  dessinerPilStocks();
+}
+
+const pilSem = v => v == null ? "—" : v >= 100 ? "> 99 sem." : v.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " sem.";
+
+function dessinerPilStocks() {
+  const corps = document.getElementById("pil-corps"), d = PIL.stocks;
+  if (!corps || !d) return;
+  const t = d.total || {}, res = d.reseau || {};
+  if (!t.pieces) { corps.innerHTML = `<div class="pil-vide" style="padding:26px 0">Aucun stock connu pour ce périmètre.</div>`; return; }
+  const partiel = Number(d.nb_selection) < Number(d.nb_reseau);
+  const mags = (d.magasins || []).filter(m => m.code), seul = pilSeul();
+  const cmp = (v, ref, unite) => !partiel || v == null || ref == null ? "" : `succursales <b>${unite === "sem" ? pilSem(ref) : pilPct(ref)}</b>`;
+  const carte = (val, lib, note, cle) => `<div class="pil-kpi${cle ? " cle" : ""}"><div class="val">${val}</div><div class="lib">${lib}</div><div class="note">${note}</div></div>`;
+  const couleurs = new Map([...(d.marques || [])].slice(0, PIL_PALETTE.length).map((x, i) => [x.nom, PIL_PALETTE[i]]));
+  const couleursRayons = new Map((d.rayons || []).map((x, i) => [x.nom, PIL_PALETTE[i % PIL_PALETTE.length]]));
+  const maxi = Math.max(1, ...mags.map(m => m.valeur));
+  const classeCouv = v => v == null ? "" : v > 26 ? "pil-etiquette orange" : "";
+  corps.innerHTML = `
+    <section class="pil-kpis">
+      ${carte(pilEur(t.valeur), "Valeur du stock", partiel ? `<b>${pilPct(pilPart(t.valeur, res.valeur))}</b> du stock des succursales` : "au prix d'achat", true)}
+      ${carte(pilNb(t.pieces), "Pièces en stock", `${pilNb(t.refs)} références${Number(d.a_venir) > 0 ? ` · <b>+${pilNb(d.a_venir)}</b> à venir` : ""}`)}
+      ${carte(pilSem(t.couv), "Couverture", cmp(t.couv, res.couv, "sem") || `au rythme des ${Number(d.semaines).toLocaleString("fr-FR")} dernières semaines`)}
+      ${carte(pilPct(t.pctDormant), "Stock dormant", `<b>${pilEur(t.dormant_v)}</b>${partiel ? ` · ${cmp(t.pctDormant, res.pctDormant)}` : " sans aucune vente sur la période"}`)}
+      ${carte(pilPct(t.pctAncien), "Anciennes saisons", `<b>${pilEur(t.ancien_v)}</b>${partiel ? ` · ${cmp(t.pctAncien, res.pctAncien)}` : " hors saisons en cours"}`)}
+    </section>
+    <section class="pil-carte">
+      <h2>Stock par magasin</h2>
+      <div class="pil-aide">Valeur au prix d'achat. <b>Dormant</b> : part du stock sur des produits que le magasin n'a pas vendus une seule fois sur la période.
+        <b>Anciennes saisons</b> : tout ce qui n'est pas ${echapperHTML((d.saisons_en_cours || []).join(", "))}. Cliquez sur un magasin pour ne voir que lui.</div>
+      <div class="pil-defile"><table class="pil-table"><thead><tr><th>Magasin</th><th class="num">Valeur</th><th></th><th class="num">Pièces</th><th class="num">Références</th>
+        <th class="num">Vendu sur la période</th><th class="num">Couverture</th><th class="num">Dormant</th><th class="num">Anciennes saisons</th></tr></thead>
+        <tbody>${[...mags].sort((a, b) => b.valeur - a.valeur).map(m => `<tr class="${m.code === seul ? "choisi" : ""}" style="cursor:pointer" onclick="pilChoisir(['${echapperHTML(m.code)}'])">
+          <td>${echapperHTML(m.nom)}${m.outlet ? ` <span class="pil-ref">outlet</span>` : ""}</td><td class="num"><b>${pilEur(m.valeur)}</b></td>
+          <td style="width:22%"><div class="pil-piste" style="height:10px"><div class="pil-seg" style="height:10px;width:${100 * m.valeur / maxi}%"></div></div></td>
+          <td class="num">${pilNb(m.pieces)}</td><td class="num">${pilNb(m.refs)}</td><td class="num">${pilNb(m.vendu)}</td>
+          <td class="num"><span class="${classeCouv(m.couv)}">${pilSem(m.couv)}</span></td><td class="num">${pilPct(m.pctDormant)}</td><td class="num">${pilPct(m.pctAncien)}</td></tr>`).join("")}</tbody></table></div>
+      ${seul ? `<a class="pil-voir" onclick="pilChoisir([])">Revenir à tous mes magasins</a>` : ""}
+    </section>
+    <section class="pil-grille deux">
+      ${pilPanneauRang("Stock par marque", "Part de chaque marque dans la valeur du stock.", d.marques || [], "part", couleurs, true)}
+      ${pilPanneauRang("Stock par rayon", "Part de chaque rayon dans la valeur du stock.", d.rayons || [], "part", couleursRayons, false)}
+    </section>
+    <section class="pil-carte" id="pil-stocks-detail"></section>
+    <section class="pil-carte forte" id="pil-stocks-dormants"></section>`;
+  dessinerPilStocksDetail(); dessinerPilStocksDormants();
+}
+
+function dessinerPilStocksDetail() {
+  const zone = document.getElementById("pil-stocks-detail"), d = PIL.stocks;
+  if (!zone || !d) return;
+  const L = [...(d[PIL.stocksDim] || [])].sort((a, b) => b.valeur - a.valeur), montre = PIL.stocksTout ? L : L.slice(0, 20);
+  zone.innerHTML = `<h2>Le détail</h2>
+    <div class="pil-aide">Une couverture longue avec beaucoup de dormant signale un stock à animer, à transférer ou à solder.</div>
+    <div class="pil-bascule">${[["marques", "Par marque"], ["rayons", "Par rayon"], ["saisons", "Par saison"]].map(([k, lib]) =>
+      `<button class="${PIL.stocksDim === k ? "on" : ""}" onclick="PIL.stocksDim = '${k}'; PIL.stocksTout = false; dessinerPilStocksDetail()">${lib}</button>`).join("")}</div>
+    <div class="pil-defile"><table class="pil-table"><thead><tr><th>${PIL.stocksDim === "marques" ? "Marque" : PIL.stocksDim === "rayons" ? "Rayon" : "Saison"}</th>
+      <th class="num">Valeur</th><th class="num">Part du stock</th><th class="num">Pièces</th><th class="num">Vendu sur la période</th><th class="num">Couverture</th>
+      <th class="num">Dormant</th><th class="num">Dont dormant</th></tr></thead>
+      <tbody>${montre.map(x => `<tr><td>${PIL.stocksDim === "marques" ? pilLogo(x.nom, "pil-logo-mini") : ""}${echapperHTML(x.nom)}</td><td class="num"><b>${pilEur(x.valeur)}</b></td>
+        <td class="num">${pilPct(x.part)}</td><td class="num">${pilNb(x.pieces)}</td><td class="num">${pilNb(x.vendu)}</td><td class="num">${pilSem(x.couv)}</td>
+        <td class="num">${pilPct(x.pctDormant)}</td><td class="num">${pilEur(x.dormant_v)}</td></tr>`).join("")}</tbody></table></div>
+    ${L.length > 20 ? `<a class="pil-voir" onclick="PIL.stocksTout = !PIL.stocksTout; dessinerPilStocksDetail()">${PIL.stocksTout ? "Réduire la liste" : `Voir les ${L.length} lignes →`}</a>` : ""}`;
+}
+
+function dessinerPilStocksDormants() {
+  const zone = document.getElementById("pil-stocks-dormants"), d = PIL.stocks;
+  if (!zone || !d) return;
+  const L = d.dormants || [], montre = L.slice(0, PIL.stocksDormVoir);
+  zone.innerHTML = `<h2>Stock dormant <span class="pil-compte">${pilEur(d.total?.dormant_v)}</span></h2>
+    <div class="pil-aide">Les produits qui immobilisent le plus de valeur sans se vendre : en stock dans un magasin qui n'en a écoulé aucune pièce
+      du ${new Date(d.du).toLocaleDateString("fr-FR")} au ${new Date(d.au).toLocaleDateString("fr-FR")}. À animer, à transférer vers un magasin qui le vend, ou à solder.</div>
+    ${L.length ? `<div class="pil-defile"><table class="pil-table"><thead><tr><th></th><th>Produit</th><th>Marque</th><th>Saison</th>
+        <th class="num">Pièces dormantes</th><th class="num">Valeur</th><th class="num">Magasins concernés</th></tr></thead>
+      <tbody>${montre.map(p => `<tr><td class="pil-photo">${pilVignette(p)}</td><td>${echapperHTML(p.designation || "")}<br><span class="pil-ref">${echapperHTML(p.reference)}</span></td>
+        <td>${echapperHTML(p.marque || "")}</td><td>${echapperHTML(p.saison || "")}</td><td class="num">${pilNb(p.pieces)}</td>
+        <td class="num"><b>${pilEur(p.valeur)}</b></td><td class="num">${pilNb(p.nmag)}</td></tr>`).join("")}</tbody></table></div>
+      ${L.length > PIL.stocksDormVoir ? `<a class="pil-voir" onclick="PIL.stocksDormVoir += 50; dessinerPilStocksDormants()">Voir 50 de plus (${L.length} produits listés) →</a>` : ""}`
+      : `<div class="pil-vide">Aucun stock dormant sur la période.</div>`}`;
+}
+
+function exporterPilStocks() {
+  const d = PIL.stocks;
+  if (!d || !Number(d.total?.pieces)) { alert("Rien à exporter."); return; }
+  const { du, au } = pilDates(PIL.periode), arr = v => v == null ? "" : Math.round(v * 10) / 10;
+  const feuille = (nom, entete, L) => ({ nom, gras: [1], figer: 1, largeurs: [28, 14, 12, 10, 16, 14, 12, 14, 16, 14],
+    lignes: [[entete, "Valeur (prix d'achat)", "Part du stock %", "Pièces", "Vendu sur la période", "Couverture (semaines)", "Dormant %", "Valeur dormante", "Anciennes saisons %", "Valeur anciennes saisons"],
+      ...[...L].sort((a, b) => b.valeur - a.valeur).map(x => [x.nom, x.valeur, arr(x.part), x.pieces, x.vendu, arr(x.couv), arr(x.pctDormant), x.dormant_v, arr(x.pctAncien), x.ancien_v])] });
+  telechargerXlsx(`PILOTAGE_STOCKS_${du.replace(/-/g, "")}_${au.replace(/-/g, "")}.xlsx`, [
+    feuille("Par magasin", "Magasin", (d.magasins || []).filter(m => m.code)), feuille("Par marque", "Marque", d.marques || []),
+    feuille("Par rayon", "Rayon", d.rayons || []), feuille("Par saison", "Saison", d.saisons || []),
+    { nom: "Stock dormant", gras: [1], figer: 1, largeurs: [18, 34, 16, 12, 14, 14, 14],
+      lignes: [["Référence", "Désignation", "Marque", "Saison", "Pièces dormantes", "Valeur", "Magasins concernés"],
+        ...(d.dormants || []).map(p => [p.reference, p.designation || "", p.marque || "", p.saison || "", p.pieces, p.valeur, Number(p.nmag) || 0])] }]);
 }
 
 async function rendreReporting() {
