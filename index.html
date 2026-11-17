@@ -1434,7 +1434,90 @@
   .rep-produit img, .rep-produit .vide { width: 38px; height: 38px; object-fit: contain; background: #f4f4f2; border-radius: 8px; flex: none; }
   .rep-produit b { display: block; font-size: 12.5px; line-height: 1.2; }
   .rep-produit span { font-size: 11px; color: var(--encre2); }
-  </style>
+  
+  /* ---- Pilotage secteur (onglet Remises) ---- */
+  .pil { padding: 0 22px 70px; color: #111; }
+  .pil-onglets { display: flex; gap: 26px; border-bottom: 1px solid #e6e6e6; margin: 4px 0 0; }
+  .pil-onglets a { padding: 10px 0 11px; color: #8a8a8a; text-decoration: none; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; border-bottom: 2px solid transparent; cursor: pointer; }
+  .pil-onglets a.on { color: #111; border-color: #f2751f; font-weight: 600; }
+  .pil-onglets a.bientot { cursor: default; }
+  .pil-onglets a.bientot small { font-size: 10px; letter-spacing: 0; text-transform: none; margin-left: 4px; }
+  .pil-filtres { position: sticky; top: 0; background: var(--papier, #fff); z-index: 5; padding: 12px 0; border-bottom: 1px solid #e6e6e6; }
+  .pil-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 20px 0 16px; }
+  .pil-kpi { border: 1px solid #e6e6e6; border-radius: 12px; padding: 14px 16px; background: #fff; }
+  .pil-kpi.cle { border-color: #111; }
+  .pil-kpi .val { font-size: 26px; font-weight: 600; letter-spacing: -.01em; }
+  .pil-kpi .lib { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: #555; margin-top: 2px; }
+  .pil-kpi .note { font-size: 12px; color: #777; margin-top: 6px; }
+  .pil-kpi .note b { color: #111; }
+  .pil-carte { border: 1px solid #e6e6e6; border-radius: 12px; padding: 16px 18px; background: #fff; margin-bottom: 16px; }
+  .pil-carte.forte { border-color: #111; }
+  .pil-carte h2 { font-size: 12px; letter-spacing: .09em; text-transform: uppercase; margin: 0 0 2px; font-weight: 700; }
+  .pil-carte h3 { font-size: 13px; margin: 14px 0 2px; }
+  .pil-aide { color: #555; font-size: 12.5px; margin-bottom: 12px; }
+  .pil-grille { display: grid; grid-template-columns: 1.55fr 1fr; gap: 16px; align-items: start; }
+  .pil-compte { display: inline-block; background: #111; color: #fff; border-radius: 20px; padding: 1px 9px; font-size: 12px; letter-spacing: 0; margin-left: 6px; vertical-align: 1px; }
+  .pil-compte.clair { background: #f3f3f2; color: #555; font-weight: 400; font-size: 11.5px; }
+  .pil-etats { display: inline-flex; border: 1px solid #d5d5d5; border-radius: 8px; overflow: hidden; margin: 2px 0 6px; }
+  .pil-etats button { border: 0; background: #fff; padding: 6px 12px; font-size: 12.5px; cursor: pointer; border-right: 1px solid #e6e6e6; font-family: inherit; color: #111; }
+  .pil-etats button:last-child { border-right: 0; }
+  .pil-etats button.on { background: #111; color: #fff; }
+  .pil-etats span { margin-left: 5px; border-radius: 20px; padding: 0 7px; background: #eee; color: #333; font-size: 11.5px; }
+  .pil-etats button[data-etat="ok"] span { background: #1a7f4b; color: #fff; }
+  .pil-etats button[data-etat="ko"] span { background: #c62828; color: #fff; }
+  .pil-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .pil-table th { text-align: left; font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: #555; font-weight: 600; padding: 7px 8px; border-bottom: 1px solid #111; white-space: nowrap; }
+  .pil-table td { padding: 7px 8px; border-bottom: 1px solid #e6e6e6; vertical-align: middle; }
+  .pil-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pil-table tr.ok td { background: #eaf6ef; }
+  .pil-table tr.ko td { background: #fdecec; }
+  .pil-table tr.ok td:first-child { box-shadow: inset 4px 0 0 #1a7f4b; }
+  .pil-table tr.ko td:first-child { box-shadow: inset 4px 0 0 #c62828; }
+  .pil-defile { overflow-x: auto; }
+  .pil-dec { white-space: nowrap; }
+  .pil-dec button { border-radius: 6px; padding: 3px 9px; font-size: 12px; cursor: pointer; margin-right: 4px; font-weight: 600; font-family: inherit; }
+  .pil-dec .oui { border: 1px solid #1a7f4b; color: #146c3f; background: #eaf6ef; }
+  .pil-dec .oui:hover { background: #1a7f4b; color: #fff; }
+  .pil-dec .non { border: 1px solid #c62828; color: #a81f1f; background: #fdecec; }
+  .pil-dec .non:hover { background: #c62828; color: #fff; }
+  .pil-pilule { display: inline-block; border-radius: 20px; padding: 2px 10px; font-size: 12px; font-weight: 700; color: #fff; }
+  .pil-pilule.ok { background: #1a7f4b; } .pil-pilule.ko { background: #c62828; }
+  .pil-rendu { font-size: 12px; color: #555; }
+  .pil-rendu a { margin-left: 6px; text-decoration: underline; cursor: pointer; color: #555; }
+  .pil-voir { margin-top: 8px; font-size: 12.5px; text-decoration: underline; cursor: pointer; display: inline-block; }
+  .pil-ligne { display: grid; grid-template-columns: 180px 1fr 60px; align-items: center; gap: 10px; padding: 3px 0; cursor: pointer; border-radius: 6px; }
+  .pil-ligne:hover, .pil-ligne.choisi { background: #f3f3f2; }
+  .pil-ligne .nom { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 6px; }
+  .pil-piste { position: relative; height: 16px; }
+  .pil-seg { position: absolute; left: 0; top: 0; height: 16px; background: #d95f12; border-radius: 0 4px 4px 0; }
+  .pil-repere { position: absolute; top: -3px; bottom: -3px; width: 0; border-left: 1.5px dashed #111; opacity: .55; }
+  .pil-ligne .tot { font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; padding-right: 6px; }
+  .pil-colonnes { display: flex; align-items: flex-end; gap: 14px; height: 180px; padding: 8px 6px 0; border-bottom: 1px solid #e6e6e6; }
+  .pil-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .pil-col i { display: block; width: 100%; max-width: 64px; background: #d95f12; border-radius: 4px 4px 0 0; }
+  .pil-col .v { font-size: 12.5px; font-weight: 600; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .pil-etiq { display: flex; gap: 14px; padding: 6px 6px 0; font-size: 11.5px; color: #555; }
+  .pil-etiq span { flex: 1; text-align: center; }
+  .pil-mini { display: inline-block; height: 8px; background: #d95f12; border-radius: 0 4px 4px 0; vertical-align: middle; margin-right: 8px; }
+  .pil-bascule { display: inline-flex; border: 1px solid #d5d5d5; border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
+  .pil-bascule button { border: 0; background: #fff; padding: 6px 12px; font-size: 12.5px; cursor: pointer; font-family: inherit; color: #111; }
+  .pil-bascule button.on { background: #111; color: #fff; }
+  .pil-pos { display: grid; grid-template-columns: 220px 1fr 170px; gap: 14px; align-items: center; padding: 9px 0 2px; }
+  .pil-pos .lib2 { font-size: 13px; } .pil-pos .lib2 small { display: block; color: #8a8a8a; font-size: 11.5px; }
+  .pil-rail { position: relative; height: 26px; }
+  .pil-rail::before { content: ""; position: absolute; left: 0; right: 0; top: 12px; height: 2px; background: #dcdcdc; }
+  .pil-rail i { position: absolute; top: 9px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: #c4c4c4; }
+  .pil-rail .moy { position: absolute; top: 3px; bottom: 3px; width: 0; border-left: 1.5px dashed #111; opacity: .6; }
+  .pil-rail .moi { position: absolute; top: 5px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: #d95f12; box-shadow: 0 0 0 2px #fff; }
+  .pil-pos .rang { font-size: 13px; text-align: right; } .pil-pos .rang b { font-size: 15px; }
+  .pil-bornes { display: grid; grid-template-columns: 220px 1fr 170px; gap: 14px; font-size: 11px; color: #8a8a8a; border-bottom: 1px solid #e6e6e6; padding-bottom: 6px; }
+  .pil-bornes div:nth-child(2) { display: flex; justify-content: space-between; }
+  .pil-vide { color: #8a8a8a; font-size: 13px; padding: 8px 0; }
+  @media (max-width: 900px) {
+    .pil-kpis { grid-template-columns: repeat(2, 1fr); } .pil-grille { grid-template-columns: 1fr; }
+    .pil-ligne { grid-template-columns: 120px 1fr 54px; } .pil-pos, .pil-bornes { grid-template-columns: 1fr; gap: 4px; } .pil-pos .rang { text-align: left; }
+  }
+</style>
 </head>
 <body>
 <header>
@@ -1458,6 +1541,7 @@
     <div class="menu-deroulant" id="lien-dashboard" style="display:none">
       <a href="#/dashboard" id="lien-dashboard-tete">DASHBOARD ▾</a>
       <div class="sous-menu">
+        <a href="#/pilotage" class="lien-dash-magasins" style="display:none">Pilotage secteur</a>
         <a href="#/dashboard" class="lien-dash-magasins" style="display:none">Magasins &amp; produits</a>
         <a href="#/reporting" class="lien-dash-magasins" style="display:none">Analyse CA, marge &amp; saisons</a>
         <a href="#/hebdo" id="lien-hebdo" style="display:none">Reporting hebdo (direction)</a>
@@ -1750,6 +1834,7 @@
   <section class="vue page-claire" id="vue-dashboard"></section>
   <section class="vue page-claire" id="vue-reassort"></section>
   <section class="vue page-claire" id="vue-reporting"></section>
+  <section class="vue page-claire" id="vue-pilotage"></section>
   <section class="vue page-claire" id="vue-hebdo"></section>
   <section class="vue page-claire" id="vue-import-reporting"></section>
   <section class="vue page-claire" id="vue-non-livrable"></section>
@@ -2015,10 +2100,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1794923668"></script>
-<script src="imports.js?v=1794923668"></script>
-<script src="merch-shopify.js?v=1794923668"></script>
-<script src="moteur-merch.js?v=1794923668"></script>
+<script src="config.js?v=1794929877"></script>
+<script src="imports.js?v=1794929877"></script>
+<script src="merch-shopify.js?v=1794929877"></script>
+<script src="moteur-merch.js?v=1794929877"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2507,6 +2592,9 @@ function router() {
   } else if (route === "precommandes-admin") {
     document.getElementById("vue-precommandes-admin").classList.add("active");
     rendrePrecommandesAdmin(decodeURIComponent(args.join("/")));
+  } else if (route === "pilotage") {
+    document.getElementById("vue-pilotage").classList.add("active");
+    rendrePilotage();
   } else if (route === "reporting") {
     document.getElementById("vue-reporting").classList.add("active");
     rendreReporting();
@@ -11960,6 +12048,340 @@ async function lancerCalculReporting() {
    produits. Tout vient d'une seule RPC (dash_reporting) : elle calcule le CA HT avec
    la TVA du pays du magasin, la marge avec le coût d'achat du journal des ventes, et
    compare à la période précédente et à l'an dernier. */
+/* ================= Pilotage secteur =================
+   Page des chefs de secteur (menu DASHBOARD). Onglet « Remises » : taux de remise sur le prix de vente de base,
+   alertes à trancher (prix anormalement bas, articles offerts sous 100 € de ticket), comparaison au réseau.
+   Tout le calcul et les droits sont dans les fonctions SQL pilotage_* ; ici on choisit le périmètre et on affiche.
+   Les ventes détaillées arrivent seules chaque jour (Fastmag → SFTP → relève automatique). */
+let PIL = { choisis: [], periode: "35j", etat: "attente", dims: "marques", donnees: null, chargement: 0,
+            lignes: null, voirTout: { bas: false, offert: false }, erreur: null };
+const PIL_PERIODES = [["s-1", "Semaine dernière"], ["mois", "Mois en cours"], ["mois-1", "Mois précédent"], ["35j", "35 derniers jours"]];
+const PIL_APERCU = 15;
+const pilEur = n => Math.round(Number(n) || 0).toLocaleString("fr-FR") + " €";
+const pilNb = n => Math.round(Number(n) || 0).toLocaleString("fr-FR");
+const pilPct = n => n == null || !Number.isFinite(n) ? "—" : n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
+const pilTaux = o => o && Number(o.base) > 0 ? 100 * (1 - o.ca / o.base) : null;
+const pilPart = (a, b) => Number(b) > 0 ? 100 * a / b : null;
+const pilJour = j => { const p = String(j || "").split("-"); return p.length === 3 ? `${p[2]}/${p[1]}` : ""; };
+const pilOrdinal = n => n === 1 ? "1er" : n + "e";
+function pilDates(periode) {
+  if (periode !== "mois-1") return dashDates(periode);
+  const d = new Date(), jour = x => x.toISOString().slice(0, 10);
+  return { du: jour(new Date(Date.UTC(d.getFullYear(), d.getMonth() - 1, 1))), au: jour(new Date(Date.UTC(d.getFullYear(), d.getMonth(), 0))) };
+}
+const pilMagasins = () => DASH.magasins.filter(m => m.code !== "WEB");
+const pilSeul = () => PIL.choisis.length === 1 ? PIL.choisis[0] : (pilMagasins().length === 1 ? pilMagasins()[0].code : null);
+
+async function rendrePilotage() {
+  const vue = document.getElementById("vue-pilotage");
+  if (!DASH.magasins.length) {
+    vue.innerHTML = `<div class="col-tete"><h1>PILOTAGE SECTEUR</h1><div class="compte-produits">Chargement…</div></div>`;
+    const souci = await chargerMagasinsDash();
+    if (souci) { vue.innerHTML = `<div class="col-tete"><h1>PILOTAGE SECTEUR</h1><div class="compte-produits">${souci}</div></div>`; return; }
+  }
+  if (!pilMagasins().length) {
+    vue.innerHTML = `<div class="col-tete"><h1>PILOTAGE SECTEUR</h1><div class="compte-produits">Cette page suit les magasins physiques : aucun ne vous est ouvert.</div></div>`;
+    return;
+  }
+  PIL.choisis = PIL.choisis.filter(c => pilMagasins().some(m => m.code === c));
+  vue.innerHTML = `
+    <div class="col-tete" style="padding-bottom:10px">
+      <h1>PILOTAGE SECTEUR</h1>
+      <div class="compte-produits">Vos magasins, comparés entre eux et au réseau. Les ventes arrivent seules chaque jour depuis Fastmag.</div>
+    </div>
+    <div class="pil">
+      <nav class="pil-onglets">
+        <a class="on">Remises</a>
+        <a class="bientot">Top produits<small>bientôt</small></a>
+        <a class="bientot">Parts de marché<small>bientôt</small></a>
+        <a class="bientot">Stocks<small>bientôt</small></a>
+      </nav>
+      <div class="pil-filtres dash-filtres" id="pil-filtres"></div>
+      <div id="pil-corps"><div class="pil-vide">Chargement…</div></div>
+    </div>`;
+  dessinerPilFiltres();
+  await chargerPilotage();
+}
+
+function dessinerPilFiltres() {
+  const zone = document.getElementById("pil-filtres");
+  if (!zone) return;
+  const mags = pilMagasins(), groupes = [...new Set(mags.map(m => m.groupe).filter(Boolean))];
+  const { du, au } = pilDates(PIL.periode);
+  zone.innerHTML = `
+    ${mags.length > 1 ? `<div class="dash-ligne">
+      <span class="compte-produits" style="margin:0">Magasins :</span>
+      <button class="puce-claire dash-chip${PIL.choisis.length ? "" : " on"}" onclick="pilChoisir([])">Tous · ${mags.length}</button>
+      ${groupes.length > 1 ? groupes.map(g => `<button class="puce-claire dash-chip" onclick="pilChoisirGroupe('${echapperHTML(g)}')">${echapperHTML(g)}</button>`).join("") : ""}
+      <span class="tb-sep"></span>
+      ${mags.map(m => `<button class="puce-claire dash-chip${PIL.choisis.includes(m.code) ? " on" : ""}" onclick="pilBasculer('${echapperHTML(m.code)}')">${echapperHTML(m.nom || m.code)}</button>`).join("")}
+    </div>` : `<div class="dash-ligne"><span class="compte-produits" style="margin:0">Magasin : <b>${echapperHTML(mags[0].nom || mags[0].code)}</b></span></div>`}
+    <div class="dash-ligne">
+      <span class="compte-produits" style="margin:0">Période :</span>
+      ${PIL_PERIODES.map(([cle, lib]) => `<button class="puce-claire dash-chip${PIL.periode === cle ? " on" : ""}" onclick="pilPeriode('${cle}')">${lib}</button>`).join("")}
+      <span class="compte-produits" style="margin:0">du ${new Date(du).toLocaleDateString("fr-FR")} au ${new Date(au).toLocaleDateString("fr-FR")}</span>
+      <button class="puce-claire" onclick="chargerPilotage()">↻ Actualiser</button>
+      <button class="puce-claire forte" onclick="exporterPilotage()">Exporter en Excel</button>
+    </div>`;
+}
+function pilChoisir(liste) { PIL.choisis = liste.slice(); PIL.lignes = null; dessinerPilFiltres(); chargerPilotage(); }
+function pilChoisirGroupe(g) { pilChoisir(pilMagasins().filter(m => m.groupe === g).map(m => m.code)); }
+function pilBasculer(code) { pilChoisir(PIL.choisis.includes(code) ? PIL.choisis.filter(c => c !== code) : PIL.choisis.concat(code)); }
+function pilPeriode(p) { PIL.periode = p; PIL.lignes = null; dessinerPilFiltres(); chargerPilotage(); }
+
+async function chargerPilotage() {
+  const corps = document.getElementById("pil-corps");
+  if (!corps) return;
+  const { du, au } = pilDates(PIL.periode), jeton = ++PIL.chargement;
+  corps.innerHTML = `<div class="pil-vide">Chargement…</div>`;
+  PIL.voirTout = { bas: false, offert: false };
+  let d;
+  try { d = await api("/rest/v1/rpc/pilotage_remises", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au } }); }
+  catch (e) {
+    if (jeton !== PIL.chargement) return;
+    corps.innerHTML = `<div class="pil-vide">Chargement impossible : ${echapperHTML((e.donnees?.message || e.message || "").slice(0, 200))}</div>`;
+    return;
+  }
+  if (jeton !== PIL.chargement) return;
+  PIL.donnees = d;
+  dessinerPilotage();
+  const seul = pilSeul();
+  if (seul && d?.selection?.pieces) {
+    try { PIL.lignes = await api("/rest/v1/rpc/pilotage_remises_lignes", { corps: { p_magasin: seul, p_du: du, p_au: au } }) || []; }
+    catch (e) { PIL.lignes = []; }
+    if (jeton === PIL.chargement) dessinerPilDetail();
+  }
+}
+
+/* Mesures d'un magasin, pour le classement et la position dans le réseau. */
+function pilMesures(m) {
+  return { tx: pilTaux(m), p20: pilPart(m.p_fort, m.pieces), t20: pilPart(m.tk_fort, m.tk), ca: Number(m.ca) || 0, al: Number(m.al) || 0, of: Number(m.offerts) || 0 };
+}
+
+function dessinerPilotage() {
+  const corps = document.getElementById("pil-corps"), d = PIL.donnees;
+  if (!corps || !d) return;
+  const sel = d.selection || {}, res = d.reseau || {};
+  if (!Number(sel.pieces)) {
+    corps.innerHTML = `<div class="pil-vide" style="padding:26px 0">Aucune vente détaillée sur cette période pour ce périmètre.
+      Les ventes arrivent chaque jour depuis Fastmag ; l'historique commence en octobre 2026.</div>`;
+    return;
+  }
+  const mags = (d.magasins || []).map(m => ({ ...m, ...pilMesures(m) }));
+  const seul = pilSeul(), moi = seul ? mags.find(m => m.code === seul) : null;
+  const toutLeReseau = Number(d.nb_selection) >= Number(d.nb_reseau);
+  const txSel = pilTaux(sel), txRes = pilTaux(res);
+  const rang = cle => moi ? [...mags].sort((a, b) => (b[cle] ?? -1) - (a[cle] ?? -1)).findIndex(x => x === moi) + 1 : null;
+  const ecart = (v, ref) => v == null || ref == null ? "" : `${v - ref >= 0 ? "+" : "−"}${Math.abs(v - ref).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} pt`;
+  const cmp = (v, ref, cle) => toutLeReseau ? "" : `réseau <b>${pilPct(ref)}</b> · ${ecart(v, ref)}${moi ? ` · <b>${pilOrdinal(rang(cle))}</b> sur ${mags.length}` : ""}`;
+  const p20 = pilPart(sel.p_fort, sel.pieces), t20 = pilPart(sel.tk_fort, sel.tk);
+  const carte = (val, lib, note, cle) => `<div class="pil-kpi${cle ? " cle" : ""}"><div class="val">${val}</div><div class="lib">${lib}</div><div class="note">${note}</div></div>`;
+  const seuil = Number(d.seuil) || 20;
+  corps.innerHTML = `
+    <section class="pil-kpis">
+      ${carte(pilPct(txSel), "Taux de remise", cmp(txSel, txRes, "tx") || "prix payé contre prix de vente de base", true)}
+      ${carte(pilEur(sel.base - sel.ca), "Montant remisé", toutLeReseau ? "hors articles offerts dès 100 € de ticket" : `<b>${pilPct(pilPart(sel.base - sel.ca, res.base - res.ca))}</b> de la remise du réseau`)}
+      ${carte(pilEur(sel.ca), "CA TTC", toutLeReseau ? `${pilNb(sel.pieces)} pièces vendues` : `<b>${pilPct(pilPart(sel.ca, res.ca))}</b> du CA du réseau${moi ? ` · ${pilOrdinal(rang("ca"))} sur ${mags.length}` : ""}`)}
+      ${carte(pilPct(p20), `Pièces à −${seuil} % et plus`, cmp(p20, pilPart(res.p_fort, res.pieces), "p20") || `${pilNb(sel.p_fort)} pièces sur ${pilNb(sel.pieces)}`)}
+      ${carte(pilPct(t20), `Tickets avec une remise ≥ ${seuil} %`, cmp(t20, pilPart(res.tk_fort, res.tk), "t20") || `${pilNb(sel.tk_fort)} tickets sur ${pilNb(sel.tk)}`)}
+    </section>
+    ${moi ? pilBlocPosition(moi, mags, res) : ""}
+    <section class="pil-carte forte" id="pil-verif"></section>
+    <section class="pil-grille">
+      <div class="pil-carte">
+        <h2>Remise par magasin</h2>
+        <div class="pil-aide">Écart entre le prix de vente de base et le prix payé, du plus fort au plus faible. Le trait pointillé est la moyenne du réseau
+          (${pilPct(txRes)}). Cliquez sur un magasin pour le comparer au réseau.</div>
+        ${pilBarresMagasins(mags, txRes, seul)}
+      </div>
+      <div>
+        <div class="pil-carte">
+          <h2>Évolution par semaine</h2>
+          <div class="pil-aide">Taux de remise par semaine (lundi indiqué). Une semaine à cheval sur la période est incomplète.</div>
+          ${pilColonnesSemaines(d.semaines || [])}
+        </div>
+        <div class="pil-carte" id="pil-dims"></div>
+      </div>
+    </section>
+    <section class="pil-carte" id="pil-detail"></section>`;
+  dessinerPilVerif(); dessinerPilDims(); dessinerPilDetail();
+}
+
+function pilBarresMagasins(mags, txRes, seul) {
+  const visibles = mags.filter(m => m.code && m.tx != null).sort((a, b) => b.tx - a.tx);
+  if (!visibles.length) return `<div class="pil-vide">Aucun magasin à afficher.</div>`;
+  const maxi = Math.max(10, Math.ceil(Math.max(...visibles.map(m => m.tx), txRes || 0) / 10) * 10);
+  return visibles.map(m => `<div class="pil-ligne${m.code === seul ? " choisi" : ""}" onclick="pilChoisir(['${echapperHTML(m.code)}'])"
+      title="${echapperHTML(m.nom)} — CA ${pilEur(m.ca)} · remisé ${pilEur(m.base - m.ca)} · ${pilPct(m.tx)}">
+      <div class="nom">${echapperHTML(m.nom)}${m.outlet ? ` <span style="color:#8a8a8a;font-size:11px">outlet</span>` : ""}</div>
+      <div class="pil-piste"><div class="pil-seg" style="width:${Math.max(0, 100 * m.tx / maxi)}%"></div>
+        ${txRes != null ? `<div class="pil-repere" style="left:${100 * txRes / maxi}%"></div>` : ""}</div>
+      <div class="tot">${pilPct(m.tx)}</div></div>`).join("") +
+    `<div class="pil-ligne" style="cursor:default;background:none"><div></div><div style="display:flex;justify-content:space-between;font-size:11px;color:#8a8a8a">
+      ${[0, 1, 2, 3, 4].map(k => `<span>${Math.round(maxi * k / 4)} %</span>`).join("")}</div><div></div></div>`;
+}
+
+function pilColonnesSemaines(sems) {
+  const pts = sems.map(s => ({ lundi: s.lundi, tx: pilTaux(s) })).filter(s => s.tx != null);
+  if (!pts.length) return `<div class="pil-vide">Pas de vente sur la période.</div>`;
+  const maxi = Math.max(10, ...pts.map(s => s.tx));
+  return `<div class="pil-colonnes">${pts.map(s => `<div class="pil-col" title="Semaine du ${pilJour(s.lundi)} : ${pilPct(s.tx)}">
+      <div class="v">${pilPct(s.tx)}</div><i style="height:${Math.max(2, 140 * s.tx / maxi)}px"></i></div>`).join("")}</div>
+    <div class="pil-etiq">${pts.map(s => `<span>${pilJour(s.lundi)}</span>`).join("")}</div>`;
+}
+
+function pilBlocPosition(moi, mags, res) {
+  const lignes = [["tx", "Taux de remise", "sur le prix de vente de base", pilTaux(res), true],
+    ["p20", `Pièces à −${Number(PIL.donnees.seuil) || 20} % et plus`, "part des pièces vendues", pilPart(res.p_fort, res.pieces), true],
+    ["t20", `Tickets avec une remise ≥ ${Number(PIL.donnees.seuil) || 20} %`, "part des tickets", pilPart(res.tk_fort, res.tk), true],
+    ["al", "Prix anormalement bas", "ventes à vérifier sur la période", null, false],
+    ["of", "Articles offerts sous 100 €", "à vérifier sur la période", null, false]];
+  const rail = ([cle, lib, aide, moyenne, enPct]) => {
+    const vals = mags.map(m => m[cle]).filter(v => v != null);
+    if (moi[cle] == null || !vals.length) return "";
+    const min = Math.min(...vals), max = Math.max(...vals), pos = v => 100 * (v - min) / (max - min || 1);
+    const moy = moyenne ?? vals.reduce((a, b) => a + b, 0) / vals.length;
+    const fmt = v => enPct ? pilPct(v) : pilNb(v);
+    const r = [...mags].sort((a, b) => (b[cle] ?? -1) - (a[cle] ?? -1)).findIndex(x => x === moi) + 1;
+    return `<div class="pil-pos"><div class="lib2">${lib}<small>${aide}</small></div>
+      <div class="pil-rail">${mags.filter(m => m !== moi && m[cle] != null).map(m => `<i style="left:${pos(m[cle])}%" title="${echapperHTML(m.nom || "Autre magasin")} : ${fmt(m[cle])}"></i>`).join("")}
+        <span class="moy" style="left:${pos(Math.min(Math.max(moy, min), max))}%" title="Moyenne du réseau : ${fmt(moy)}"></span>
+        <span class="moi" style="left:${pos(moi[cle])}%" title="${echapperHTML(moi.nom)} : ${fmt(moi[cle])}"></span></div>
+      <div class="rang"><b>${fmt(moi[cle])}</b> · ${pilOrdinal(r)} sur ${mags.length}<br><span style="color:#8a8a8a;font-size:12px">réseau : ${fmt(moy)}</span></div></div>
+      <div class="pil-bornes"><div></div><div><span>${fmt(min)}</span><span>${fmt(max)}</span></div><div></div></div>`;
+  };
+  return `<section class="pil-carte">
+    <h2>Où se situe ${echapperHTML(moi.nom)} dans le réseau</h2>
+    <div class="pil-aide">Le point orange est le magasin, les points gris sont les ${mags.length - 1} autres, le trait pointillé est la moyenne du réseau.
+      Le rang va de la valeur la plus forte (1er) à la plus faible (${pilOrdinal(mags.length)}).
+      <a style="text-decoration:underline;cursor:pointer" onclick="pilChoisir([])">Revenir à tous mes magasins</a></div>
+    ${lignes.map(rail).join("")}</section>`;
+}
+
+/* ---- À vérifier : alertes à trancher ---- */
+function dessinerPilVerif() {
+  const zone = document.getElementById("pil-verif"), d = PIL.donnees;
+  if (!zone || !d) return;
+  const toutes = d.alertes || [], total = Number(d.alertes_total) || toutes.length;
+  const nb = e => toutes.filter(a => e === "attente" ? !a.etat : a.etat === e).length;
+  const visible = a => PIL.etat === "tout" || (PIL.etat === "attente" ? !a.etat : a.etat === PIL.etat);
+  const decision = a => !a.etat
+    ? `<span class="pil-dec"><button class="oui" onclick="pilTrancher(${a.ligne_id}, 'ok')">✓ Justifiée</button><button class="non" onclick="pilTrancher(${a.ligne_id}, 'ko')">✕ Anomalie</button></span>`
+    : `<span class="pil-rendu"><span class="pil-pilule ${a.etat}">${a.etat === "ok" ? "✓ Justifiée" : "✕ Anomalie"}</span> ${echapperHTML(a.motif || "")}<br>
+        ${echapperHTML(a.a_moi ? "par vous" : (a.par_email || "").split("@")[0] || "")}${a.quand ? " · " + new Date(a.quand).toLocaleDateString("fr-FR") : ""}
+        <a onclick="pilTrancher(${a.ligne_id}, null)">annuler</a></span>`;
+  const quand = a => `${pilJour(a.jour)} ${String(a.heure || "").slice(0, 5)}`;
+  const table = (type, entetes, ligne, vide) => {
+    const liste = toutes.filter(a => a.type_alerte === type && visible(a));
+    const montre = PIL.voirTout[type] ? liste : liste.slice(0, PIL_APERCU);
+    return `<div class="pil-defile"><table class="pil-table"><thead><tr>${entetes.map(([t, n]) => `<th${n ? ' class="num"' : ""}>${t}</th>`).join("")}</tr></thead>
+      <tbody>${montre.map(a => `<tr class="${a.etat || ""}">${ligne(a)}<td>${decision(a)}</td></tr>`).join("")
+        || `<tr><td colspan="${entetes.length}" class="pil-vide">${vide}</td></tr>`}</tbody></table></div>
+      ${liste.length > PIL_APERCU ? `<a class="pil-voir" onclick="PIL.voirTout.${type} = !PIL.voirTout.${type}; dessinerPilVerif()">${PIL.voirTout[type] ? "Réduire la liste" : `Voir les ${liste.length} lignes →`}</a>` : ""}`;
+  };
+  const nBas = toutes.filter(a => a.type_alerte === "bas").length, nOff = toutes.filter(a => a.type_alerte === "offert").length;
+  const rien = PIL.etat === "attente" ? "Rien à traiter 👍" : "Rien dans cette liste.";
+  zone.innerHTML = `
+    <h2>À vérifier <span class="pil-compte">${nb("attente")}</span></h2>
+    <div class="pil-aide">Une alerte n'est pas une faute : geste commercial, produit abîmé, échange… Le superviseur tranche chaque ligne :
+      <b>justifiée</b> ou <b>anomalie</b>. La décision est gardée avec son nom et la date. Le numéro de vente permet de retrouver le ticket dans Fastmag.
+      ${total > toutes.length ? `<br>Seules les ${toutes.length} plus fortes alertes sont affichées sur ${total} : réduisez la période ou le périmètre.` : ""}</div>
+    <div class="pil-etats">
+      ${[["attente", "À traiter"], ["ok", "Justifiées"], ["ko", "Anomalies"], ["tout", "Tout"]].map(([e, lib]) =>
+        `<button data-etat="${e}" class="${PIL.etat === e ? "on" : ""}" onclick="PIL.etat = '${e}'; dessinerPilVerif()">${lib}${e === "tout" ? "" : ` <span>${nb(e)}</span>`}</button>`).join("")}
+    </div>
+    <h3>Prix anormalement bas <span class="pil-compte clair">${nBas} vente${nBas > 1 ? "s" : ""}</span></h3>
+    <div class="pil-aide">Payé au moins ${Number(d.pct)} % et ${Number(d.eur)} € sous le prix habituel du même produit. Saisons en cours
+      (${echapperHTML((d.saisons_en_cours || []).join(", "))}) : tous les magasins comparés entre eux. Anciennes saisons : les outlets entre eux, les autres magasins entre eux.</div>
+    ${table("bas", [["Magasin"], ["Date"], ["N° vente"], ["Vendeur"], ["Produit"], ["Saison"], ["Habituel", 1], ["Payé", 1], ["Écart", 1], ["Décision"]],
+      a => `<td>${echapperHTML(a.nom || a.magasin)}</td><td>${quand(a)}</td><td>${a.vente}</td><td>${echapperHTML(a.vendeur || "—")}</td>
+            <td>${echapperHTML(a.designation || "")} · ${echapperHTML(a.reference)}${a.taille ? " · " + echapperHTML(a.taille) : ""}</td><td>${echapperHTML(a.saison || "")}</td>
+            <td class="num">${pilEur(a.habituel)}</td><td class="num"><b>${pilEur(a.paye)}</b></td>
+            <td class="num">−${a.habituel > 0 ? Math.round(100 * (1 - a.paye / a.habituel)) : 0} %</td>`, rien)}
+    <h3>Articles offerts sous 100 € de ticket <span class="pil-compte clair">${nOff} article${nOff > 1 ? "s" : ""}</span></h3>
+    <div class="pil-aide">Un article offert est normal à partir de 100 € d'achat : ceux-là ne comptent pas dans le taux de remise. Ceux-ci ont été offerts sur un ticket plus petit.</div>
+    ${table("offert", [["Magasin"], ["Date"], ["N° vente"], ["Vendeur"], ["Article offert"], ["Prix de base", 1], ["Reste du ticket", 1], ["Décision"]],
+      a => `<td>${echapperHTML(a.nom || a.magasin)}</td><td>${quand(a)}</td><td>${a.vente}</td><td>${echapperHTML(a.vendeur || "—")}</td>
+            <td>${echapperHTML(a.designation || "")} · ${echapperHTML(a.reference)}</td><td class="num">${eur(Number(a.prix_fiche) || 0)}</td>
+            <td class="num"><b>${eur(Number(a.ticket) || 0)}</b></td>`, rien)}`;
+}
+
+async function pilTrancher(ligneId, etat) {
+  let motif = null;
+  if (etat) {
+    motif = prompt(etat === "ok" ? "Motif (facultatif) : geste commercial, produit abîmé, échange…" : "Que s'est-il passé ? Le motif est obligatoire pour une anomalie.", "");
+    if (motif === null) return;
+    if (etat === "ko" && !motif.trim()) { alert("Le motif est obligatoire pour une anomalie."); return; }
+  }
+  try {
+    const r = await api("/rest/v1/rpc/pilotage_remise_trancher", { corps: { p_ligne_id: ligneId, p_etat: etat, p_motif: motif } });
+    const a = (PIL.donnees?.alertes || []).find(x => x.ligne_id === ligneId);
+    if (a) Object.assign(a, { etat: r?.etat || null, motif: r?.motif || null, par_email: r?.par_email || null, quand: r?.quand || null, a_moi: !!r?.etat });
+    dessinerPilVerif();
+  } catch (e) { alert(e.donnees?.message || e.message || "Enregistrement impossible"); }
+}
+
+function dessinerPilDims() {
+  const zone = document.getElementById("pil-dims"), d = PIL.donnees;
+  if (!zone || !d) return;
+  const liste = (d[PIL.dims] || []).map(x => ({ nom: x.nom, ca: Number(x.ca) || 0, remise: (Number(x.base) || 0) - (Number(x.ca) || 0), tx: pilTaux(x) }))
+    .filter(x => x.remise > 0).slice(0, 12);
+  const maxi = Math.max(1, ...liste.map(x => x.remise));
+  zone.innerHTML = `<h2>Où part la remise</h2>
+    <div class="pil-aide">Montant remisé et taux, du plus gros au plus petit.</div>
+    <div class="pil-bascule">${[["marques", "Par marque"], ["rayons", "Par rayon"]].map(([k, lib]) =>
+      `<button class="${PIL.dims === k ? "on" : ""}" onclick="PIL.dims = '${k}'; dessinerPilDims()">${lib}</button>`).join("")}</div>
+    <table class="pil-table"><thead><tr><th>${PIL.dims === "marques" ? "Marque" : "Rayon"}</th><th class="num">CA TTC</th><th class="num">Remisé</th><th class="num">Taux</th></tr></thead>
+      <tbody>${liste.map(x => `<tr><td>${echapperHTML(x.nom)}</td><td class="num">${pilEur(x.ca)}</td>
+        <td class="num"><span class="pil-mini" style="width:${Math.round(60 * x.remise / maxi)}px"></span>${pilEur(x.remise)}</td><td class="num">${pilPct(x.tx)}</td></tr>`).join("")
+        || `<tr><td colspan="4" class="pil-vide">Aucune remise sur la période.</td></tr>`}</tbody></table>`;
+}
+
+function dessinerPilDetail() {
+  const zone = document.getElementById("pil-detail"), d = PIL.donnees;
+  if (!zone || !d) return;
+  const seul = pilSeul(), seuil = Number(d.seuil) || 20;
+  if (!seul) {
+    zone.innerHTML = `<h2>Tickets remisés</h2><div class="pil-aide" style="margin:0">Choisissez un seul magasin (en haut, ou en cliquant sur sa barre) pour voir ses ventes remisées à ${seuil} % et plus, ligne par ligne.</div>`;
+    return;
+  }
+  const nom = pilMagasins().find(m => m.code === seul)?.nom || seul;
+  if (PIL.lignes === null) { zone.innerHTML = `<h2>${echapperHTML(nom)} — ventes remisées à ${seuil} % et plus</h2><div class="pil-vide">Chargement…</div>`; return; }
+  const L = PIL.lignes;
+  zone.innerHTML = `<h2>${echapperHTML(nom)} — ventes remisées à ${seuil} % et plus <span class="pil-compte clair">${L.length}${L.length >= 500 ? " premières" : ""} lignes</span></h2>
+    <div class="pil-aide">Les plus gros montants remisés d'abord. L'export Excel contient toutes les lignes affichées.</div>
+    <div class="pil-defile"><table class="pil-table"><thead><tr><th>Date</th><th>N° vente</th><th>Vendeur</th><th>Référence</th><th>Désignation</th><th>Taille</th><th>Saison</th>
+      <th class="num">Prix de base</th><th class="num">Payé</th><th class="num">Remise</th></tr></thead>
+      <tbody>${L.slice(0, 100).map(l => `<tr><td>${pilJour(l.jour)} ${String(l.heure || "").slice(0, 5)}</td><td>${l.vente}</td><td>${echapperHTML(l.vendeur || "—")}</td>
+        <td>${echapperHTML(l.reference)}</td><td>${echapperHTML(l.designation || "")}</td><td>${echapperHTML(l.taille || "")}</td><td>${echapperHTML(l.saison || "")}</td>
+        <td class="num">${eur(Number(l.prix_fiche) || 0)}</td><td class="num">${eur(Number(l.paye) || 0)}</td><td class="num"><b>−${Math.round(l.remise_pct)} %</b></td></tr>`).join("")
+        || `<tr><td colspan="10" class="pil-vide">Aucune vente remisée à ce niveau sur la période.</td></tr>`}</tbody></table></div>
+    ${L.length > 100 ? `<div class="pil-aide" style="margin:8px 0 0">100 lignes affichées sur ${L.length} : le reste est dans l'export Excel.</div>` : ""}`;
+}
+
+function exporterPilotage() {
+  const d = PIL.donnees;
+  if (!d || !Number(d.selection?.pieces)) { alert("Rien à exporter sur cette période."); return; }
+  const { du, au } = pilDates(PIL.periode);
+  const mags = (d.magasins || []).filter(m => m.code).map(m => ({ ...m, ...pilMesures(m) })).sort((a, b) => (b.tx ?? 0) - (a.tx ?? 0));
+  const arr = (n, k = 1) => n == null ? "" : Math.round(n * 10 ** k) / 10 ** k;
+  const feuilles = [
+    { nom: "Remise par magasin", gras: [1], figer: 1, largeurs: [26, 10, 14, 14, 14, 12, 16, 18, 14, 14],
+      lignes: [["Magasin", "Outlet", "CA TTC", "Au prix de base", "Montant remisé", "Taux de remise %", `Pièces à −${d.seuil} % et plus %`, `Tickets avec remise ≥ ${d.seuil} % %`, "Prix anormalement bas", "Offerts sous 100 €"],
+        ...mags.map(m => [m.nom, m.outlet ? "oui" : "", m.ca, Number(m.base), Number(m.base) - m.ca, arr(m.tx), arr(m.p20), arr(m.t20), m.al, m.of])] },
+    { nom: "À vérifier", gras: [1], figer: 1, largeurs: [22, 20, 12, 8, 12, 16, 18, 30, 8, 10, 12, 12, 10, 12, 12, 30, 22, 12],
+      lignes: [["Type", "Magasin", "Date", "Heure", "N° vente", "Vendeur", "Référence", "Désignation", "Taille", "Saison", "Prix de base", "Prix habituel", "Payé", "Écart €", "Reste du ticket", "Décision", "Motif", "Par"],
+        ...(d.alertes || []).map(a => [a.type_alerte === "bas" ? "Prix anormalement bas" : "Offert sous 100 €", a.nom || a.magasin, a.jour, String(a.heure || "").slice(0, 5), a.vente,
+          a.vendeur || "", a.reference, a.designation || "", a.taille || "", a.saison || "", Number(a.prix_fiche) || 0, a.habituel == null ? "" : Number(a.habituel), Number(a.paye) || 0,
+          Number(a.ecart) || 0, Number(a.ticket) || 0, a.etat === "ok" ? "Justifiée" : a.etat === "ko" ? "Anomalie" : "À traiter", a.motif || "", a.par_email || ""])] },
+  ];
+  if (pilSeul() && PIL.lignes?.length) feuilles.push({ nom: "Ventes remisées", gras: [1], figer: 1, largeurs: [12, 8, 12, 16, 18, 30, 8, 10, 8, 12, 12, 10, 12],
+    lignes: [["Date", "Heure", "N° vente", "Vendeur", "Référence", "Désignation", "Taille", "Saison", "Quantité", "Prix de base", "Payé", "Remise %", "Remise €"],
+      ...PIL.lignes.map(l => [l.jour, String(l.heure || "").slice(0, 5), l.vente, l.vendeur || "", l.reference, l.designation || "", l.taille || "", l.saison || "", l.quantite,
+        Number(l.prix_fiche) || 0, Number(l.paye) || 0, Number(l.remise_pct) || 0, Number(l.remise_eur) || 0])] });
+  telechargerXlsx(`PILOTAGE_REMISES_${du.replace(/-/g, "")}_${au.replace(/-/g, "")}.xlsx`, feuilles);
+}
+
 async function rendreReporting() {
   const vue = document.getElementById("vue-reporting");
   if (!DASH.magasins.length) {
