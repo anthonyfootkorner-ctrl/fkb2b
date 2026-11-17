@@ -1671,6 +1671,7 @@
   #vue-pilotage .pil-etiquette.vert { background: rgba(76, 195, 138, .16); color: var(--pil-vert); border: 1px solid var(--pil-vert); }
   #vue-pilotage .pil-etiquette.accent { background: rgba(255, 90, 0, .16); color: var(--pil-accent); border: 1px solid rgba(255, 90, 0, .5); }
   #vue-pilotage .pil-etiquette.bleu { background: rgba(57, 135, 229, .16); color: #7fb3f2; border: 1px solid #3987e5; }
+  #vue-pilotage .pil-retour { margin: -4px 0 12px; }
   #vue-pilotage .pil-legende { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin-top: 10px; font-size: 12.5px; color: var(--pil-doux); }
   #vue-pilotage .pil-legende i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
   /* anneau + classement */
@@ -12974,7 +12975,7 @@ function dessinerPilStocks() {
       ${carte(pilPct(t.pctDormant), "Stock dormant", `<b>${pilEur(t.dormant_v)}</b>${partiel ? ` · ${cmp(t.pctDormant, res.pctDormant)}` : " sans aucune vente sur la période"}`)}
       ${carte(pilPct(t.pctAncien), "Anciennes saisons", `<b>${pilEur(t.ancien_v)}</b>${partiel ? ` · ${cmp(t.pctAncien, res.pctAncien)}` : " hors saisons en cours"}`)}
     </section>
-    <section class="pil-carte">
+    ${seul ? `<div class="pil-retour"><a class="pil-voir" onclick="pilChoisir([])">← Revenir à tous mes magasins</a></div>` : `<section class="pil-carte">
       <h2>Stock par magasin</h2>
       <div class="pil-aide">Valeur au prix d'achat. <b>Dormant</b> : part du stock sur des produits que le magasin n'a pas vendus une seule fois sur la période.
         <b>Anciennes saisons</b> : tout ce qui n'est pas ${echapperHTML((d.saisons_en_cours || []).join(", "))}. Cliquez sur un magasin pour ne voir que lui.</div>
@@ -12985,8 +12986,7 @@ function dessinerPilStocks() {
           <td style="width:22%"><div class="pil-piste" style="height:10px"><div class="pil-seg" style="height:10px;width:${100 * m.valeur / maxi}%"></div></div></td>
           <td class="num">${pilNb(m.pieces)}</td><td class="num">${pilNb(m.refs)}</td><td class="num">${pilNb(m.vendu)}</td>
           <td class="num"><span class="${classeCouv(m.couv)}">${pilSem(m.couv)}</span></td><td class="num">${pilPct(m.pctDormant)}</td><td class="num">${pilPct(m.pctAncien)}</td></tr>`).join("")}</tbody></table></div>
-      ${seul ? `<a class="pil-voir" onclick="pilChoisir([])">Revenir à tous mes magasins</a>` : ""}
-    </section>
+    </section>`}
     <section class="pil-grille deux">
       ${pilPanneauRang("Stock par marque", "Part de chaque marque dans la valeur du stock.", d.marques || [], "part", couleurs, true)}
       ${pilPanneauRang("Stock par rayon", "Part de chaque rayon dans la valeur du stock.", d.rayons || [], "part", couleursRayons, false)}
