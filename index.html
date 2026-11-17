@@ -12057,8 +12057,8 @@ let PIL = { choisis: [], periode: "35j", etat: "attente", dims: "marques", donne
             lignes: null, voirTout: { bas: false, offert: false }, erreur: null };
 const PIL_PERIODES = [["s-1", "Semaine dernière"], ["mois", "Mois en cours"], ["mois-1", "Mois précédent"], ["35j", "35 derniers jours"]];
 const PIL_APERCU = 15;
-const pilEur = n => Math.round(Number(n) || 0).toLocaleString("fr-FR") + " €";
-const pilNb = n => Math.round(Number(n) || 0).toLocaleString("fr-FR");
+const pilEur = n => Math.round(Number(n) || 0).toLocaleString("fr-FR").replace(/\u202f/g, "\u00a0") + "\u00a0€";
+const pilNb = n => Math.round(Number(n) || 0).toLocaleString("fr-FR").replace(/\u202f/g, "\u00a0");
 const pilPct = n => n == null || !Number.isFinite(n) ? "—" : n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
 const pilTaux = o => o && Number(o.base) > 0 ? 100 * (1 - o.ca / o.base) : null;
 const pilPart = (a, b) => Number(b) > 0 ? 100 * a / b : null;
