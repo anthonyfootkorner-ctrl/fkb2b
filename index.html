@@ -1629,6 +1629,10 @@
   .pil-rk li.top .n { color: var(--pil-accent); }
   .pil-rk .logo { width: 34px; height: 34px; border-radius: 9px; background: #fff; color: #0B0B0C; display: grid; place-items: center; font: 800 12px var(--pil-titre); font-stretch: 80%; letter-spacing: 0; }
   .pil-rk .logo.aucun { background: transparent; }
+  .pil-rk .logo img { max-width: 26px; max-height: 22px; object-fit: contain; display: block; }
+  .pil-logo-mini { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: #fff; color: #0B0B0C; margin-right: 10px; vertical-align: middle;
+    font: 800 10px var(--pil-titre); letter-spacing: 0; overflow: hidden; }
+  .pil-logo-mini img { max-width: 20px; max-height: 17px; object-fit: contain; display: block; }
   .pil-rk .nm { font: 700 16px var(--pil-titre); font-stretch: 85%; text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pil-rk .pc { font: 800 20px var(--pil-titre); font-stretch: 85%; font-variant-numeric: tabular-nums; }
   .pil-rk li.top .pc { color: var(--pil-accent); }
@@ -12675,6 +12679,16 @@ const PIL_PALETTE = ["#d95926", "#3987e5", "#199e70", "#c98500", "#d55181", "#00
 const PIL_AUTRES = "#6B6E75";
 const pilPts = d => d == null || !Number.isFinite(d) ? "—" : `${d >= 0 ? "+" : "−"}${Math.abs(d).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pt`;
 
+/* Logo d'une marque : web/logos/<MARQUE>.png puis .svg (les mêmes fichiers que « Nos marques »), sinon ses initiales.
+   Pour ajouter un logo, il suffit de déposer le fichier dans web/logos au nom exact de la marque. */
+const pilInitiales = n => String(n || "").split(/\s+/).map(m => m[0] || "").join("").slice(0, 3).toUpperCase();
+const pilLogo = (nom, classe = "logo") => `<span class="${classe}"><img loading="lazy" src="logos/${encodeURIComponent(nom)}.png" alt="${echapperHTML(nom)}"
+  data-marque="${echapperHTML(nom)}" data-essai="png" onerror="pilLogoSuivant(this)"></span>`;
+function pilLogoSuivant(img) {
+  if (img.dataset.essai === "png") { img.dataset.essai = "svg"; img.src = `logos/${encodeURIComponent(img.dataset.marque)}.svg`; }
+  else img.replaceWith(document.createTextNode(pilInitiales(img.dataset.marque)));
+}
+
 async function chargerPilParts() {
   const corps = document.getElementById("pil-corps");
   if (!corps) return;
@@ -12722,13 +12736,12 @@ function pilPanneauRang(titre, sous, liste, cle, couleurs, avecLogo) {
   if (reste >= 0.05) items.push({ nom: "Autres", valeur: reste, couleur: PIL_AUTRES, autre: true });
   if (!items.length) return `<section class="pil-carte"><h2>${titre}</h2><div class="pil-vide">Pas de donnée sur la période.</div></section>`;
   const maxi = Math.max(...items.map(i => i.valeur));
-  const initiales = n => n.split(/\s+/).map(m => m[0]).join("").slice(0, 3).toUpperCase();
   return `<section class="pil-carte">
     <h2>${titre}</h2><div class="pil-aide">${sous}</div>
     <div class="pil-rk"><div class="anneau">${pilAnneau(items)}</div>
       <ol>${items.map((it, i) => `<li class="${i === 0 ? "top" : ""}" title="${echapperHTML(it.nom)}${it.x ? ` — CA ${pilEur(it.x.ca)} · marge ${pilEur(it.x.marge)}` : ""}">
         <div class="rl"><span class="n">${i + 1}</span>
-          ${avecLogo ? (it.autre ? `<span class="logo aucun"></span>` : `<span class="logo">${echapperHTML(initiales(it.nom))}</span>`) : ""}
+          ${avecLogo ? (it.autre ? `<span class="logo aucun"></span>` : pilLogo(it.nom)) : ""}
           <span class="nm">${echapperHTML(it.nom)}</span><span class="pc">${pilPct(it.valeur)}</span></div>
         <div class="tr"><div class="fl" style="width:${Math.max(1.5, 100 * it.valeur / maxi)}%;background:${it.couleur}"></div></div></li>`).join("")}</ol></div>
   </section>`;
@@ -12780,7 +12793,7 @@ function dessinerPilPartsDetail() {
     <div class="pil-defile"><table class="pil-table"><thead><tr><th>${PIL.partsDim === "marques" ? "Marque" : PIL.partsDim === "rayons" ? "Rayon" : "Famille"}</th>
       <th class="num">Pièces</th><th class="num">CA TTC</th><th class="num">Part du CA</th>${partiel ? `<th class="num">Part succursales</th>` : ""}
       ${aN1 ? `<th class="num">Part l'an dernier</th><th class="num">Évolution</th>` : ""}<th class="num">Marge HT</th><th class="num">Part de la marge</th><th class="num">Taux de marge</th></tr></thead>
-      <tbody>${montre.map(x => `<tr><td>${echapperHTML(x.nom)}</td><td class="num">${pilNb(x.pieces)}</td><td class="num">${pilEur(x.ca)}</td>
+      <tbody>${montre.map(x => `<tr><td>${PIL.partsDim === "marques" ? pilLogo(x.nom, "pil-logo-mini") : ""}${echapperHTML(x.nom)}</td><td class="num">${pilNb(x.pieces)}</td><td class="num">${pilEur(x.ca)}</td>
         <td class="num"><b>${pilPct(x.part)}</b></td>${partiel ? `<td class="num">${pilPct(x.partRes)}</td>` : ""}
         ${aN1 ? `<td class="num">${pilPct(x.partN1)}</td><td class="num">${delta(x.part, x.partN1)}</td>` : ""}
         <td class="num">${pilEur(x.marge)}</td><td class="num">${pilPct(x.partMarge)}</td><td class="num">${pilPct(x.tauxMarge)}</td></tr>`).join("")}</tbody></table></div>
