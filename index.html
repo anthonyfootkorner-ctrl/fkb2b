@@ -1531,6 +1531,110 @@
     .pil-kpis { grid-template-columns: repeat(2, 1fr); } .pil-grille { grid-template-columns: 1fr; }
     .pil-ligne { grid-template-columns: 120px 1fr 54px; } .pil-pos, .pil-bornes { grid-template-columns: 1fr; gap: 4px; } .pil-pos .rang { text-align: left; }
   }
+
+  /* ---- Pilotage secteur : direction artistique « Suivi hebdo » (fond noir, orange vif, titres condensés) ---- */
+  #vue-pilotage { --pil-bg: #0B0B0C; --pil-surface: #1F2023; --pil-surface2: #2B2D31; --pil-encre: #FFFFFF; --pil-doux: #A3A6AD; --pil-trait: #34363B;
+    --pil-accent: #FF5A00; --pil-vert: #4CC38A; --pil-rouge: #FF6B6B; --pil-ambre: #F2A93B;
+    --pil-titre: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif; --pil-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    background: var(--pil-bg); color: var(--pil-encre); color-scheme: dark; }
+  #vue-pilotage .col-tete h1, #vue-pilotage .pil-tete h1 { font-family: var(--pil-titre); font-stretch: 70%; font-weight: 900; font-size: clamp(38px, 6vw, 64px);
+    line-height: .9; letter-spacing: 0; text-transform: uppercase; margin: 0; color: var(--pil-encre); }
+  #vue-pilotage .pil-tete h1 em { font-style: normal; color: var(--pil-accent); }
+  #vue-pilotage .pil-tete { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 28px; margin: 0 22px; padding: 46px 0 22px; position: relative; }
+  #vue-pilotage .pil-tete::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: linear-gradient(90deg, var(--pil-accent) 0 120px, var(--pil-trait) 120px); }
+  #vue-pilotage .pil-surtitre { font-family: var(--pil-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--pil-accent); margin: 0 0 8px; font-weight: 500; }
+  #vue-pilotage .pil-chapo { color: var(--pil-doux); font-size: 14px; max-width: 420px; }
+  #vue-pilotage .compte-produits { color: var(--pil-doux); }
+  #vue-pilotage .compte-produits b { color: var(--pil-encre); }
+  #vue-pilotage .pil { color: var(--pil-encre); }
+  #vue-pilotage .pil-onglets { gap: 4px; flex-wrap: wrap; margin-top: 20px; background: var(--pil-surface); border: 0; border-radius: 8px; padding: 5px; }
+  #vue-pilotage .pil-onglets a { font: 800 15px/1 var(--pil-titre); font-stretch: 80%; letter-spacing: .04em; padding: 12px 16px; border-radius: 5px; border: 0; color: var(--pil-doux); flex: 1 1 auto; text-align: center; }
+  #vue-pilotage .pil-onglets a:hover { color: var(--pil-encre); }
+  #vue-pilotage .pil-onglets a.on { background: var(--pil-accent); color: #fff; }
+  #vue-pilotage .pil-onglets a.bientot { opacity: .55; }
+  #vue-pilotage .pil-filtres { background: var(--pil-bg); border-bottom: 1px solid var(--pil-trait); }
+  #vue-pilotage .puce-claire { background: var(--pil-surface); border-color: var(--pil-trait); color: var(--pil-encre); }
+  #vue-pilotage .puce-claire:hover { border-color: var(--pil-accent); color: var(--pil-accent); }
+  #vue-pilotage .puce-claire.on, #vue-pilotage .puce-claire.dash-chip.on { background: var(--pil-accent); border-color: var(--pil-accent); color: #fff; }
+  #vue-pilotage .puce-claire.forte { border-color: var(--pil-encre); }
+  #vue-pilotage .tb-sep { background: var(--pil-trait); }
+  #vue-pilotage .pil-kpis { gap: 14px; }
+  #vue-pilotage .pil-kpi { background: var(--pil-surface); border: 0; border-radius: 10px; }
+  #vue-pilotage .pil-kpi.cle { box-shadow: inset 0 0 0 2px var(--pil-accent); }
+  #vue-pilotage .pil-kpi .val { font-family: var(--pil-titre); font-stretch: 75%; font-weight: 900; font-size: 32px; line-height: 1.05; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  #vue-pilotage .pil-kpi .lib { font-family: var(--pil-mono); font-size: 11px; letter-spacing: .12em; color: var(--pil-doux); margin-top: 4px; }
+  #vue-pilotage .pil-kpi .note { color: var(--pil-doux); }
+  #vue-pilotage .pil-kpi .note b { color: var(--pil-encre); }
+  #vue-pilotage .pil-carte { background: var(--pil-surface); border: 0; border-radius: 10px; padding: 18px 18px 16px; margin-bottom: 14px; }
+  #vue-pilotage .pil-carte.forte { box-shadow: inset 0 0 0 2px var(--pil-accent); }
+  #vue-pilotage .pil-carte h2 { font-family: var(--pil-titre); font-stretch: 80%; font-weight: 800; font-size: 22px; letter-spacing: 0; margin: 0 0 4px; }
+  #vue-pilotage .pil-carte h3 { font-family: var(--pil-titre); font-stretch: 85%; font-weight: 800; font-size: 16px; text-transform: uppercase; }
+  #vue-pilotage .pil-aide { color: var(--pil-doux); font-size: 13px; }
+  #vue-pilotage .pil-aide b { color: var(--pil-encre); }
+  #vue-pilotage .pil-grille { gap: 14px; }
+  #vue-pilotage .pil-grille.deux { grid-template-columns: 1fr 1fr; }
+  #vue-pilotage .pil-compte { background: var(--pil-accent); color: #fff; font-family: var(--pil-mono); }
+  #vue-pilotage .pil-compte.clair { background: var(--pil-surface2); color: var(--pil-doux); }
+  #vue-pilotage .pil-etats, #vue-pilotage .pil-bascule { background: var(--pil-bg); border: 0; border-radius: 6px; padding: 3px; gap: 2px; }
+  #vue-pilotage .pil-etats button, #vue-pilotage .pil-bascule button { font: 700 13px/1 var(--pil-titre); font-stretch: 85%; text-transform: uppercase; letter-spacing: .04em;
+    padding: 8px 12px; border: 0; border-radius: 4px; background: transparent; color: var(--pil-doux); }
+  #vue-pilotage .pil-etats button.on, #vue-pilotage .pil-bascule button.on { background: var(--pil-surface2); color: var(--pil-encre); }
+  #vue-pilotage .pil-etats span { background: var(--pil-surface2); color: var(--pil-encre); font-family: var(--pil-mono); }
+  #vue-pilotage .pil-etats button[data-etat="ok"] span { background: var(--pil-vert); color: #0B0B0C; }
+  #vue-pilotage .pil-etats button[data-etat="ko"] span { background: var(--pil-rouge); color: #0B0B0C; }
+  #vue-pilotage .pil-table { font-variant-numeric: tabular-nums; }
+  #vue-pilotage .pil-table th { font-family: var(--pil-mono); font-size: 11px; letter-spacing: .1em; color: var(--pil-doux); font-weight: 500; border-bottom: 1px solid var(--pil-trait); }
+  #vue-pilotage .pil-table td { border-bottom: 1px solid var(--pil-surface2); }
+  #vue-pilotage .pil-table tbody tr:hover td { background: var(--pil-surface2); }
+  #vue-pilotage .pil-table tr.ok td { background: rgba(76, 195, 138, .14); }
+  #vue-pilotage .pil-table tr.ko td { background: rgba(255, 107, 107, .15); }
+  #vue-pilotage .pil-table tr.ok td:first-child { box-shadow: inset 4px 0 0 var(--pil-vert); }
+  #vue-pilotage .pil-table tr.ko td:first-child { box-shadow: inset 4px 0 0 var(--pil-rouge); }
+  #vue-pilotage .pil-dec .oui { border-color: var(--pil-vert); color: var(--pil-vert); background: rgba(76, 195, 138, .12); }
+  #vue-pilotage .pil-dec .oui:hover { background: var(--pil-vert); color: #0B0B0C; }
+  #vue-pilotage .pil-dec .non { border-color: var(--pil-rouge); color: var(--pil-rouge); background: rgba(255, 107, 107, .12); }
+  #vue-pilotage .pil-dec .non:hover { background: var(--pil-rouge); color: #0B0B0C; }
+  #vue-pilotage .pil-pilule { color: #0B0B0C; }
+  #vue-pilotage .pil-pilule.ok { background: var(--pil-vert); } #vue-pilotage .pil-pilule.ko { background: var(--pil-rouge); }
+  #vue-pilotage .pil-rendu, #vue-pilotage .pil-rendu a { color: var(--pil-doux); }
+  #vue-pilotage .pil-voir { color: var(--pil-encre); }
+  #vue-pilotage .pil-ligne:hover, #vue-pilotage .pil-ligne.choisi { background: var(--pil-surface2); }
+  #vue-pilotage .pil-seg, #vue-pilotage .pil-col i, #vue-pilotage .pil-mini, #vue-pilotage .pil-top5 .barre i { background: var(--pil-accent); }
+  #vue-pilotage .pil-repere { border-left-color: var(--pil-encre); opacity: .7; }
+  #vue-pilotage .pil-colonnes { border-bottom-color: var(--pil-trait); }
+  #vue-pilotage .pil-etiq { color: var(--pil-doux); font-family: var(--pil-mono); }
+  #vue-pilotage .pil-rail::before { background: var(--pil-trait); }
+  #vue-pilotage .pil-rail i { background: #6B6E75; }
+  #vue-pilotage .pil-rail .moy { border-left-color: var(--pil-encre); }
+  #vue-pilotage .pil-rail .moi { background: var(--pil-accent); box-shadow: 0 0 0 2px var(--pil-surface); }
+  #vue-pilotage .pil-bornes { border-bottom-color: var(--pil-surface2); color: var(--pil-doux); }
+  #vue-pilotage .pil-pos .lib2 small { color: var(--pil-doux); }
+  #vue-pilotage .pil-ref { color: var(--pil-doux); font-family: var(--pil-mono); font-size: 11px; }
+  #vue-pilotage .pil-vide { color: var(--pil-doux); }
+  #vue-pilotage .pil-photo img, #vue-pilotage .pil-photo .vide { background: #fff; }
+  #vue-pilotage .pil-etiquette.rouge { background: rgba(255, 107, 107, .16); color: var(--pil-rouge); border-color: var(--pil-rouge); }
+  #vue-pilotage .pil-etiquette.orange { background: rgba(242, 169, 59, .16); color: var(--pil-ambre); border-color: var(--pil-ambre); }
+  #vue-pilotage .pil-groupe h3 { border-bottom-color: var(--pil-trait); }
+  #vue-pilotage .pil-delta.haut { color: var(--pil-vert); } #vue-pilotage .pil-delta.bas { color: var(--pil-rouge); }
+  /* anneau + classement */
+  .pil-rk { display: grid; grid-template-columns: 170px 1fr; gap: 20px; align-items: center; margin-top: 8px; }
+  .pil-rk .anneau { width: 100%; max-width: 170px; justify-self: center; }
+  .pil-rk .anneau svg { width: 100%; height: auto; display: block; }
+  .pil-rk ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .pil-rk li { padding: 8px 12px 9px; border: 1px solid transparent; border-radius: 12px; }
+  .pil-rk li:hover { background: var(--pil-surface2); }
+  .pil-rk li.top { border-color: rgba(255, 90, 0, .55); background: linear-gradient(180deg, rgba(255, 90, 0, .16), rgba(255, 90, 0, .04)); box-shadow: 0 8px 28px -12px rgba(255, 90, 0, .45); }
+  .pil-rk .rl { display: grid; grid-template-columns: 18px auto minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+  .pil-rk .n { font: 800 14px var(--pil-mono); color: var(--pil-doux); text-align: center; }
+  .pil-rk li.top .n { color: var(--pil-accent); }
+  .pil-rk .logo { width: 34px; height: 34px; border-radius: 9px; background: #fff; color: #0B0B0C; display: grid; place-items: center; font: 800 12px var(--pil-titre); font-stretch: 80%; }
+  .pil-rk .logo.aucun { background: transparent; }
+  .pil-rk .nm { font: 700 16px var(--pil-titre); font-stretch: 85%; text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pil-rk .pc { font: 800 20px var(--pil-titre); font-stretch: 85%; font-variant-numeric: tabular-nums; }
+  .pil-rk li.top .pc { color: var(--pil-accent); }
+  .pil-rk .tr { height: 5px; margin-top: 6px; background: var(--pil-surface2); border-radius: 3px; overflow: hidden; }
+  .pil-rk .fl { height: 100%; border-radius: 3px; }
+  @media (max-width: 900px) { #vue-pilotage .pil-grille.deux { grid-template-columns: 1fr; } .pil-rk { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -12068,7 +12172,7 @@ async function lancerCalculReporting() {
    Tout le calcul et les droits sont dans les fonctions SQL pilotage_* ; ici on choisit le périmètre et on affiche.
    Les ventes détaillées arrivent seules chaque jour (Fastmag → SFTP → relève automatique). */
 let PIL = { onglet: "remises", choisis: [], periode: "35j", etat: "attente", dims: "marques", donnees: null, chargement: 0,
-            top: null, topTri: "pieces", topVue: "tout", topVoir: 50,
+            top: null, topTri: "pieces", topVue: "tout", topVoir: 50, parts: null, partsDim: "marques", partsTout: false,
             lignes: null, voirTout: { bas: false, offert: false }, erreur: null };
 const PIL_PERIODES = [["s-1", "Semaine dernière"], ["mois", "Mois en cours"], ["mois-1", "Mois précédent"], ["35j", "35 derniers jours"]];
 const PIL_APERCU = 15;
@@ -12101,9 +12205,10 @@ async function rendrePilotage() {
   }
   PIL.choisis = PIL.choisis.filter(c => pilMagasins().some(m => m.code === c));
   vue.innerHTML = `
-    <div class="col-tete" style="padding-bottom:10px">
-      <h1>PILOTAGE SECTEUR</h1>
-      <div class="compte-produits">Vos succursales, comparées entre elles et à l'ensemble des succursales. Les ventes arrivent seules chaque jour depuis Fastmag.</div>
+    <div class="pil-tete">
+      <div><p class="pil-surtitre">Footkorner · Succursales</p>
+        <h1>Pilotage <em>secteur</em></h1></div>
+      <div class="pil-chapo">Vos succursales, comparées entre elles et à l'ensemble des succursales. Les ventes arrivent seules chaque jour depuis Fastmag.</div>
     </div>
     <div class="pil">
       <nav class="pil-onglets" id="pil-onglets"></nav>
@@ -12142,6 +12247,7 @@ function pilPeriode(p) { PIL.periode = p; PIL.lignes = null; dessinerPilFiltres(
 
 async function chargerPilotage() {
   if (PIL.onglet === "top") return chargerPilTop();
+  if (PIL.onglet === "parts") return chargerPilParts();
   const corps = document.getElementById("pil-corps");
   if (!corps) return;
   const { du, au } = pilDates(PIL.periode), jeton = ++PIL.chargement;
@@ -12373,6 +12479,7 @@ function dessinerPilDetail() {
 
 function exporterPilotage() {
   if (PIL.onglet === "top") return exporterPilTop();
+  if (PIL.onglet === "parts") return exporterPilParts();
   const d = PIL.donnees;
   if (!d || !Number(d.selection?.pieces)) { alert("Rien à exporter sur cette période."); return; }
   const { du, au } = pilDates(PIL.periode);
@@ -12399,7 +12506,7 @@ function exporterPilotage() {
    Ce qui se vend le mieux dans les succursales choisies : classement en pièces, en CA ou en ROS, avec le stock,
    la couverture et le stock central, pour repérer ce qu'il faut réassortir. Calcul : pilotage_top_produits. */
 const PIL_ONGLETS = [["remises", "Remises"], ["top", "Top produits"], ["parts", "Parts de marché"], ["stocks", "Stocks"]];
-const PIL_ONGLETS_PRETS = new Set(["remises", "top"]);
+const PIL_ONGLETS_PRETS = new Set(["remises", "top", "parts"]);
 function dessinerPilOnglets() {
   const nav = document.getElementById("pil-onglets");
   if (!nav) return;
@@ -12559,6 +12666,136 @@ function exporterPilTop() {
     lignes: [["Rang", "Référence", "Désignation", "Marque", "Rayon", "Pièces", "Pièces période précédente", "CA TTC", "Remise %", "ROS", "ROS succursales", "Magasins vendeurs", "Stock magasins", "En transit", "En préparation", "Couverture (semaines)", "Stock central", "Magasins en rupture", "Magasins à moins de 2 sem.", "Détail ruptures"],
       ...P.map((p, i) => [i + 1, p.reference, p.designation || "", p.marque || "", pilCat(p.categorie), p.pieces, Number(p.pieces_avant) || 0, p.ca, p.remise == null ? "" : Number(p.remise),
         p.ros, p.ros_reseau, Number(p.nmag) || 0, p.stock, Number(p.transit) || 0, Number(p.preparation) || 0, p.couv == null ? "" : Math.round(p.couv * 10) / 10, p.central, p.magRupture, p.magTendu, (p.mags_rupture || []).join(", ")])] }]);
+}
+
+/* ---- Pilotage secteur · onglet Parts de marché ----
+   Poids de chaque marque, rayon et famille dans le CA TTC et dans la marge HT des succursales choisies.
+   Présentation reprise du « Suivi hebdo » : anneau + classement, le premier mis en avant. Calcul : pilotage_parts. */
+const PIL_PALETTE = ["#d95926", "#3987e5", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767", "#4fb0c6", "#b07cc6", "#8fa34a", "#c76b3c"];
+const PIL_AUTRES = "#6B6E75";
+const pilPts = d => d == null || !Number.isFinite(d) ? "—" : `${d >= 0 ? "+" : "−"}${Math.abs(d).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pt`;
+
+async function chargerPilParts() {
+  const corps = document.getElementById("pil-corps");
+  if (!corps) return;
+  const { du, au } = pilDates(PIL.periode), jeton = ++PIL.chargement;
+  corps.innerHTML = `<div class="pil-vide">Chargement…</div>`;
+  let d;
+  try { d = await api("/rest/v1/rpc/pilotage_parts", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au } }); }
+  catch (e) {
+    if (jeton !== PIL.chargement) return;
+    corps.innerHTML = `<div class="pil-vide">Chargement impossible : ${echapperHTML((e.donnees?.message || e.message || "").slice(0, 200))}</div>`;
+    return;
+  }
+  if (jeton !== PIL.chargement) return;
+  const t = d?.total || {};
+  for (const dim of ["marques", "rayons", "familles"]) for (const x of d?.[dim] || []) {
+    for (const k of ["pieces", "ca", "ht", "marge", "ca_res", "ca_n1"]) x[k] = Number(x[k]) || 0;
+    if (dim === "rayons") x.nom = pilCat(x.nom);
+    x.part = pilPart(x.ca, t.ca); x.partMarge = pilPart(x.marge, t.marge);
+    x.partRes = pilPart(x.ca_res, t.ca_res); x.partN1 = Number(t.ca_n1) > 0 ? pilPart(x.ca_n1, t.ca_n1) : null;
+    x.tauxMarge = x.ht > 0 ? 100 * x.marge / x.ht : null;
+  }
+  PIL.parts = d;
+  dessinerPilParts();
+}
+
+/* Anneau : une part par élément, 2 px de fond entre les parts. */
+function pilAnneau(items) {
+  const total = items.reduce((s, x) => s + Math.max(x.valeur, 0), 0) || 1, R = 80, r = 50, C = 90;
+  let angle = -Math.PI / 2;
+  const pt = (rayon, a) => `${(C + rayon * Math.cos(a)).toFixed(2)} ${(C + rayon * Math.sin(a)).toFixed(2)}`;
+  const parts = items.filter(x => x.valeur > 0).map(x => {
+    const a0 = angle, a1 = angle + 2 * Math.PI * x.valeur / total; angle = a1;
+    const grand = a1 - a0 > Math.PI ? 1 : 0, fin = Math.min(a1, a0 + 2 * Math.PI - 0.0001);
+    return `<path d="M ${pt(R, a0)} A ${R} ${R} 0 ${grand} 1 ${pt(R, fin)} L ${pt(r, fin)} A ${r} ${r} 0 ${grand} 0 ${pt(r, a0)} Z" fill="${x.couleur}" stroke="var(--pil-surface)" stroke-width="2">
+      <title>${echapperHTML(x.nom)} : ${pilPct(x.valeur)}</title></path>`;
+  }).join("");
+  return `<svg viewBox="0 0 180 180" role="img" aria-label="Répartition">${parts}</svg>`;
+}
+
+/* Panneau « anneau + classement » : les éléments au-dessus de 2 %, puis « Autres ». */
+function pilPanneauRang(titre, sous, liste, cle, couleurs, avecLogo) {
+  const visibles = liste.filter(x => x[cle] != null && x[cle] >= 1.95).sort((a, b) => b[cle] - a[cle]).slice(0, 10);
+  const reste = Math.max(0, 100 - visibles.reduce((s, x) => s + x[cle], 0));
+  const items = visibles.map(x => ({ nom: x.nom, valeur: x[cle], couleur: couleurs.get(x.nom) || PIL_AUTRES, x }));
+  if (reste >= 0.05) items.push({ nom: "Autres", valeur: reste, couleur: PIL_AUTRES, autre: true });
+  if (!items.length) return `<section class="pil-carte"><h2>${titre}</h2><div class="pil-vide">Pas de donnée sur la période.</div></section>`;
+  const maxi = Math.max(...items.map(i => i.valeur));
+  const initiales = n => n.split(/\s+/).map(m => m[0]).join("").slice(0, 3).toUpperCase();
+  return `<section class="pil-carte">
+    <h2>${titre}</h2><div class="pil-aide">${sous}</div>
+    <div class="pil-rk"><div class="anneau">${pilAnneau(items)}</div>
+      <ol>${items.map((it, i) => `<li class="${i === 0 ? "top" : ""}" title="${echapperHTML(it.nom)}${it.x ? ` — CA ${pilEur(it.x.ca)} · marge ${pilEur(it.x.marge)}` : ""}">
+        <div class="rl"><span class="n">${i + 1}</span>
+          ${avecLogo ? (it.autre ? `<span class="logo aucun"></span>` : `<span class="logo">${echapperHTML(initiales(it.nom))}</span>`) : ""}
+          <span class="nm">${echapperHTML(it.nom)}</span><span class="pc">${pilPct(it.valeur)}</span></div>
+        <div class="tr"><div class="fl" style="width:${Math.max(1.5, 100 * it.valeur / maxi)}%;background:${it.couleur}"></div></div></li>`).join("")}</ol></div>
+  </section>`;
+}
+
+function dessinerPilParts() {
+  const corps = document.getElementById("pil-corps"), d = PIL.parts;
+  if (!corps || !d) return;
+  const t = d.total || {}, marques = d.marques || [], rayons = d.rayons || [];
+  if (!Number(t.ca)) { corps.innerHTML = `<div class="pil-vide" style="padding:26px 0">Aucune vente sur cette période pour ce périmètre.</div>`; return; }
+  // une marque garde la même couleur dans les deux anneaux (CA et marge) : la couleur suit la marque, pas son rang
+  const couleurs = new Map();
+  for (const x of [...marques].sort((a, b) => b.ca - a.ca)) if (couleurs.size < PIL_PALETTE.length && (x.part >= 1.95 || x.partMarge >= 1.95)) couleurs.set(x.nom, PIL_PALETTE[couleurs.size]);
+  const couleursRayons = new Map([...rayons].sort((a, b) => b.ca - a.ca).map((x, i) => [x.nom, PIL_PALETTE[i % PIL_PALETTE.length]]));
+  const evol = Number(t.ca_n1) > 0 ? 100 * (t.ca - t.ca_n1) / t.ca_n1 : null;
+  const m1 = [...marques].sort((a, b) => b.ca - a.ca)[0], r1 = [...rayons].sort((a, b) => b.ca - a.ca)[0];
+  const carte = (val, lib, note, cle) => `<div class="pil-kpi${cle ? " cle" : ""}"><div class="val">${val}</div><div class="lib">${lib}</div><div class="note">${note}</div></div>`;
+  corps.innerHTML = `
+    <section class="pil-kpis">
+      ${carte(pilEur(t.ca), "CA TTC", evol == null ? "ventes moins retours" : `<b>${evol >= 0 ? "+" : "−"}${Math.abs(evol).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %</b> par rapport à l'an dernier`, true)}
+      ${carte(pilEur(t.marge), "Marge HT", "CA hors taxes moins coût d'achat")}
+      ${carte(pilPct(Number(t.ht) > 0 ? 100 * t.marge / t.ht : null), "Taux de marge", "marge HT sur CA HT")}
+      ${carte(m1 ? echapperHTML(m1.nom) : "—", "Marque n° 1", m1 ? `<b>${pilPct(m1.part)}</b> du CA · ${pilPts(m1.partN1 == null ? null : m1.part - m1.partN1)} sur un an` : "")}
+      ${carte(r1 ? echapperHTML(r1.nom) : "—", "Rayon n° 1", r1 ? `<b>${pilPct(r1.part)}</b> du CA · ${pilPts(r1.partN1 == null ? null : r1.part - r1.partN1)} sur un an` : "")}
+    </section>
+    <section class="pil-grille deux">
+      ${pilPanneauRang("Part de marché — CA TTC", "Part de chaque marque dans le chiffre d'affaires.", marques, "part", couleurs, true)}
+      ${pilPanneauRang("Marge HT générée", "Part de chaque marque dans la marge.", marques, "partMarge", couleurs, true)}
+    </section>
+    <section class="pil-grille deux">
+      ${pilPanneauRang("CA par rayon", "Part de chaque rayon dans le chiffre d'affaires.", rayons, "part", couleursRayons, false)}
+      ${pilPanneauRang("Marge par rayon", "Part de chaque rayon dans la marge HT.", rayons, "partMarge", couleursRayons, false)}
+    </section>
+    <section class="pil-carte" id="pil-parts-detail"></section>`;
+  dessinerPilPartsDetail();
+}
+
+function dessinerPilPartsDetail() {
+  const zone = document.getElementById("pil-parts-detail"), d = PIL.parts;
+  if (!zone || !d) return;
+  const partiel = Number(d.nb_selection) < Number(d.nb_reseau), aN1 = Number(d.total?.ca_n1) > 0;
+  const L = [...(d[PIL.partsDim] || [])].filter(x => x.ca !== 0 || x.ca_n1 !== 0).sort((a, b) => b.ca - a.ca);
+  const montre = PIL.partsTout ? L : L.slice(0, 20);
+  const delta = (v, ref) => v == null || ref == null ? "—" : `<span class="pil-delta ${v - ref >= 0 ? "haut" : "bas"}">${v - ref >= 0 ? "▲" : "▼"} ${pilPts(v - ref).replace(/^[+−]/, "")}</span>`;
+  zone.innerHTML = `<h2>Le détail</h2>
+    <div class="pil-aide">La part est le poids dans le CA TTC de ${partiel ? "vos magasins choisis" : "l'ensemble des succursales"}.${aN1 ? " L'évolution compare cette part à celle de la même période l'an dernier, en points." : ""}</div>
+    <div class="pil-bascule">${[["marques", "Par marque"], ["rayons", "Par rayon"], ["familles", "Par famille"]].map(([k, lib]) =>
+      `<button class="${PIL.partsDim === k ? "on" : ""}" onclick="PIL.partsDim = '${k}'; PIL.partsTout = false; dessinerPilPartsDetail()">${lib}</button>`).join("")}</div>
+    <div class="pil-defile"><table class="pil-table"><thead><tr><th>${PIL.partsDim === "marques" ? "Marque" : PIL.partsDim === "rayons" ? "Rayon" : "Famille"}</th>
+      <th class="num">Pièces</th><th class="num">CA TTC</th><th class="num">Part du CA</th>${partiel ? `<th class="num">Part succursales</th>` : ""}
+      ${aN1 ? `<th class="num">Part l'an dernier</th><th class="num">Évolution</th>` : ""}<th class="num">Marge HT</th><th class="num">Part de la marge</th><th class="num">Taux de marge</th></tr></thead>
+      <tbody>${montre.map(x => `<tr><td>${echapperHTML(x.nom)}</td><td class="num">${pilNb(x.pieces)}</td><td class="num">${pilEur(x.ca)}</td>
+        <td class="num"><b>${pilPct(x.part)}</b></td>${partiel ? `<td class="num">${pilPct(x.partRes)}</td>` : ""}
+        ${aN1 ? `<td class="num">${pilPct(x.partN1)}</td><td class="num">${delta(x.part, x.partN1)}</td>` : ""}
+        <td class="num">${pilEur(x.marge)}</td><td class="num">${pilPct(x.partMarge)}</td><td class="num">${pilPct(x.tauxMarge)}</td></tr>`).join("")}</tbody></table></div>
+    ${L.length > 20 ? `<a class="pil-voir" onclick="PIL.partsTout = !PIL.partsTout; dessinerPilPartsDetail()">${PIL.partsTout ? "Réduire la liste" : `Voir les ${L.length} lignes →`}</a>` : ""}`;
+}
+
+function exporterPilParts() {
+  const d = PIL.parts;
+  if (!d || !Number(d.total?.ca)) { alert("Rien à exporter sur cette période."); return; }
+  const { du, au } = pilDates(PIL.periode), arr = v => v == null ? "" : Math.round(v * 10) / 10;
+  const feuille = (nom, entete, L) => ({ nom, gras: [1], figer: 1, largeurs: [28, 10, 14, 12, 16, 16, 14, 16, 14],
+    lignes: [[entete, "Pièces", "CA TTC", "Part du CA %", "Part succursales %", "Part an dernier %", "Marge HT", "Part de la marge %", "Taux de marge %"],
+      ...[...L].sort((a, b) => b.ca - a.ca).map(x => [x.nom, x.pieces, x.ca, arr(x.part), arr(x.partRes), arr(x.partN1), x.marge, arr(x.partMarge), arr(x.tauxMarge)])] });
+  telechargerXlsx(`PILOTAGE_PARTS_DE_MARCHE_${du.replace(/-/g, "")}_${au.replace(/-/g, "")}.xlsx`,
+    [feuille("Par marque", "Marque", d.marques || []), feuille("Par rayon", "Rayon", d.rayons || []), feuille("Par famille", "Famille", d.familles || [])]);
 }
 
 async function rendreReporting() {
