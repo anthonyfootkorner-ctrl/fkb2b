@@ -1703,6 +1703,9 @@
   .pil-rk .tr { height: 5px; margin-top: 6px; background: var(--pil-surface2); border-radius: 3px; overflow: hidden; }
   .pil-rk .fl { height: 100%; border-radius: 3px; }
   @media (max-width: 900px) { #vue-pilotage .pil-grille.deux { grid-template-columns: 1fr; } .pil-rk { grid-template-columns: 1fr; } }
+  .tb-table tr.tb-marque:hover td { background: rgba(17,17,17,.04); }
+  .tb-table tr.tb-marque.on td { background: rgba(17,17,17,.08); }
+  .tb-table td.num small { display: block; opacity: .6; font-size: 10px; }
 </style>
 </head>
 <body>
@@ -2286,10 +2289,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1794929877"></script>
-<script src="imports.js?v=1794929877"></script>
-<script src="merch-shopify.js?v=1794929877"></script>
-<script src="moteur-merch.js?v=1794929877"></script>
+<script src="config.js?v=1795023764"></script>
+<script src="imports.js?v=1795023764"></script>
+<script src="merch-shopify.js?v=1795023764"></script>
+<script src="moteur-merch.js?v=1795023764"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -6813,14 +6816,21 @@ function rendreMesPrecommandes(precos) {
   }).join("");
 }
 
-let PRECO_ADMIN_CAMPAGNE = null, PRECO_ADMIN_FILTRE = "";
+let PRECO_ADMIN_CAMPAGNE = null, PRECO_ADMIN_FILTRE = "", PRECO_ADMIN_MARQUE = "";
+/* Un panier par marque : le back-office se filtre sur une marque (liste, compteurs, exports,
+   fichiers Fastmag), puisque chaque marque se valide et s'intègre à part. */
+const paniersDe = r => (r.paniers || []).filter(p => !PRECO_ADMIN_MARQUE || (p.marques || []).includes(PRECO_ADMIN_MARQUE));
+const envoisVus = r => paniersDe(r).map(p => p.envoi).filter(e => e && e.statut !== "refusee");
+const suffixeMarqueAdmin = () => PRECO_ADMIN_MARQUE ? "_" + PRECO_ADMIN_MARQUE.replace(/[^\w-]+/g, "_") : "";
 async function rendrePrecommandesAdmin(campagne) {
   const vue = document.getElementById("vue-precommandes-admin");
   if (!estStaff) { vue.innerHTML = `<div class="col-tete"><div class="compte-produits">Réservé aux comptes internes.</div></div>`; return; }
   const campagnes = await api("/rest/v1/rpc/campagnes_precommande", { corps: {} }).catch(() => []);
   if (!campagnes.length) { vue.innerHTML = `<div class="col-tete"><h1>PRÉCOMMANDES</h1><div class="compte-produits">Aucune campagne.</div></div>`; return; }
+  const avant = PRECO_ADMIN_CAMPAGNE;
   PRECO_ADMIN_CAMPAGNE = campagne && campagnes.some(c => c.campagne === campagne) ? campagne
     : (PRECO_ADMIN_CAMPAGNE && campagnes.some(c => c.campagne === PRECO_ADMIN_CAMPAGNE) ? PRECO_ADMIN_CAMPAGNE : campagnes[0].campagne);
+  if (avant !== PRECO_ADMIN_CAMPAGNE) PRECO_ADMIN_MARQUE = "";
   const info = campagnes.find(c => c.campagne === PRECO_ADMIN_CAMPAGNE) || {};
   vue.innerHTML = `
     <div class="col-tete">
@@ -6841,10 +6851,14 @@ async function rendrePrecommandesAdmin(campagne) {
           <option value="refusee">Refusées</option>
           <option value="hors_budget">Au-dessus du budget</option>
         </select>
+        <select class="qte-claire" style="width:200px; text-align:left" id="pa-marque" onchange="PRECO_ADMIN_MARQUE=this.value; rendreListePrecoAdmin()">
+          <option value="">Toutes les marques</option>
+        </select>
         <span class="compte-produits" style="margin:0">${info.deadline ? `date limite ${new Date(info.deadline).toLocaleDateString("fr-FR")}` : "sans date limite"}
           · ${info.references || 0} références</span>
         <button class="puce-claire" onclick="exporterPrecoAdmin()">Exporter le cumul (CSV)</button>
         <button class="puce-claire" onclick="excelPrecoReseau()" title="Les transmissions du filtre choisi (toutes hors refusées par défaut) : cumul réseau, récap par magasin, et un bon de commande par magasin et panier">⬇ Excel réseau</button>
+        <button class="puce-claire" id="pa-zip-fastmag" onclick="zipFastmagPreco()" title="Un fichier ZIP avec le fichier d'import Fastmag de chaque panier : les validés à intégrer (ou le statut filtré), pour la marque choisie">⬇ Fichiers Fastmag (ZIP)</button>
         <button class="puce-claire" id="pa-zip-bdc" onclick="zipBdcValides()" title="Un fichier ZIP avec un bon de commande Excel par panier validé (validés + intégrés, ou seulement le statut filtré)">⬇ BDC validés (ZIP)</button>
         <button class="puce-claire" onclick="location.hash='#/merch-preco/'+encodeURIComponent(PRECO_ADMIN_CAMPAGNE)">Merch de la campagne →</button>
         <button class="puce-claire forte" onclick="location.hash='#/tableau-bord-preco/'+encodeURIComponent(PRECO_ADMIN_CAMPAGNE)">📊 Tableau de bord →</button>
@@ -7001,12 +7015,20 @@ const totalTransmis = r => envoisTransmis(r).reduce((s, e) => s + Number(e.total
 
 function rendreListePrecoAdmin() {
   const rangs = PRECO_ADMIN_RANGS;
+  // la liste des marques présentes dans les paniers de la campagne
+  const selMarque = document.getElementById("pa-marque");
+  if (selMarque) {
+    const marques = [...new Set(rangs.flatMap(r => (r.paniers || []).flatMap(p => p.marques || [])))].sort((a, b) => a.localeCompare(b, "fr"));
+    if (PRECO_ADMIN_MARQUE && !marques.includes(PRECO_ADMIN_MARQUE)) marques.push(PRECO_ADMIN_MARQUE);
+    selMarque.innerHTML = `<option value="">Toutes les marques</option>` + marques.map(m => `<option value="${echapperHTML(m)}">${echapperHTML(m)}</option>`).join("");
+    selMarque.value = PRECO_ADMIN_MARQUE;
+  }
   const chiffre = (v, lib) => `<div class="recap-chiffre"><b>${v}</b><span>${lib}</span></div>`;
-  const paniers = rangs.flatMap(r => (r.paniers || []).map(p => ({ ...p, magasin: r })));
-  const transmis = rangs.filter(r => envoisTransmis(r).length);
-  const nonTransmis = rangs.filter(r => !envoisTransmis(r).length);
+  const paniers = rangs.flatMap(r => paniersDe(r).map(p => ({ ...p, magasin: r })));
+  const transmis = rangs.filter(r => envoisVus(r).length);
+  const nonTransmis = rangs.filter(r => !envoisVus(r).length);
   const parStatut = st => paniers.filter(p => p.envoi && p.envoi.statut === st).length;
-  const montant = rangs.reduce((s, r) => s + totalTransmis(r), 0);
+  const montant = rangs.reduce((s, r) => s + envoisVus(r).reduce((t, e) => t + Number(e.total_net || 0), 0), 0);
   const budget = rangs.reduce((s, r) => s + Number(r.budget || 0), 0);
   const horsBudget = r => Number(r.budget) > 0 && totalTransmis(r) > Number(r.budget);
   document.getElementById("pa-chiffres").innerHTML =
@@ -7016,36 +7038,36 @@ function rendreListePrecoAdmin() {
     + chiffre(parStatut("transmise"), "paniers à valider")
     + chiffre(parStatut("validee"), "à intégrer")
     + chiffre(parStatut("integree"), "intégrés")
-    + chiffre(eur(montant), "transmis HT net")
+    + chiffre(eur(montant), PRECO_ADMIN_MARQUE ? `transmis HT net ${echapperHTML(PRECO_ADMIN_MARQUE)}` : "transmis HT net")
     + (budget ? chiffre(eur(budget), "budget cumulé") + chiffre(rangs.filter(horsBudget).length, "au-dessus du budget") : "");
 
   const f = PRECO_ADMIN_FILTRE;
   const vues = rangs.filter(r =>
     !f ? true
-    : f === "non_transmis" ? !envoisTransmis(r).length
+    : f === "non_transmis" ? !envoisVus(r).length
     : f === "hors_budget" ? horsBudget(r)
-    : (r.paniers || []).some(p => p.envoi && p.envoi.statut === f));
+    : paniersDe(r).some(p => p.envoi && p.envoi.statut === f));
   const zone = document.getElementById("pa-liste");
   if (!vues.length) { zone.innerHTML = `<div class="compte-produits">Aucun magasin dans cette sélection.</div>`; return; }
   zone.innerHTML = vues.map(r => {
-    const nb = (r.paniers || []).length;
-    const tot = totalTransmis(r);
+    const nb = paniersDe(r).length;
+    const tot = envoisVus(r).reduce((t, e) => t + Number(e.total_net || 0), 0);
     const ecart = envoisTransmis(r).length && Number(r.budget) > 0 ? tot - Number(r.budget) : null;
     const nomMag = `${r.id_fastmag ? r.id_fastmag + ") " : ""}${r.nom}${r.ville ? " · " + r.ville : ""}`;
-    const aValider = (r.paniers || []).filter(p => p.envoi && p.envoi.statut === "transmise").length;
-    const [libMag, clsMag] = !nb ? ["RIEN DE SAISI", "alerte"]
-      : !envoisTransmis(r).length ? ["NON TRANSMIS", "alerte"]
+    const aValider = paniersDe(r).filter(p => p.envoi && p.envoi.statut === "transmise").length;
+    const [libMag, clsMag] = !nb ? [PRECO_ADMIN_MARQUE ? `RIEN DE SAISI EN ${PRECO_ADMIN_MARQUE}` : "RIEN DE SAISI", "alerte"]
+      : !envoisVus(r).length ? ["NON TRANSMIS", "alerte"]
       : aValider ? [`${aValider} À VALIDER`, "attente"]
-      : (r.paniers || []).some(p => p.envoi && p.envoi.statut === "validee") ? ["À INTÉGRER", "attente"] : ["INTÉGRÉ", "ok"];
+      : paniersDe(r).some(p => p.envoi && p.envoi.statut === "validee") ? ["À INTÉGRER", "attente"] : ["INTÉGRÉ", "ok"];
     return `<div class="cmd-carte" id="pa-${r.societe_id}">
       <div class="cmd-tete">
         <span class="cmd-num">${echapperHTML(nomMag)}</span>
         <span class="badge-c ${clsMag}">${libMag}</span>
         <span class="badge-c" style="opacity:.7">${echapperHTML(r.reseau || "")}</span>
         ${nb ? `<span class="badge-c" style="opacity:.7">${nb} panier${nb > 1 ? "s" : ""}</span>` : ""}
-        ${envoisTransmis(r).length ? `<span class="cmd-montant">${eur(tot)} HT net transmis</span>` : ""}
+        ${envoisVus(r).length ? `<span class="cmd-montant">${eur(tot)} HT net transmis${PRECO_ADMIN_MARQUE ? " " + echapperHTML(PRECO_ADMIN_MARQUE) : ""}</span>` : ""}
       </div>
-      ${(r.paniers || []).map(p => rendrePanierAdmin(p, r)).join("")}
+      ${paniersDe(r).map(p => rendrePanierAdmin(p, r)).join("")}
       <div class="cmd-actions" style="border-top:1px dashed var(--hairline); padding-top:8px">
         <label class="pa-budget">Budget
           <input class="qte-claire" style="width:110px" type="number" min="0" step="100" value="${r.budget ?? ""}" placeholder="—"
@@ -7063,6 +7085,7 @@ function rendrePanierAdmin(p, r) {
   const [lib, cls] = e ? (LIBELLES_PRECO[e.statut] || [e.statut, ""]) : ["NON TRANSMIS", "alerte"];
   return `<div class="pa-panier">
       <span class="nom">« ${echapperHTML(p.nom)} »</span>
+      ${(p.marques || []).map(m => `<span class="badge-c" style="opacity:.75">${echapperHTML(m)}</span>`).join("")}
       <span class="badge-c ${cls}">${lib}</span>
       ${e ? `<span class="cmd-montant" style="font-size:13px">${eur(Number(e.total_net))} HT${Number(e.remise_pct) > 0 ? " net" : ""}</span>` : ""}
       <span class="meta">
@@ -7333,6 +7356,44 @@ async function fichierFastmagPreco(id, societeId) {
   } catch (e) { if (etat) etat.textContent = "fichier impossible : " + (e.donnees?.message || e.message); }
 }
 
+/* Tous les fichiers d'import Fastmag d'un coup, pour la marque choisie : les paniers validés
+   (à intégrer) par défaut, ou le statut filtré (transmises, intégrées). Un fichier par
+   panier, exactement celui du bouton « ⬇ Fichier Fastmag », rangés dans un seul ZIP. */
+async function zipFastmagPreco() {
+  const statuts = ["transmise", "validee", "integree"].includes(PRECO_ADMIN_FILTRE) ? [PRECO_ADMIN_FILTRE] : ["validee"];
+  const envois = PRECO_ADMIN_RANGS.flatMap(r => paniersDe(r).filter(p => p.envoi && statuts.includes(p.envoi.statut)).map(p => p.envoi));
+  const quoi = `${statuts.map(s => (LIBELLES_PRECO[s] || [s])[0]).join(", ").toLowerCase()}${PRECO_ADMIN_MARQUE ? " · " + PRECO_ADMIN_MARQUE : ""}`;
+  if (!envois.length) { alert(`Aucun panier (${quoi}) : rien à intégrer.`); return; }
+  const bouton = document.getElementById("pa-zip-fastmag"), libelle = bouton?.textContent;
+  const etat = t => { if (bouton) bouton.textContent = t; };
+  if (bouton) bouton.disabled = true;
+  try {
+    const noms = new Set(), fichiers = [];
+    let lignes = 0;
+    for (let i = 0; i < envois.length; i++) {
+      etat(`fichiers ${i + 1}/${envois.length}…`);
+      const f = await api("/rest/v1/rpc/fichier_precommande", { corps: { p_id: envois[i].id } });
+      if (!f || !f.lignes) continue;
+      let nom = f.nom;
+      for (let k = 2; noms.has(nom); k++) nom = f.nom.replace(/(\.[^.]+)?$/, `_${k}$1`);
+      noms.add(nom);
+      lignes += Number(f.lignes) || 0;
+      fichiers.push({ nom, octets: new Uint8Array([...f.contenu].map(c => { const n = c.charCodeAt(0); return n < 256 ? n : 63; })) });
+    }
+    if (!fichiers.length) { alert("Aucune ligne à intégrer."); etat(libelle); if (bouton) bouton.disabled = false; return; }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([zipperStore(fichiers)], { type: "application/zip" }));
+    a.download = `FASTMAG_${String(PRECO_ADMIN_CAMPAGNE).replace(/[^\w-]+/g, "_")}${suffixeMarqueAdmin()}_${statuts.join("-").toUpperCase()}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.zip`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    etat(`✓ ${fichiers.length} fichier${fichiers.length > 1 ? "s" : ""} · ${lignes} lignes`);
+    setTimeout(() => { etat(libelle); if (bouton) bouton.disabled = false; }, 4000);
+  } catch (e) {
+    alert("Fichiers impossibles : " + (e.donnees?.message || e.message));
+    etat(libelle); if (bouton) bouton.disabled = false;
+  }
+}
+
 /* Campagne servie sur stock : deux fichiers Fastmag, CENTRAL (limité à l'état de stock) puis WEB (le reste). */
 async function fichiersCentralWebPreco(id, societeId) {
   const etat = document.getElementById(`pa-etat-${societeId}`);
@@ -7357,7 +7418,7 @@ async function exporterPrecoAdmin() {
   const statuts = prompt("Cumuler quelles transmissions ? (transmise, validee, integree — séparées par des virgules)", "validee,integree");
   if (statuts === null) return;
   const voulus = statuts.split(",").map(x => x.trim()).filter(Boolean);
-  const envois = PRECO_ADMIN_RANGS.flatMap(r => (r.paniers || []).map(p => p.envoi)).filter(e => e && voulus.includes(e.statut));
+  const envois = PRECO_ADMIN_RANGS.flatMap(r => paniersDe(r).map(p => p.envoi)).filter(e => e && voulus.includes(e.statut));
   if (!envois.length) { alert("Aucune transmission dans ces statuts."); return; }
   const cumul = {};
   for (const e0 of envois) {
@@ -7373,7 +7434,7 @@ async function exporterPrecoAdmin() {
       .map(e => [e.reference, e.taille, e.livraison, e.pieces, e.magasins].join(";"))).join("\r\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
-  a.download = `CUMUL_${PRECO_ADMIN_CAMPAGNE.replace(/[^\w-]+/g, "_")}.csv`;
+  a.download = `CUMUL_${PRECO_ADMIN_CAMPAGNE.replace(/[^\w-]+/g, "_")}${suffixeMarqueAdmin()}.csv`;
   a.click();
 }
 
@@ -8186,9 +8247,9 @@ async function excelPrecoEnvoi(envoiId, campagne, options = {}) {
 // sur « Validées » ou « Intégrées », seul ce statut part ; sinon les deux.
 async function zipBdcValides() {
   const statuts = ["validee", "integree"].includes(PRECO_ADMIN_FILTRE) ? [PRECO_ADMIN_FILTRE] : ["validee", "integree"];
-  const envois = PRECO_ADMIN_RANGS.flatMap(r => (r.paniers || []).filter(p => p.envoi && statuts.includes(p.envoi.statut))
+  const envois = PRECO_ADMIN_RANGS.flatMap(r => paniersDe(r).filter(p => p.envoi && statuts.includes(p.envoi.statut))
     .map(p => ({ magasin: r, panier: p, envoi: p.envoi })));
-  if (!envois.length) { alert("Aucun bon de commande validé sur cette campagne."); return; }
+  if (!envois.length) { alert("Aucun bon de commande validé sur cette campagne" + (PRECO_ADMIN_MARQUE ? " pour " + PRECO_ADMIN_MARQUE : "") + "."); return; }
   const bouton = document.getElementById("pa-zip-bdc"), libelle = bouton?.textContent;
   const etat = t => { if (bouton) bouton.textContent = t; };
   if (bouton) bouton.disabled = true;
@@ -8214,7 +8275,7 @@ async function zipBdcValides() {
     }
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([zipperStore(fichiers)], { type: "application/zip" }));
-    a.download = `BDC_${String(PRECO_ADMIN_CAMPAGNE).replace(/[^\w-]+/g, "_")}_${statuts.join("-").toUpperCase()}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.zip`;
+    a.download = `BDC_${String(PRECO_ADMIN_CAMPAGNE).replace(/[^\w-]+/g, "_")}${suffixeMarqueAdmin()}_${statuts.join("-").toUpperCase()}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.zip`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     etat(`✓ ${fichiers.length} BDC`);
@@ -8234,7 +8295,7 @@ async function excelPrecoReseau() {
   const statuts = ["transmise", "validee", "integree", "refusee"].includes(f) ? [f] : ["transmise", "validee", "integree"];
   const horsBudget = r => Number(r.budget) > 0 && totalTransmis(r) > Number(r.budget);
   const envois = PRECO_ADMIN_RANGS.filter(r => f !== "hors_budget" || horsBudget(r))
-    .flatMap(r => (r.paniers || []).filter(p => p.envoi && statuts.includes(p.envoi.statut))
+    .flatMap(r => paniersDe(r).filter(p => p.envoi && statuts.includes(p.envoi.statut))
     .map(p => ({ magasin: r, panier: p, envoi: p.envoi })));
   if (!envois.length) { alert("Aucune transmission à exporter pour ce filtre."); return; }
   const etat = document.getElementById("pa-chiffres");
@@ -8276,7 +8337,7 @@ async function excelPrecoReseau() {
     f.nom = `${e.magasin.id_fastmag ? e.magasin.id_fastmag + " " : ""}${e.magasin.nom || ""} ${e.panier.nom}`.slice(0, 31 - suffixe.length).trim() + suffixe;
     feuilles.push(f);
   }
-  telechargerXlsx(`PRECO_${String(PRECO_ADMIN_CAMPAGNE).replace(/[^\w-]+/g, "_")}_RESEAU${f ? "_" + f.toUpperCase() : ""}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`, feuilles);
+  telechargerXlsx(`PRECO_${String(PRECO_ADMIN_CAMPAGNE).replace(/[^\w-]+/g, "_")}${suffixeMarqueAdmin()}_RESEAU${f ? "_" + f.toUpperCase() : ""}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`, feuilles);
 }
 
 
@@ -8286,7 +8347,7 @@ async function excelPrecoReseau() {
    catégorie, rayon, famille, sous-famille, les tops produits, le profil de tailles, le
    classement des magasins et les références que personne n'a prises. Tout est agrégé
    côté serveur (tableau_bord_precommande) : la page ne reçoit que des totaux. */
-let TB_PRECO = { campagne: null, statuts: ["transmise", "validee", "integree"], reseaux: [], societes: [], ouverts: [], donnees: null, tri: "montant", tout: {} };
+let TB_PRECO = { campagne: null, statuts: ["transmise", "validee", "integree"], reseaux: [], societes: [], marques: [], listeMarques: [], ouverts: [], donnees: null, tri: "montant", tout: {} };
 const STATUTS_TB = [["brouillon", "Brouillons", "en cours, non transmis"], ["transmise", "Transmis", "à valider"],
   ["validee", "Validés", "à intégrer"], ["integree", "Intégrés", "Fastmag"], ["refusee", "Refusés", ""]];
 const tbNb = n => Math.round(Number(n) || 0).toLocaleString("fr-FR");
@@ -8321,6 +8382,9 @@ async function rendreTableauBordPreco(campagne) {
     </div>
     <div id="tb-corps" style="margin: 0 22px 60px"><div class="compte-produits">Chargement…</div></div>`;
   TB_PRECO.ouverts = []; TB_PRECO.societes = []; TB_PRECO.reseaux = [];
+  // arrivé du back-office filtré sur une marque : le tableau de bord s'ouvre sur cette marque
+  TB_PRECO.marques = PRECO_ADMIN_MARQUE && PRECO_ADMIN_CAMPAGNE === TB_PRECO.campagne ? [PRECO_ADMIN_MARQUE] : [];
+  TB_PRECO.listeMarques = [];
   rendrePerimetreTB();
   await chargerTableauBordPreco();
 }
@@ -8340,6 +8404,9 @@ function rendrePerimetreTB() {
     <button class="puce-claire" onclick="definirStatutsTB(['transmise','validee','integree'])">Engagé</button>
     <button class="puce-claire" onclick="definirStatutsTB(['validee','integree'])">Validé seulement</button>
     <button class="puce-claire" onclick="definirStatutsTB(['brouillon','transmise','validee','integree'])">Tout sauf refusés</button></div>
+    ${(TB_PRECO.listeMarques || []).length > 1 ? `<div class="ligne"><span class="compte-produits" style="margin:0">Marque :</span>
+    <button class="puce-claire tb-chip${!TB_PRECO.marques.length ? " on" : ""}" onclick="definirMarquesTB([])">Toutes</button>
+    ${TB_PRECO.listeMarques.map(m => `<button class="puce-claire tb-chip${TB_PRECO.marques.includes(m) ? " on" : ""}" onclick="basculerMarqueTB(${JSON.stringify(m).replaceAll('"', "&quot;")})">${echapperHTML(m)}</button>`).join("")}</div>` : ""}
     ${ouverts.length ? `<div class="ligne"><span class="compte-produits" style="margin:0">Réseau :</span>
     <button class="puce-claire tb-chip${!TB_PRECO.reseaux.length ? " on" : ""}" onclick="definirReseauxTB([])">Tous · ${ouverts.length}</button>
     ${reseaux.map(r => `<button class="puce-claire tb-chip${TB_PRECO.reseaux.includes(r) ? " on" : ""}" onclick="basculerReseauTB('${echapperHTML(r)}')">${
@@ -8363,6 +8430,14 @@ function basculerReseauTB(r) {
   if (TB_PRECO.reseaux.length) TB_PRECO.societes = TB_PRECO.societes.filter(id => TB_PRECO.reseaux.includes((TB_PRECO.ouverts.find(m => m.societe_id === id) || {}).reseau || "?"));
   rendrePerimetreTB(); chargerTableauBordPreco();
 }
+/* Filtre marque : chaque marque s'achète et s'intègre à part (un panier par marque) ;
+   tout le tableau de bord, et son Excel, se recalcule sur la ou les marques retenues. */
+function basculerMarqueTB(m) {
+  TB_PRECO.marques = TB_PRECO.marques.includes(m) ? TB_PRECO.marques.filter(x => x !== m) : TB_PRECO.marques.concat(m);
+  rendrePerimetreTB(); chargerTableauBordPreco();
+}
+function definirMarquesTB(liste) { TB_PRECO.marques = liste.slice(); rendrePerimetreTB(); chargerTableauBordPreco(); }
+function choisirMarqueTB(m) { definirMarquesTB(TB_PRECO.marques.length === 1 && TB_PRECO.marques[0] === m ? [] : [m]); }
 function definirReseauxTB(liste) { TB_PRECO.reseaux = liste.slice(); rendrePerimetreTB(); chargerTableauBordPreco(); }
 function definirMagasinsTB(liste) { TB_PRECO.societes = liste.slice(); rendrePerimetreTB(); chargerTableauBordPreco(); }
 function retirerMagasinTB(id) { definirMagasinsTB(TB_PRECO.societes.filter(x => x !== id)); }
@@ -8402,7 +8477,8 @@ async function chargerTableauBordPreco() {
   corps.style.opacity = ".5";
   try {
     TB_PRECO.donnees = await api("/rest/v1/rpc/tableau_bord_precommande", { corps: { p_campagne: TB_PRECO.campagne, p_statuts: TB_PRECO.statuts,
-      p_reseaux: TB_PRECO.reseaux.length ? TB_PRECO.reseaux : null, p_societes: TB_PRECO.societes.length ? TB_PRECO.societes : null } });
+      p_reseaux: TB_PRECO.reseaux.length ? TB_PRECO.reseaux : null, p_societes: TB_PRECO.societes.length ? TB_PRECO.societes : null,
+      p_marques: TB_PRECO.marques.length ? TB_PRECO.marques : null } });
   } catch (e) {
     corps.style.opacity = "1";
     corps.innerHTML = `<div class="compte-produits">Impossible de charger : ${echapperHTML(String(e.donnees?.message || e.message))}</div>`;
@@ -8414,6 +8490,10 @@ async function chargerTableauBordPreco() {
     TB_PRECO.ouverts = TB_PRECO.donnees.ouverts;
     rendrePerimetreTB();
   }
+  if (!TB_PRECO.listeMarques.length && (TB_PRECO.donnees.par_marque || []).length) {   // les marques de la campagne, une fois
+    TB_PRECO.listeMarques = marquesUtilesTB(TB_PRECO.donnees.par_marque).map(m => m.marque);
+    rendrePerimetreTB();
+  }
   dessinerTableauBordPreco();
 }
 
@@ -8421,7 +8501,8 @@ const tbDim = nom => (TB_PRECO.donnees?.dims || []).filter(d => d.dim === nom);
 function libellePerimetreTB() {
   const statuts = TB_PRECO.statuts.map(s => (STATUTS_TB.find(x => x[0] === s) || [s, s])[1]).join(" + ");
   const mags = TB_PRECO.societes.map(id => TB_PRECO.ouverts.find(m => m.societe_id === id)).filter(Boolean);
-  return statuts + (TB_PRECO.reseaux.length ? " · " + TB_PRECO.reseaux.join(" + ") : "")
+  return statuts + (TB_PRECO.marques.length ? " · " + TB_PRECO.marques.join(" + ") : "")
+    + (TB_PRECO.reseaux.length ? " · " + TB_PRECO.reseaux.join(" + ") : "")
     + (mags.length ? " · " + (mags.length > 3 ? `${mags.length} magasins` : mags.map(nomMagasinTB).join(", ")) : "");
 }
 
@@ -8476,8 +8557,9 @@ function dessinerTableauBordPreco() {
     ${(d.par_reseau || []).length ? `<div class="tb-reseau">${(d.par_reseau || []).map(r => `<span class="badge-c">${echapperHTML(r.reseau)} · ${r.actifs}/${r.ouverts} magasins · ${eur(Number(r.montant))}</span>`).join("")}</div>` : ""}
   </div>`;
 
+  const recapMarques = tbRecapMarques(d.par_marque || []);
   if (!Number(sc.lignes)) {
-    corps.innerHTML = avancement + perimetre + `<div class="compte-produits">Aucune ligne dans ce périmètre : élargissez-le (les brouillons, par exemple).</div>`;
+    corps.innerHTML = avancement + recapMarques + perimetre + `<div class="compte-produits">Aucune ligne dans ce périmètre : élargissez-le (les brouillons, par exemple).</div>`;
     return;
   }
 
@@ -8509,8 +8591,43 @@ function dessinerTableauBordPreco() {
       r.photo ? `<img src="${echapperHTML(r.photo)}" loading="lazy" alt="">` : ""}<b>${echapperHTML(r.reference)}</b><span class="fin">${echapperHTML((r.designation || "").slice(0, 28))}${r.categorie ? " · " + echapperHTML(r.categorie) : ""}</span></span>`).join("")}</div>
   </div>`;
 
-  corps.innerHTML = avancement + perimetre + `<div class="tb-grille">${cadencement}${matrice}</div>`
+  corps.innerHTML = avancement + recapMarques + perimetre + `<div class="tb-grille">${cadencement}${matrice}</div>`
     + `<div class="tb-grille">${axes}</div>` + tops + tailles + magasins + dormantes;
+}
+
+/* Les marques à montrer : celles qui ont une offre visible ou de l'activité (« Sans marque »
+   = références sans fiche Fastmag, invisibles des magasins, seulement si on y a saisi). */
+const marquesUtilesTB = liste => (liste || []).filter(m => Number(m.magasins_saisi) > 0
+  || (m.marque !== "Sans marque" && Number(m.refs_offertes) > 0));
+
+/* Récap par marque : où en est chaque marque (paniers par statut, montants), toujours sur
+   toutes les marques du périmètre réseau / magasins. Un clic sur une ligne filtre le
+   tableau de bord sur cette marque (re-clic : toutes). */
+function tbRecapMarques(liste) {
+  const rows = marquesUtilesTB(liste);
+  if (!rows.length) return "";
+  const n = v => Number(v) || 0;
+  const tot = k => rows.reduce((s, r) => s + n(r[k]), 0);
+  const cpt = v => n(v) ? `<b>${tbNb(v)}</b>` : `<span style="opacity:.3">—</span>`;
+  const ligne = r => `<tr class="tb-marque${TB_PRECO.marques.includes(r.marque) ? " on" : ""}" style="cursor:pointer" title="Filtrer le tableau de bord sur ${echapperHTML(r.marque)}"
+      onclick="choisirMarqueTB(${JSON.stringify(r.marque).replaceAll('"', "&quot;")})">
+    <td class="lib"><b>${echapperHTML(r.marque)}</b></td>
+    <td class="num">${tbNb(r.refs_prises)} / ${tbNb(r.refs_offertes)}</td>
+    <td class="num">${tbNb(r.magasins_saisi)}</td><td class="num">${tbNb(r.magasins_transmis)}</td>
+    <td class="num">${cpt(r.paniers_brouillon)}${n(r.montant_brouillon) ? `<small>${eur(n(r.montant_brouillon))}</small>` : ""}</td>
+    <td class="num">${cpt(r.paniers_transmis)}</td><td class="num">${cpt(r.paniers_valides)}</td><td class="num">${cpt(r.paniers_integres)}</td>
+    <td class="num">${tbNb(r.pieces)}</td><td class="num">${eur(n(r.montant))}</td><td class="num"><b>${eur(n(r.montant_net))}</b></td></tr>`;
+  return `<div class="bloc-clair tb-bloc">
+    <h3 class="titre-bloc">Récap par marque · ${rows.length} marque${rows.length > 1 ? "s" : ""}</h3>
+    <div class="compte-produits" style="margin:0 0 10px">Paniers par statut et montants, marque par marque. Pièces et montants sur les statuts retenus (${
+      TB_PRECO.statuts.map(s => (STATUTS_TB.find(x => x[0] === s) || [s, s])[1]).join(" + ")}) ; net = remises déduites (transmis). Cliquez une marque pour filtrer tout le tableau de bord.</div>
+    <table class="tb-table"><thead><tr><th>Marque</th><th class="num">Réf. prises / offertes</th><th class="num">Mag. saisi</th><th class="num">Mag. transmis</th>
+      <th class="num">En cours</th><th class="num">À valider</th><th class="num">Validés</th><th class="num">Intégrés</th>
+      <th class="num">Pièces</th><th class="num">HT brut</th><th class="num">HT net</th></tr></thead>
+    <tbody>${rows.map(ligne).join("")}
+    <tr class="tb-total"><td class="lib">Total</td><td></td><td></td><td></td>
+      <td class="num">${tbNb(tot("paniers_brouillon"))}</td><td class="num">${tbNb(tot("paniers_transmis"))}</td><td class="num">${tbNb(tot("paniers_valides"))}</td><td class="num">${tbNb(tot("paniers_integres"))}</td>
+      <td class="num">${tbNb(tot("pieces"))}</td><td class="num">${eur(tot("montant"))}</td><td class="num"><b>${eur(tot("montant_net"))}</b></td></tr></tbody></table></div>`;
 }
 
 function tbEntonnoir(etapes) {
@@ -8667,10 +8784,15 @@ function excelTableauBordPreco() {
   const magasins = { nom: "Magasins", gras: [1], figer: 1, largeurs: [10, 28, 14, 12, 14, 10, 8, 8, 12],
     lignes: [["Code", "Magasin", "Ville", "Réseau", "Montant HT", "Part %", "Pièces", "Réf.", "Paniers", "Budget"],
       ...(d.magasins || []).map(m => [m.id_fastmag || "", m.nom || m.compte || "", m.ville || "", m.reseau || "", r2(m.montant), tbPart(m.montant, sc.montant), Number(m.pieces), Number(m.refs), Number(m.paniers), Number(m.budget) > 0 ? r2(m.budget) : ""])] };
+  const parMarque = { nom: "Par marque", gras: [1], figer: 1, largeurs: [20, 12, 12, 10, 10, 10, 14, 10, 10, 10, 10, 14, 14],
+    lignes: [["Marque", "Réf. offertes", "Réf. prises", "Mag. saisi", "Mag. transmis", "Paniers en cours", "En cours HT", "À valider", "Validés", "Intégrés", "Pièces", "HT brut", "HT net"],
+      ...marquesUtilesTB(d.par_marque).map(m => [m.marque, Number(m.refs_offertes), Number(m.refs_prises), Number(m.magasins_saisi), Number(m.magasins_transmis),
+        Number(m.paniers_brouillon), r2(m.montant_brouillon), Number(m.paniers_transmis), Number(m.paniers_valides), Number(m.paniers_integres),
+        Number(m.pieces), r2(m.montant), r2(m.montant_net)])] };
   const sans = { nom: "Sans commande", gras: [1], figer: 1, largeurs: [14, 40, 18],
     lignes: [["Référence", "Désignation", "Catégorie"], ...((d.sans_commande || {}).liste || []).map(r => [r.reference, r.designation || "", r.categorie || ""])] };
-  telechargerXlsx(`TABLEAU_BORD_${String(d.campagne).replace(/[^\w-]+/g, "_")}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`,
-    [synthese, dim("Cadencement", "livraison", tbDate), matrice, dim("Catégories", "categorie"), dim("Rayons", "rayon"), dim("Familles", "famille"), dim("Sous-familles", "sous_famille"), tops, tailles, magasins, sans]);
+  telechargerXlsx(`TABLEAU_BORD_${String(d.campagne).replace(/[^\w-]+/g, "_")}${TB_PRECO.marques.length ? "_" + TB_PRECO.marques.join("-").replace(/[^\w-]+/g, "_") : ""}_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`,
+    [synthese, parMarque, dim("Cadencement", "livraison", tbDate), matrice, dim("Catégories", "categorie"), dim("Rayons", "rayon"), dim("Familles", "famille"), dim("Sous-familles", "sous_famille"), tops, tailles, magasins, sans]);
 }
 
 
