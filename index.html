@@ -87,6 +87,9 @@
   .magasin-menu .note { font-size: 10.5px; color: var(--gris); line-height: 1.5;
     border-top: 1px solid var(--bord); margin-top: 6px; padding: 9px 12px 6px; }
   .magasin-fixe { font-size: 11.5px; color: var(--gris); letter-spacing: .08em; text-align: right; }
+  .staff-agir { background: transparent; color: inherit; border: 1px solid rgba(255,255,255,.35); border-radius: 999px;
+    font: inherit; font-size: 11.5px; letter-spacing: .06em; padding: 5px 10px; max-width: 260px; cursor: pointer; }
+  .staff-agir option { color: #111; }
   @media (max-width: 720px) {
     .magasin-btn { max-width: 46vw; }
     .magasin-menu { width: min(88vw, 320px); }
@@ -2289,10 +2292,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1795023764"></script>
-<script src="imports.js?v=1795023764"></script>
-<script src="merch-shopify.js?v=1795023764"></script>
-<script src="moteur-merch.js?v=1795023764"></script>
+<script src="config.js?v=1795098141"></script>
+<script src="imports.js?v=1795098141"></script>
+<script src="merch-shopify.js?v=1795098141"></script>
+<script src="moteur-merch.js?v=1795098141"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -2432,8 +2435,14 @@ async function init() {
     const titre = { admin: "Administrateur — toutes sociétés",
                     admin_commercial: "Administration commerciale",
                     admin_adv: "Administration des ventes" }[MON_ROLE];
-    clientActif = { nom: titre, famille_tarifaire: "", id_fastmag: null, compte: "ADMIN" };
-    document.getElementById("societe-nom").textContent = titre;
+    /* Un admin peut « agir pour » un compte interne Footkorner (réseau FK SIEGE : WEB 164,
+       FOOTKORNER 238…) pour y saisir une précommande comme un magasin (demande d'Anthony du
+       19/11). Choix mémorisé sur le poste ; « Administrateur » revient à la vue toutes sociétés. */
+    const internes = estAdmin ? MES_SOCIETES.filter(x => (x.reseau || "").toUpperCase() === "FK SIEGE") : [];
+    let memoStaff = null;
+    try { memoStaff = localStorage.getItem("fkb2b-staff-societe"); } catch {}
+    clientActif = internes.find(x => x.id === memoStaff) || { nom: titre, famille_tarifaire: "", id_fastmag: null, compte: "ADMIN" };
+    rendreSelecteurStaff(titre, internes);
     rafraichirFilesCommandes();
   } else {
     const memo = localStorage.getItem("fkb2b-societe");
@@ -2519,6 +2528,21 @@ function logoSuivant(img) {
 /* ---------------- sélecteur de magasin (propriétaires multi-magasins) ---------------- */
 // Le magasin actif détermine les tarifs, l'historique de commandes et l'ID Fastmag
 // du fichier envoyé : il doit rester lisible en permanence, pas caché dans un menu.
+function rendreSelecteurStaff(titre, internes) {
+  const zone = document.getElementById("societe-nom");
+  if (!internes.length) { zone.textContent = titre; return; }
+  zone.innerHTML = `<select class="staff-agir" title="Agir pour un compte interne : précommande, catalogue à ses tarifs"
+      onchange="agirPourStaff(this.value)">
+    <option value="">${echapperHTML(titre)}</option>
+    ${internes.map(x => `<option value="${x.id}"${x.id === clientActif.id ? " selected" : ""}>Agir pour : ${
+      echapperHTML((x.id_fastmag ? x.id_fastmag + ") " : "") + (x.nom || x.compte))}</option>`).join("")}
+  </select>`;
+}
+function agirPourStaff(id) {
+  try { id ? localStorage.setItem("fkb2b-staff-societe", id) : localStorage.removeItem("fkb2b-staff-societe"); } catch {}
+  location.reload();   // tout se recharge aux couleurs du compte choisi (catalogue, précommandes, paniers)
+}
+
 function rendreSelecteurSociete() {
   const zone = document.getElementById("societe-nom");
   const nomCourt = s => s.nom || s.compte || "Magasin";
