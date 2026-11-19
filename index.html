@@ -90,6 +90,10 @@
   .staff-agir { background: transparent; color: inherit; border: 1px solid rgba(255,255,255,.35); border-radius: 999px;
     font: inherit; font-size: 11.5px; letter-spacing: .06em; padding: 5px 10px; max-width: 260px; cursor: pointer; }
   .staff-agir option { color: #111; }
+  .vitrine-tuile .tuile-deadline { position: absolute; top: 10px; left: 10px; z-index: 2; background: #fff; color: #111;
+    font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(17,17,17,.15); }
+  .vitrine-tuile .tuile-deadline.chaud { background: #e8611a; color: #fff; border-color: #e8611a; }
+  .vitrine-tuile .tuile-deadline.froid { background: #111; color: #fff; border-color: #111; }
   @media (max-width: 720px) {
     .magasin-btn { max-width: 46vw; }
     .magasin-menu { width: min(88vw, 320px); }
@@ -2292,10 +2296,10 @@
   <button class="btn-noir" id="btn-ajouter">AJOUTER AU PANIER</button>
 </div>
 
-<script src="config.js?v=1795098141"></script>
-<script src="imports.js?v=1795098141"></script>
-<script src="merch-shopify.js?v=1795098141"></script>
-<script src="moteur-merch.js?v=1795098141"></script>
+<script src="config.js?v=1795127708"></script>
+<script src="imports.js?v=1795127708"></script>
+<script src="merch-shopify.js?v=1795127708"></script>
+<script src="moteur-merch.js?v=1795127708"></script>
 <script>
 // Version des CGV acceptée à la commande : à incrémenter à chaque nouvelle version du texte.
 const CGV_VERSION = "2026-08";
@@ -5842,6 +5846,25 @@ let PRECO_DOCUMENTS = [];  // catalogues téléchargeables de la campagne (marqu
    pastille sur la carte, la fiche et la grille, en tête de leur catégorie, et une alerte à confirmer
    au panier et à la validation quand le panier ne les contient pas. Non bloquant. */
 let PRECO_OBLIGATOIRES = new Map();   // référence → { ordre, note }
+/* Dates limites par marque (AH27 : chaque marque clôture à sa date, table campagne_deadlines).
+   Date incluse : on commande jusqu'au soir du jour J ; le serveur bloque ensuite saisie et transmission. */
+let PRECO_DEADLINES = { campagne: null, parMarque: new Map() };
+async function chargerDeadlinesPreco(campagne) {
+  if (PRECO_DEADLINES.campagne === campagne) return PRECO_DEADLINES.parMarque;
+  const lignes = await api(`/rest/v1/campagne_deadlines?campagne=eq.${encodeURIComponent(campagne)}&select=marque,deadline`).catch(() => []);
+  PRECO_DEADLINES = { campagne, parMarque: new Map((lignes || []).map(l => [l.marque, l.deadline])) };
+  return PRECO_DEADLINES.parMarque;
+}
+const deadlineMarquePreco = m => (m && PRECO_DEADLINES.parMarque.get(m)) || PRECO_INFOS?.deadline || null;
+function etatDeadlinePreco(d) {   // { texte, ton } pour une date limite (AAAA-MM-JJ)
+  if (!d) return null;
+  const jour = new Date(d + "T00:00:00"), auj = new Date(); auj.setHours(0, 0, 0, 0);
+  const reste = Math.round((jour - auj) / 864e5);
+  const date = jour.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+  return reste < 0 ? { texte: `clôturée le ${date}`, ton: "froid", reste }
+    : reste === 0 ? { texte: `dernier jour · ${date}`, ton: "chaud", reste }
+    : { texte: `jusqu'au ${date}`, ton: reste <= 3 ? "chaud" : "", reste };
+}
 const estObligatoirePreco = ref => PRECO_OBLIGATOIRES.has(ref);
 const pastilleObligatoire = () => `<span class="pastille-oblig" title="Référence de l'assortiment obligatoire">Assortiment obligatoire</span>`;
 /* Les obligatoires attendus dans un panier : ceux de sa marque quand la campagne a un panier par
@@ -5928,6 +5951,7 @@ async function rendreCataloguePreco(campagne) {
       api("/rest/v1/rpc/mes_campagnes", { corps: { p_societe: clientActif?.id ?? null } }).catch(() => []),
       api(`/rest/v1/campagne_documents?campagne=eq.${encodeURIComponent(campagne)}&order=ordre,libelle`).catch(() => []),
       api(`/rest/v1/precommande_obligatoires?campagne=eq.${encodeURIComponent(campagne)}&select=reference,ordre,note`).catch(() => []),
+      chargerDeadlinesPreco(campagne),
     ]);
     PRECO_PRODUITS = produits;
     PRECO_DOCUMENTS = documents || [];
@@ -6138,9 +6162,13 @@ function rendreVitrinePreco() {
 function rendreVitrineMarques(zone) {
   zone.hidden = false;
   const arg = v => JSON.stringify(v).replaceAll('"', "&quot;");
-  const tuile = (label, n, photo, onclick) => `<div class="vitrine-tuile${photo ? " photo" : ""}" onclick="${onclick}">
+  const tuile = (label, n, photo, onclick) => {
+    const e = etatDeadlinePreco(PRECO_DEADLINES.parMarque.get(label));
+    return `<div class="vitrine-tuile${photo ? " photo" : ""}" onclick="${onclick}">
       ${photo ? `<img class="fond" loading="lazy" src="${photo}" alt="">` : `<div class="corps"><div class="nom">${echapperHTML(label)}</div></div>`}
+      ${e ? `<div class="tuile-deadline ${e.ton}">${e.texte}</div>` : ""}
       <div class="voir">Voir ${echapperHTML(label)} <span>${n}</span></div></div>`;
+  };
   const compte = {};
   for (const p of PRECO_PRODUITS) if (p.marque) compte[p.marque] = (compte[p.marque] || 0) + 1;
   const marques = Object.keys(compte).sort((a, b) => compte[b] - compte[a] || a.localeCompare(b));
@@ -6195,7 +6223,7 @@ function rendreVitrineCategories(zone) {
       <div class="corps">
         <div class="sous">${echapperHTML(PRECO_COURANTE || "")}</div>
         <div class="grand">${echapperHTML(PRECO_MARQUE)}</div>
-        <div class="sous">${deLaMarque.length} références</div>
+        <div class="sous">${deLaMarque.length} références${(e => e ? ` · commandes ${e.texte}` : "")(etatDeadlinePreco(PRECO_DEADLINES.parMarque.get(PRECO_MARQUE)))}</div>
       </div>
       <div class="voir">Voir tout ${echapperHTML(PRECO_MARQUE)} <span>${deLaMarque.length}</span></div>
     </div>
@@ -7522,13 +7550,16 @@ async function rendreValidationPreco(campagne) {
   const dates = Object.keys(parDate).sort();
   const remise = remiseCompte();
   const net = ht * (1 - remise / 100);
-  const deadline = PRECO_INFOS?.deadline ? new Date(PRECO_INFOS.deadline).toLocaleDateString("fr-FR") : null;
+  await chargerDeadlinesPreco(campagne);
   const societe = clientActif?.nom ? `${clientActif.id_fastmag ? clientActif.id_fastmag + ") " : ""}${clientActif.nom}` : "votre magasin";
   const verrou = precoVerrouillee(envoi);
   const pa = panierActif();
   // assortiment obligatoire : ce qui manque (ou est à 0) dans ce qui sera transmis
   const marqueValid = panierParMarque() ? (lignes.map(l => produit(l.reference)?.marque).find(Boolean) || null) : null;
   const manquants = lignes.length ? obligatoiresAttendusPreco(marqueValid).filter(p => !refs.has(p.reference)) : [];
+  const dateLimite = deadlineMarquePreco(marqueValid || marquePanierPreco());
+  const deadline = dateLimite ? new Date(dateLimite + "T00:00:00").toLocaleDateString("fr-FR") : null;
+  const close = etatDeadlinePreco(dateLimite)?.reste < 0 && !estStaff;
 
   vue.innerHTML = `
     <div class="col-tete">
@@ -7543,7 +7574,7 @@ async function rendreValidationPreco(campagne) {
               precoVerrouillee(m.envoi) ? (m.envoi.statut === "integree" ? " — intégrée" : " — validée") : m.envoi ? " — transmise" : m.pieces > 0 ? ` — ${m.pieces} pièces saisies` : " — rien de saisi"}</option>`).join("")}
           </select></label>` : echapperHTML(societe)}
         · ${rendreSelecteurPanierPreco()}${
-        deadline ? ` · à transmettre avant le <b>${deadline}</b>` : ""}</div>
+        deadline ? ` · ${close ? `<b style="color:#a3341f">précommande ${echapperHTML(marqueValid || marquePanierPreco() || "")} close depuis le ${deadline}</b>` : `à transmettre au plus tard le <b>${deadline}</b>`}` : ""}</div>
     </div>
     <div class="valid-preco">
       ${verrou ? `<div class="valid-info verrou"><b>Précommande n° ${envoi.numero} ${envoi.statut === "integree" ? "intégrée en Fastmag" : "validée par Footkorner"}</b>
@@ -8409,6 +8440,7 @@ async function rendreTableauBordPreco(campagne) {
   // arrivé du back-office filtré sur une marque : le tableau de bord s'ouvre sur cette marque
   TB_PRECO.marques = PRECO_ADMIN_MARQUE && PRECO_ADMIN_CAMPAGNE === TB_PRECO.campagne ? [PRECO_ADMIN_MARQUE] : [];
   TB_PRECO.listeMarques = [];
+  await chargerDeadlinesPreco(TB_PRECO.campagne);
   rendrePerimetreTB();
   await chargerTableauBordPreco();
 }
@@ -8635,7 +8667,7 @@ function tbRecapMarques(liste) {
   const cpt = v => n(v) ? `<b>${tbNb(v)}</b>` : `<span style="opacity:.3">—</span>`;
   const ligne = r => `<tr class="tb-marque${TB_PRECO.marques.includes(r.marque) ? " on" : ""}" style="cursor:pointer" title="Filtrer le tableau de bord sur ${echapperHTML(r.marque)}"
       onclick="choisirMarqueTB(${JSON.stringify(r.marque).replaceAll('"', "&quot;")})">
-    <td class="lib"><b>${echapperHTML(r.marque)}</b></td>
+    <td class="lib"><b>${echapperHTML(r.marque)}</b>${(e => e ? `<br><span class="sous">${e.texte}</span>` : "")(etatDeadlinePreco(PRECO_DEADLINES.parMarque.get(r.marque)))}</td>
     <td class="num">${tbNb(r.refs_prises)} / ${tbNb(r.refs_offertes)}</td>
     <td class="num">${tbNb(r.magasins_saisi)}</td><td class="num">${tbNb(r.magasins_transmis)}</td>
     <td class="num">${cpt(r.paniers_brouillon)}${n(r.montant_brouillon) ? `<small>${eur(n(r.montant_brouillon))}</small>` : ""}</td>
