@@ -14027,7 +14027,8 @@ function memoriserRea() {
     JSON.stringify({ magasin: REA.magasin, selection: REA.selection, saisie: REA.saisie })); }
   catch (e) { /* sans mémoire locale */ }
 }
-const reaSucc = () => DASH.magasins.filter(m => m.groupe === "SUCC");
+// succursales ET franchises (décision Anthony 20/11/2026) : le réassort part au code client Fastmag du magasin, au prix de gros
+const reaSucc = () => DASH.magasins.filter(m => m.groupe === "SUCC" || m.groupe === "FRANCHISE");
 const reaDansSelection = ref => REA.selection.includes(ref);
 const reaPieces = () => Object.values(REA.saisie).reduce((s, q) => s + (Number(q) || 0), 0);
 
@@ -14096,7 +14097,7 @@ async function rendreReassort() {
   const succ = reaSucc();
   if (!succ.length) {
     vue.innerHTML = `<div class="col-tete"><h1>RÉASSORT</h1>
-      <div class="compte-produits">Le réassort est réservé aux succursales.</div></div>`;
+      <div class="compte-produits">Le réassort est réservé aux magasins du réseau (succursales et franchises).</div></div>`;
     return;
   }
   // jamais de magasin choisi d'office parmi plusieurs : c'est lui qui fixe le code client Fastmag
@@ -14110,7 +14111,7 @@ async function rendreReassort() {
         (critère <b>REAMANU</b> + date du jour).</div>
       <div class="dash-ligne" style="margin-top:10px">
         <span class="compte-produits" style="margin:0">Magasin livré :</span>
-        ${succ.map(m => `<button class="puce-claire dash-chip${m.code === REA.magasin ? " on" : ""}"
+        ${succ.map((m, i) => `${i && m.groupe !== succ[i - 1].groupe ? `<span class="compte-produits" style="margin:0 4px 0 10px">Franchises :</span>` : ""}<button class="puce-claire dash-chip${m.code === REA.magasin ? " on" : ""}"
             onclick="choisirMagasinRea('${echapperHTML(m.code)}')">${echapperHTML(m.nom || m.code)}</button>`).join("")}
       </div>
     </div>`;
