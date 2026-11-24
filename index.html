@@ -12453,7 +12453,7 @@ async function lancerCalculReporting() {
    Tout le calcul et les droits sont dans les fonctions SQL pilotage_* ; ici on choisit le périmètre et on affiche.
    Les ventes détaillées arrivent seules chaque jour (Fastmag → SFTP → relève automatique). */
 let PIL = { onglet: "remises", choisis: [], periode: "mois", etat: "attente", dims: "marques", donnees: null, chargement: 0,
-            top: null, topTri: "pieces", topVue: "tout", topVoir: 50, topCat: null, topRecherche: "", parts: null, partsDim: "marques", partsTout: false, stocks: null, stocksDim: "marques", stocksTout: false, stocksDormVoir: 20, arrivages: null, arrVoir: 30, arrFiltre: "tout", du: null, au: null,
+            top: null, topTri: "pieces", topVue: "tout", topVoir: 50, topCat: null, topRecherche: "", groupe: "SUCC", parts: null, partsDim: "marques", partsTout: false, stocks: null, stocksDim: "marques", stocksTout: false, stocksDormVoir: 20, arrivages: null, arrVoir: 30, arrFiltre: "tout", du: null, au: null,
             lignes: null, voirTout: { bas: false, offert: false }, erreur: null };
 const PIL_PERIODES = [["s-1", "Semaine dernière"], ["mois", "Mois en cours"], ["mois-1", "Mois précédent"], ["35j", "35 derniers jours"]];
 const PIL_APERCU = 15;
@@ -12473,7 +12473,16 @@ function pilDates(periode) {
   return { du: jour(new Date(Date.UTC(d.getFullYear(), d.getMonth() - 1, 1))), au: jour(new Date(Date.UTC(d.getFullYear(), d.getMonth(), 0))) };
 }
 // uniquement les succursales : ni le web, ni les franchises, y compris dans les comparatifs (le « réseau » = les succursales)
-const pilMagasins = () => DASH.magasins.filter(m => m.groupe === "SUCC");
+// (bascule Succursales / Franchises : chaque groupe n'est comparé qu'à lui-même)
+const PIL_GROUPES = [["SUCC", "Succursales"], ["FRANCHISE", "Franchises"]];
+const pilGroupes = () => PIL_GROUPES.filter(([g]) => DASH.magasins.some(m => m.groupe === g));
+const pilMagasins = () => DASH.magasins.filter(m => m.groupe === PIL.groupe);
+const pilMot = maj => PIL.groupe === "FRANCHISE" ? (maj ? "Franchises" : "franchises") : (maj ? "Succursales" : "succursales");
+function pilGroupe(g) {
+  if (g === PIL.groupe) return;
+  Object.assign(PIL, { groupe: g, choisis: [], lignes: null, donnees: null, top: null, parts: null, stocks: null, arrivages: null, topCat: null, topRecherche: "" });
+  rendrePilotage();
+}
 const pilSeul = () => PIL.choisis.length === 1 ? PIL.choisis[0] : (pilMagasins().length === 1 ? pilMagasins()[0].code : null);
 
 async function rendrePilotage() {
@@ -12483,16 +12492,17 @@ async function rendrePilotage() {
     const souci = await chargerMagasinsDash();
     if (souci) { vue.innerHTML = `<div class="col-tete"><h1>PILOTAGE SECTEUR</h1><div class="compte-produits">${souci}</div></div>`; return; }
   }
+  if (!pilMagasins().length && pilGroupes().length) PIL.groupe = pilGroupes()[0][0];
   if (!pilMagasins().length) {
-    vue.innerHTML = `<div class="col-tete"><h1>PILOTAGE SECTEUR</h1><div class="compte-produits">Cette page suit les succursales : aucune ne vous est ouverte.</div></div>`;
+    vue.innerHTML = `<div class="col-tete"><h1>PILOTAGE SECTEUR</h1><div class="compte-produits">Cette page suit les succursales et les franchises : aucune ne vous est ouverte.</div></div>`;
     return;
   }
   PIL.choisis = PIL.choisis.filter(c => pilMagasins().some(m => m.code === c));
   vue.innerHTML = `
     <div class="pil-tete">
-      <div><p class="pil-surtitre">Footkorner · Succursales</p>
+      <div><p class="pil-surtitre">Footkorner · ${pilMot(true)}</p>
         <h1>Pilotage <em>secteur</em></h1></div>
-      <div class="pil-chapo">Vos succursales, comparées entre elles et à l'ensemble des succursales. Les ventes arrivent seules chaque jour depuis Fastmag.</div>
+      <div class="pil-chapo">Vos ${pilMot()}, comparées entre elles et à l'ensemble des ${pilMot()}. Les ventes arrivent seules chaque jour depuis Fastmag.</div>
     </div>
     <div class="pil">
       <nav class="pil-onglets" id="pil-onglets"></nav>
@@ -12510,6 +12520,10 @@ function dessinerPilFiltres() {
   const mags = pilMagasins(), groupes = [...new Set(mags.map(m => m.groupe).filter(Boolean))];
   const { du, au } = pilDates(PIL.periode);
   zone.innerHTML = `
+    ${pilGroupes().length > 1 ? `<div class="dash-ligne">
+      <span class="compte-produits" style="margin:0">Réseau :</span>
+      ${pilGroupes().map(([g, lib]) => `<button class="puce-claire dash-chip${PIL.groupe === g ? " on" : ""}" onclick="pilGroupe('${g}')">${lib} · ${DASH.magasins.filter(m => m.groupe === g).length}</button>`).join("")}
+    </div>` : ""}
     ${mags.length > 1 ? `<div class="dash-ligne">
       <span class="compte-produits" style="margin:0">Magasins :</span>
       <button class="puce-claire dash-chip${PIL.choisis.length ? "" : " on"}" onclick="pilChoisir([])">Tous · ${mags.length}</button>
@@ -12546,7 +12560,7 @@ async function chargerPilotage() {
   corps.innerHTML = `<div class="pil-vide">Chargement…</div>`;
   PIL.voirTout = { bas: false, offert: false };
   let d;
-  try { d = await api("/rest/v1/rpc/pilotage_remises", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au } }); }
+  try { d = await api("/rest/v1/rpc/pilotage_remises", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au, p_groupe: PIL.groupe } }); }
   catch (e) {
     if (jeton !== PIL.chargement) return;
     corps.innerHTML = `<div class="pil-vide">Chargement impossible : ${echapperHTML((e.donnees?.message || e.message || "").slice(0, 200))}</div>`;
@@ -12583,15 +12597,15 @@ function dessinerPilotage() {
   const txSel = pilTaux(sel), txRes = pilTaux(res);
   const rang = cle => moi ? [...mags].sort((a, b) => (b[cle] ?? -1) - (a[cle] ?? -1)).findIndex(x => x === moi) + 1 : null;
   const ecart = (v, ref) => v == null || ref == null ? "" : `${v - ref >= 0 ? "+" : "−"}${Math.abs(v - ref).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} pt`;
-  const cmp = (v, ref, cle) => toutLeReseau ? "" : `succursales <b>${pilPct(ref)}</b> · ${ecart(v, ref)}${moi ? ` · <b>${pilOrdinal(rang(cle))}</b> sur ${mags.length}` : ""}`;
+  const cmp = (v, ref, cle) => toutLeReseau ? "" : `${pilMot()} <b>${pilPct(ref)}</b> · ${ecart(v, ref)}${moi ? ` · <b>${pilOrdinal(rang(cle))}</b> sur ${mags.length}` : ""}`;
   const p20 = pilPart(sel.p_fort, sel.pieces), t20 = pilPart(sel.tk_fort, sel.tk);
   const carte = (val, lib, note, cle) => `<div class="pil-kpi${cle ? " cle" : ""}"><div class="val">${val}</div><div class="lib">${lib}</div><div class="note">${note}</div></div>`;
   const seuil = Number(d.seuil) || 20;
   corps.innerHTML = `
     <section class="pil-kpis">
       ${carte(pilPct(txSel), "Taux de remise", cmp(txSel, txRes, "tx") || "prix payé contre prix de vente de base", true)}
-      ${carte(pilEur(sel.base - sel.ca), "Montant remisé", toutLeReseau ? "hors articles offerts dès 100 € de ticket" : `<b>${pilPct(pilPart(sel.base - sel.ca, res.base - res.ca))}</b> de la remise des succursales`)}
-      ${carte(pilEur(sel.ca), "CA TTC", toutLeReseau ? `${pilNb(sel.pieces)} pièces vendues` : `<b>${pilPct(pilPart(sel.ca, res.ca))}</b> du CA des succursales${moi ? ` · ${pilOrdinal(rang("ca"))} sur ${mags.length}` : ""}`)}
+      ${carte(pilEur(sel.base - sel.ca), "Montant remisé", toutLeReseau ? "hors articles offerts dès 100 € de ticket" : `<b>${pilPct(pilPart(sel.base - sel.ca, res.base - res.ca))}</b> de la remise des ${pilMot()}`)}
+      ${carte(pilEur(sel.ca), "CA TTC", toutLeReseau ? `${pilNb(sel.pieces)} pièces vendues` : `<b>${pilPct(pilPart(sel.ca, res.ca))}</b> du CA des ${pilMot()}${moi ? ` · ${pilOrdinal(rang("ca"))} sur ${mags.length}` : ""}`)}
       ${carte(pilPct(p20), `Pièces à −${seuil} % et plus`, cmp(p20, pilPart(res.p_fort, res.pieces), "p20") || `${pilNb(sel.p_fort)} pièces sur ${pilNb(sel.pieces)}`)}
       ${carte(pilPct(t20), `Tickets avec une remise ≥ ${seuil} %`, cmp(t20, pilPart(res.tk_fort, res.tk), "t20") || `${pilNb(sel.tk_fort)} tickets sur ${pilNb(sel.tk)}`)}
     </section>
@@ -12600,8 +12614,8 @@ function dessinerPilotage() {
     <section class="pil-grille">
       <div class="pil-carte">
         <h2>Remise par magasin</h2>
-        <div class="pil-aide">Écart entre le prix de vente de base et le prix payé, du plus fort au plus faible. Le trait pointillé est la moyenne des succursales
-          (${pilPct(txRes)}). Cliquez sur un magasin pour le comparer aux autres succursales.</div>
+        <div class="pil-aide">Écart entre le prix de vente de base et le prix payé, du plus fort au plus faible. Le trait pointillé est la moyenne des ${pilMot()}
+          (${pilPct(txRes)}). Cliquez sur un magasin pour le comparer aux autres ${pilMot()}.</div>
         ${pilBarresMagasins(mags, txRes, seul)}
       </div>
       <div>
@@ -12655,14 +12669,14 @@ function pilBlocPosition(moi, mags, res) {
     const r = [...mags].sort((a, b) => (b[cle] ?? -1) - (a[cle] ?? -1)).findIndex(x => x === moi) + 1;
     return `<div class="pil-pos"><div class="lib2">${lib}<small>${aide}</small></div>
       <div class="pil-rail">${mags.filter(m => m !== moi && m[cle] != null).map(m => `<i style="left:${pos(m[cle])}%" title="${echapperHTML(m.nom || "Autre magasin")} : ${fmt(m[cle])}"></i>`).join("")}
-        <span class="moy" style="left:${pos(Math.min(Math.max(moy, min), max))}%" title="Moyenne des succursales : ${fmt(moy)}"></span>
+        <span class="moy" style="left:${pos(Math.min(Math.max(moy, min), max))}%" title="Moyenne des ${pilMot()} : ${fmt(moy)}"></span>
         <span class="moi" style="left:${pos(moi[cle])}%" title="${echapperHTML(moi.nom)} : ${fmt(moi[cle])}"></span></div>
-      <div class="rang"><b>${fmt(moi[cle])}</b> · ${pilOrdinal(r)} sur ${mags.length}<br><span style="color:#8a8a8a;font-size:12px">succursales : ${fmt(moy)}</span></div></div>
+      <div class="rang"><b>${fmt(moi[cle])}</b> · ${pilOrdinal(r)} sur ${mags.length}<br><span style="color:#8a8a8a;font-size:12px">${pilMot()} : ${fmt(moy)}</span></div></div>
       <div class="pil-bornes"><div></div><div><span>${fmt(min)}</span><span>${fmt(max)}</span></div><div></div></div>`;
   };
   return `<section class="pil-carte">
-    <h2>Où se situe ${echapperHTML(moi.nom)} parmi les succursales</h2>
-    <div class="pil-aide">Le point orange est le magasin, les points gris sont les ${mags.length - 1} autres succursales, le trait pointillé est leur moyenne.
+    <h2>Où se situe ${echapperHTML(moi.nom)} parmi les ${pilMot()}</h2>
+    <div class="pil-aide">Le point orange est le magasin, les points gris sont les ${mags.length - 1} autres ${pilMot()}, le trait pointillé est leur moyenne.
       Le rang va de la valeur la plus forte (1er) à la plus faible (${pilOrdinal(mags.length)}).
       <a style="text-decoration:underline;cursor:pointer" onclick="pilChoisir([])">Revenir à tous mes magasins</a></div>
     ${lignes.map(rail).join("")}</section>`;
@@ -12817,7 +12831,7 @@ async function chargerPilTop() {
   corps.innerHTML = `<div class="pil-vide">Chargement…</div>`;
   let d;
   try { d = await api("/rest/v1/rpc/pilotage_top_produits", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au,
-                                                                        p_recherche: PIL.topRecherche.trim().length >= 2 ? PIL.topRecherche.trim() : null } }); }
+                                                                        p_recherche: PIL.topRecherche.trim().length >= 2 ? PIL.topRecherche.trim() : null, p_groupe: PIL.groupe } }); }
   catch (e) {
     if (jeton !== PIL.chargement) return;
     corps.innerHTML = `<div class="pil-vide">Chargement impossible : ${echapperHTML((e.donnees?.message || e.message || "").slice(0, 200))}</div>`;
@@ -12877,8 +12891,8 @@ function dessinerPilTop() {
   const carte = (val, lib, note, cle) => `<div class="pil-kpi${cle ? " cle" : ""}"><div class="val">${val}</div><div class="lib">${lib}</div><div class="note">${note}</div></div>`;
   corps.innerHTML = `
     <section class="pil-kpis">
-      ${carte(pilNb(tot.pieces), "Pièces vendues", partiel ? `<b>${pilPct(pilPart(tot.pieces, res.pieces))}</b> des ventes des succursales` : `en ${Number(d.semaines).toLocaleString("fr-FR")} semaines`, true)}
-      ${carte(pilEur(tot.ca), "CA TTC", partiel ? `<b>${pilPct(pilPart(tot.ca, res.ca))}</b> du CA des succursales` : "ventes moins retours")}
+      ${carte(pilNb(tot.pieces), "Pièces vendues", partiel ? `<b>${pilPct(pilPart(tot.pieces, res.pieces))}</b> des ventes des ${pilMot()}` : `en ${Number(d.semaines).toLocaleString("fr-FR")} semaines`, true)}
+      ${carte(pilEur(tot.ca), "CA TTC", partiel ? `<b>${pilPct(pilPart(tot.ca, res.ca))}</b> du CA des ${pilMot()}` : "ventes moins retours")}
       ${carte(pilNb(tot.refs), "Références vendues", "au moins une pièce sur la période")}
       ${carte(pilPct(pilPart(top10, tot.pieces)), "Poids du top 10", `${pilNb(top10)} pièces sur ${pilNb(tot.pieces)}`)}
       ${carte(`${ruptures + tendus}`, "Top 50 sous tension", `<b>${ruptures}</b> en rupture dans un magasin au moins · <b>${tendus}</b> à moins de 2 semaines`)}
@@ -12976,7 +12990,7 @@ function dessinerPilTopListe() {
     const montre = P.slice(0, PIL.topVoir);
     zone.innerHTML = `<div class="pil-defile"><table class="pil-table"><thead><tr><th class="num">#</th><th></th><th>Produit</th><th>Marque</th><th>Rayon</th>
         <th class="num">Pièces</th><th class="num">Évol.</th><th class="num">CA TTC</th><th class="num">Remise</th><th class="num">ROS</th>
-        ${partiel ? `<th class="num">ROS succ.</th>` : ""}<th class="num">Mag. vendeurs</th><th class="num">Stock</th><th class="num">À venir</th><th class="num">Couverture</th><th class="num">Central</th></tr></thead>
+        ${partiel ? `<th class="num">ROS ${PIL.groupe === "FRANCHISE" ? "franch." : "succ."}</th>` : ""}<th class="num">Mag. vendeurs</th><th class="num">Stock</th><th class="num">À venir</th><th class="num">Couverture</th><th class="num">Central</th></tr></thead>
       <tbody>${montre.map((p, i) => `<tr><td class="num">${i + 1}</td><td class="pil-photo">${pilVignette(p)}</td>
         <td>${echapperHTML(p.designation || "")}<br><span class="pil-ref">${echapperHTML(p.reference)}</span></td><td>${echapperHTML(p.marque || "")}</td><td>${echapperHTML(pilCat(p.categorie))}</td>
         <td class="num"><b>${pilNb(p.pieces)}</b></td>
@@ -13010,7 +13024,7 @@ function exporterPilTop() {
   const { du, au } = pilDates(PIL.periode), P = pilTopTries();
   telechargerXlsx(`PILOTAGE_TOP_PRODUITS_${du.replace(/-/g, "")}_${au.replace(/-/g, "")}.xlsx`, [{
     nom: "Top produits", gras: [1], figer: 1, largeurs: [6, 18, 34, 16, 14, 10, 12, 12, 10, 8, 12, 12, 10, 10, 12, 14, 12, 12, 14, 40],
-    lignes: [["Rang", "Référence", "Désignation", "Marque", "Rayon", "Pièces", "Pièces période précédente", "CA TTC", "Remise %", "ROS", "ROS succursales", "Magasins vendeurs", "Stock magasins", "En transit", "En préparation", "Couverture (semaines)", "Stock central", "Magasins en rupture", "Magasins à moins de 2 sem.", "Détail ruptures"],
+    lignes: [["Rang", "Référence", "Désignation", "Marque", "Rayon", "Pièces", "Pièces période précédente", "CA TTC", "Remise %", "ROS", "ROS " + pilMot(), "Magasins vendeurs", "Stock magasins", "En transit", "En préparation", "Couverture (semaines)", "Stock central", "Magasins en rupture", "Magasins à moins de 2 sem.", "Détail ruptures"],
       ...P.map((p, i) => [i + 1, p.reference, p.designation || "", p.marque || "", pilCat(p.categorie), p.pieces, Number(p.pieces_avant) || 0, p.ca, p.remise == null ? "" : Number(p.remise),
         p.ros, p.ros_reseau, Number(p.nmag) || 0, p.stock, Number(p.transit) || 0, Number(p.preparation) || 0, p.couv == null ? "" : Math.round(p.couv * 10) / 10, p.central, p.magRupture, p.magTendu, (p.mags_rupture || []).join(", ")])] }]);
 }
@@ -13038,7 +13052,7 @@ async function chargerPilParts() {
   const { du, au } = pilDates(PIL.periode), jeton = ++PIL.chargement;
   corps.innerHTML = `<div class="pil-vide">Chargement…</div>`;
   let d;
-  try { d = await api("/rest/v1/rpc/pilotage_parts", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au } }); }
+  try { d = await api("/rest/v1/rpc/pilotage_parts", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au, p_groupe: PIL.groupe } }); }
   catch (e) {
     if (jeton !== PIL.chargement) return;
     corps.innerHTML = `<div class="pil-vide">Chargement impossible : ${echapperHTML((e.donnees?.message || e.message || "").slice(0, 200))}</div>`;
@@ -13130,11 +13144,11 @@ function dessinerPilPartsDetail() {
   const montre = PIL.partsTout ? L : L.slice(0, 20);
   const delta = (v, ref) => v == null || ref == null ? "—" : `<span class="pil-delta ${v - ref >= 0 ? "haut" : "bas"}">${v - ref >= 0 ? "▲" : "▼"} ${pilPts(v - ref).replace(/^[+−]/, "")}</span>`;
   zone.innerHTML = `<h2>Le détail</h2>
-    <div class="pil-aide">La part est le poids dans le CA TTC de ${partiel ? "vos magasins choisis" : "l'ensemble des succursales"}.${aN1 ? " L'évolution compare cette part à celle de la même période l'an dernier, en points." : ""}</div>
+    <div class="pil-aide">La part est le poids dans le CA TTC de ${partiel ? "vos magasins choisis" : "l'ensemble des " + pilMot()}.${aN1 ? " L'évolution compare cette part à celle de la même période l'an dernier, en points." : ""}</div>
     <div class="pil-bascule">${[["marques", "Par marque"], ["rayons", "Par rayon"], ["familles", "Par famille"]].map(([k, lib]) =>
       `<button class="${PIL.partsDim === k ? "on" : ""}" onclick="PIL.partsDim = '${k}'; PIL.partsTout = false; dessinerPilPartsDetail()">${lib}</button>`).join("")}</div>
     <div class="pil-defile"><table class="pil-table"><thead><tr><th>${PIL.partsDim === "marques" ? "Marque" : PIL.partsDim === "rayons" ? "Rayon" : "Famille"}</th>
-      <th class="num">Pièces</th><th class="num">CA TTC</th><th class="num">Part du CA</th>${partiel ? `<th class="num">Part succursales</th>` : ""}
+      <th class="num">Pièces</th><th class="num">CA TTC</th><th class="num">Part du CA</th>${partiel ? `<th class="num">Part ${pilMot()}</th>` : ""}
       ${aN1 ? `<th class="num">Part l'an dernier</th><th class="num">Évolution</th>` : ""}<th class="num">Marge HT</th><th class="num">Part de la marge</th><th class="num">Taux de marge</th></tr></thead>
       <tbody>${montre.map(x => `<tr><td>${PIL.partsDim === "marques" ? pilLogo(x.nom, "pil-logo-mini") : ""}${echapperHTML(x.nom)}</td><td class="num">${pilNb(x.pieces)}</td><td class="num">${pilEur(x.ca)}</td>
         <td class="num"><b>${pilPct(x.part)}</b></td>${partiel ? `<td class="num">${pilPct(x.partRes)}</td>` : ""}
@@ -13148,7 +13162,7 @@ function exporterPilParts() {
   if (!d || !Number(d.total?.ca)) { alert("Rien à exporter sur cette période."); return; }
   const { du, au } = pilDates(PIL.periode), arr = v => v == null ? "" : Math.round(v * 10) / 10;
   const feuille = (nom, entete, L) => ({ nom, gras: [1], figer: 1, largeurs: [28, 10, 14, 12, 16, 16, 14, 16, 14],
-    lignes: [[entete, "Pièces", "CA TTC", "Part du CA %", "Part succursales %", "Part an dernier %", "Marge HT", "Part de la marge %", "Taux de marge %"],
+    lignes: [[entete, "Pièces", "CA TTC", "Part du CA %", "Part " + pilMot() + " %", "Part an dernier %", "Marge HT", "Part de la marge %", "Taux de marge %"],
       ...[...L].sort((a, b) => b.ca - a.ca).map(x => [x.nom, x.pieces, x.ca, arr(x.part), arr(x.partRes), arr(x.partN1), x.marge, arr(x.partMarge), arr(x.tauxMarge)])] });
   telechargerXlsx(`PILOTAGE_PARTS_DE_MARCHE_${du.replace(/-/g, "")}_${au.replace(/-/g, "")}.xlsx`,
     [feuille("Par marque", "Marque", d.marques || []), feuille("Par rayon", "Rayon", d.rayons || []), feuille("Par famille", "Famille", d.familles || [])]);
@@ -13163,7 +13177,7 @@ async function chargerPilStocks() {
   const { du, au } = pilDates(PIL.periode), jeton = ++PIL.chargement;
   corps.innerHTML = `<div class="pil-vide">Chargement…</div>`;
   let d;
-  try { d = await api("/rest/v1/rpc/pilotage_stocks", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au } }); }
+  try { d = await api("/rest/v1/rpc/pilotage_stocks", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au, p_groupe: PIL.groupe } }); }
   catch (e) {
     if (jeton !== PIL.chargement) return;
     corps.innerHTML = `<div class="pil-vide">Chargement impossible : ${echapperHTML((e.donnees?.message || e.message || "").slice(0, 200))}</div>`;
@@ -13198,7 +13212,7 @@ function dessinerPilStocks() {
   if (!t.pieces) { corps.innerHTML = `<div class="pil-vide" style="padding:26px 0">Aucun stock connu pour ce périmètre.</div>`; return; }
   const partiel = Number(d.nb_selection) < Number(d.nb_reseau);
   const mags = (d.magasins || []).filter(m => m.code), seul = pilSeul();
-  const cmp = (v, ref, unite) => !partiel || v == null || ref == null ? "" : `succursales <b>${unite === "sem" ? pilSem(ref) : pilPct(ref)}</b>`;
+  const cmp = (v, ref, unite) => !partiel || v == null || ref == null ? "" : `${pilMot()} <b>${unite === "sem" ? pilSem(ref) : pilPct(ref)}</b>`;
   const carte = (val, lib, note, cle) => `<div class="pil-kpi${cle ? " cle" : ""}"><div class="val">${val}</div><div class="lib">${lib}</div><div class="note">${note}</div></div>`;
   const couleurs = new Map([...(d.marques || [])].slice(0, PIL_PALETTE.length).map((x, i) => [x.nom, PIL_PALETTE[i]]));
   const couleursRayons = new Map((d.rayons || []).map((x, i) => [x.nom, PIL_PALETTE[i % PIL_PALETTE.length]]));
@@ -13206,7 +13220,7 @@ function dessinerPilStocks() {
   const classeCouv = v => v == null ? "" : v > 26 ? "pil-etiquette orange" : "";
   corps.innerHTML = `
     <section class="pil-kpis">
-      ${carte(pilEur(t.valeur), "Valeur du stock", partiel ? `<b>${pilPct(pilPart(t.valeur, res.valeur))}</b> du stock des succursales` : "au prix d'achat", true)}
+      ${carte(pilEur(t.valeur), "Valeur du stock", partiel ? `<b>${pilPct(pilPart(t.valeur, res.valeur))}</b> du stock des ${pilMot()}` : "au prix d'achat", true)}
       ${carte(pilNb(t.pieces), "Pièces en stock", `${pilNb(t.refs)} références${Number(d.a_venir) > 0 ? ` · <b>+${pilNb(d.a_venir)}</b> à venir` : ""}`)}
       ${carte(pilSem(t.couv), "Couverture", cmp(t.couv, res.couv, "sem") || `au rythme des ${Number(d.semaines).toLocaleString("fr-FR")} dernières semaines`)}
       ${carte(pilPct(t.pctDormant), "Stock dormant", `<b>${pilEur(t.dormant_v)}</b>${partiel ? ` · ${cmp(t.pctDormant, res.pctDormant)}` : " sans aucune vente sur la période"}`)}
@@ -13258,13 +13272,13 @@ function dessinerPilStocksDormants() {
   zone.innerHTML = `<h2>Stock dormant <span class="pil-compte">${pilEur(d.total?.dormant_v)}</span></h2>
     <div class="pil-aide">Les produits qui immobilisent le plus de valeur sans se vendre : en stock dans un magasin qui n'en a écoulé aucune pièce
       du ${new Date(d.du).toLocaleDateString("fr-FR")} au ${new Date(d.au).toLocaleDateString("fr-FR")}.
-      Le <b>ROS des succursales</b> est celui de tous les magasins qui ont le produit (pièces vendues par semaine et par magasin détenteur) :
+      Le <b>ROS des ${pilMot()}</b> est celui de tous les magasins qui ont le produit (pièces vendues par semaine et par magasin détenteur) :
       s'il est correct, le produit <b>se vend ailleurs</b> et mérite un transfert ; s'il est nul, il <b>dort partout</b> et il faut l'animer ou le solder.</div>
     <div class="pil-bascule">${[["tout", "Tout"], ["vend", "Se vend ailleurs"], ["partout", "Dort partout"]].map(([k, lib]) =>
       `<button class="${(PIL.stocksDormFiltre || "tout") === k ? "on" : ""}" onclick="PIL.stocksDormFiltre = '${k}'; PIL.stocksDormVoir = 20; dessinerPilStocksDormants()">${lib}</button>`).join("")}</div>
     ${L.length ? `<div class="pil-defile"><table class="pil-table"><thead><tr><th></th><th>Produit</th><th>Marque</th><th>Saison</th>
         <th class="num">Pièces dormantes</th><th class="num">Valeur</th><th class="num">Magasins où ça dort</th>
-        <th class="num">ROS des succursales</th><th class="num">Magasins qui le vendent</th><th class="num">Vendu ailleurs</th><th>Verdict</th></tr></thead>
+        <th class="num">ROS des ${pilMot()}</th><th class="num">Magasins qui le vendent</th><th class="num">Vendu ailleurs</th><th>Verdict</th></tr></thead>
       <tbody>${montre.map(p => `<tr><td class="pil-photo">${pilVignette(p)}</td><td>${echapperHTML(p.designation || "")}<br><span class="pil-ref">${echapperHTML(p.reference)}</span></td>
         <td>${echapperHTML(p.marque || "")}</td><td>${echapperHTML(p.saison || "")}</td><td class="num">${pilNb(p.pieces)}</td>
         <td class="num"><b>${pilEur(p.valeur)}</b></td><td class="num">${pilNb(p.nmag)}</td>
@@ -13286,7 +13300,7 @@ function exporterPilStocks() {
     feuille("Par magasin", "Magasin", (d.magasins || []).filter(m => m.code)), feuille("Par marque", "Marque", d.marques || []),
     feuille("Par rayon", "Rayon", d.rayons || []), feuille("Par saison", "Saison", d.saisons || []),
     { nom: "Stock dormant", gras: [1], figer: 1, largeurs: [18, 34, 16, 12, 14, 14, 16, 16, 18, 16, 20, 16],
-      lignes: [["Référence", "Désignation", "Marque", "Saison", "Pièces dormantes", "Valeur", "Magasins où ça dort", "ROS des succursales", "Magasins qui le vendent", "Magasins qui l'ont", "Vendu dans les succursales", "Verdict"],
+      lignes: [["Référence", "Désignation", "Marque", "Saison", "Pièces dormantes", "Valeur", "Magasins où ça dort", "ROS des " + pilMot(), "Magasins qui le vendent", "Magasins qui l'ont", "Vendu dans les " + pilMot(), "Verdict"],
         ...(d.dormants || []).map(p => [p.reference, p.designation || "", p.marque || "", p.saison || "", p.pieces, p.valeur, p.nmag, p.ros_reseau, p.mag_vendeurs, p.mag_detenteurs, p.vendu_reseau,
           p.ailleurs === "vend" ? "Se vend ailleurs" : p.ailleurs === "partout" ? "Dort partout" : "Peu vendu"])] }]);
 }
@@ -13300,7 +13314,7 @@ async function chargerPilArrivages() {
   const { du, au } = pilDates(PIL.periode), jeton = ++PIL.chargement;
   corps.innerHTML = `<div class="pil-vide">Chargement…</div>`;
   let d;
-  try { d = await api("/rest/v1/rpc/pilotage_arrivages", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au } }); }
+  try { d = await api("/rest/v1/rpc/pilotage_arrivages", { corps: { p_magasins: PIL.choisis.length ? PIL.choisis : null, p_du: du, p_au: au, p_groupe: PIL.groupe } }); }
   catch (e) {
     if (jeton !== PIL.chargement) return;
     corps.innerHTML = `<div class="pil-vide">Chargement impossible : ${echapperHTML((e.donnees?.message || e.message || "").slice(0, 200))}</div>`;
