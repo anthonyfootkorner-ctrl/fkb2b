@@ -1088,12 +1088,18 @@ async function executerStockMagasins(analyse, surProgres) {
   }
   // le fichier porte plusieurs lignes par taille (prix d'achat différents) et des
   // quantités négatives : on somme d'abord, on ne garde que ce qui reste en rayon
+  const connus = await magasinsConnus();
   const rows = garderMagasinsConnus([...parCle.values()].filter(r => r.quantite > 0).map(({ valeur, ...r }) => ({
-    ...r, prix_achat: valeur > 0 ? Math.round(100 * valeur / r.quantite) / 100 : null })), await magasinsConnus(), surProgres);
+    ...r, prix_achat: valeur > 0 ? Math.round(100 * valeur / r.quantite) / 100 : null })), connus, surProgres);
+  // magasins du fichier (même ceux dont tout le stock est à zéro) : eux seuls sont remplacés
+  const magasinsFichier = [...new Set([...parCle.values()].map(r => r.magasin))].filter(m => connus.has(m)).sort();
   if (!rows.length) throw new Error("aucune ligne de stock boutique exploitable (CENTRAL et WEB sont ignorés)");
-  surProgres(`remplacement de la photo précédente… (${ignorees} ligne${ignorees > 1 ? "s" : ""} CENTRAL/WEB ignorée${ignorees > 1 ? "s" : ""})`);
+  surProgres(`remplacement du stock de ${magasinsFichier.length} magasins… (${ignorees} ligne${ignorees > 1 ? "s" : ""} CENTRAL/WEB ignorée${ignorees > 1 ? "s" : ""})`);
+  // Seuls les magasins présents dans le fichier sont remplacés : l'export quotidien ne couvre pas tout le
+  // réseau, et il effaçait le stock des franchises chargé par l'export complet (24/11/2026).
   // écriture directe : la table n'est ouverte en écriture qu'aux comptes qui importent (peut_importer)
-  await api("/rest/v1/stock_magasins?quantite=gte.-2147483647", { methode: "DELETE" });
+  const listeMag = "(" + magasinsFichier.map(m => `"${m}"`).join(",") + ")";
+  await api(`/rest/v1/stock_magasins?magasin=in.${encodeURIComponent(listeMag)}`, { methode: "DELETE" });
   let total = 0;
   for (let i = 0; i < rows.length; i += 2000) {
     const lot = rows.slice(i, i + 2000);
